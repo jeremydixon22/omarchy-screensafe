@@ -10,7 +10,8 @@ stage = "screen"
 fps = 24
 fade = 0
 background = "black"
-preview = 8
+# Keep the thumbnail moment inside even the shortest "Each photo" choice (5 s).
+preview = 4
 
 [[setting]]
 name = "source"
