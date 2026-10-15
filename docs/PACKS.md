@@ -133,6 +133,8 @@ A child without a `count` of its own shares its group's `i`, `n` and `k`. A chil
 
 Numbers in text are rounded to whole numbers unless given a format after `;`: `{x; 3}` pads to 3 characters with spaces, `{x; 03}` with zeros, and `{x; .2}` shows two decimals (up to 6). Write `{{` and `}}` for literal braces.
 
+Five words in braces show the clock's names rather than a number: `{zone}`, the time zone's abbreviation (`CEST`); `{zone_name}`, its name (`Europe/Berlin`); `{offset}`, its offset from UTC (`+02:00`); `{weekday_name}` (`Thursday`) and `{month_name}` (`January`). So a clock is `text = "{hour; 02}:{minute; 02} {zone}"`. See [the clock](#the-clock).
+
 Text uses JetBrains Mono, bundled with ScreenSafe, unless it names one of the pack's own fonts. A pack can bring up to 4, as TrueType or OpenType files of up to 4 MiB each, named in a `[fonts]` table:
 
 ```toml
@@ -183,18 +185,26 @@ A filled rectangle `w` by `h` (default 0.1 by 0.1), centered on its origin, in `
 
 ### `image`
 
-`file = "photo.webp"` (PNG, JPEG or WebP, up to 32 MiB and 64 megapixels), or `source = "theme-backgrounds"` for the current theme's background images.
+`file = "photo.webp"` (PNG, JPEG or WebP, up to 32 MiB and 64 megapixels); `files = ["a.webp", "b.webp", ...]`, up to 64, which `index` chooses among; `source = "theme-backgrounds"` for the current theme's background images; or `source = "photos"` for the viewer's own photos (see [Photos](#photos)). Photos taken with the camera turned are shown upright.
 
 | Setting | Default | Meaning |
 |---|---|---|
 | `fit` | `"cover"` | `cover` fills the screen, cropping; `contain` shows all of it. |
 | `zoom` | `1` | 0.1 to 10. |
 | `pan_x`, `pan_y` | `0` | −1 to 1: which part shows when the image is larger than the screen. |
-| `index` | `0` | Which theme background, counting from 0 and going round. |
+| `index` | `0` | Which of `files`, the theme's backgrounds or the photos, counting from 0 and going round. |
+| `w`, `h` | none | A box this many stage units wide and tall, centered on the element's origin, to fit the image to instead of the whole screen (numbers, both or neither). `cover` cuts the image to the box's shape; `contain` shows all of it within the box. |
+| `filter` | `"none"` | `none`, `greyscale`, `sepia`, or `theme`: shadows to highlights in the theme's background, accent and foreground colors. Or the name of a setting or param holding 0 to 3, for one of these in that order. Applied once as the image is decoded, so it costs nothing to draw. |
 
 Images are fitted to the whole screen, not the stage. `x` and `y` move them from there, and `rotate` and `scale` turn and scale them about the screen's center.
 
 An image that isn't turned and whose size holds still is drawn fast: ScreenSafe resamples it once to that size and copies it into place, so panning it costs little. Animating `zoom` or `scale`, or turning an image, filters every pixel in every frame, which costs many times more on a large screen. The first frames of a scene may show it without the image, while a large image is decoded.
+
+### Photos
+
+`source = "photos"` shows the viewer's own photos: the PNG, JPEG and WebP files directly in `~/Pictures/Screensaver`, sorted by name, up to 64 MiB each. With more than 200 there, a different selection of 200 is shown each time the screensaver opens. `photos` says how many there are, so a pack can show something else, such as its own examples, when there are none. A pack that shows photos gets a **Your photos** row on its settings page, which opens the folder.
+
+The renderer opens the photos before it confines itself, and reads each only when it's shown.
 
 ### `sprite`
 
@@ -277,11 +287,19 @@ anchor = [5, 15]
 frame = "floor(t * 6) % 4"
 ```
 
+## The clock
+
+The clock names give the local time, in the viewer's time zone, daylight saving included: a screensaver running across a change shows the right time on both sides of it. A hand turns with `clock`, as `rotate = "clock / 43200 * tau"` for an hour hand; a clock for another zone at a fixed offset uses `utc_clock`, as `mod(utc_clock / 3600 + 9, 24)` for the hour in Tokyo.
+
+`check`, `render` and the panel's thumbnails show a fixed moment instead, so their results never depend on when they were made: 10:08:30 UTC on Thursday 15 January 2026.
+
 ## Names you can use
 
 In every expression:
 
 - **Time:** `time`, seconds since the screensaver opened; `cycle`, how many times the pack has played through.
+- **The clock:** `hour` (0 to 23), `minute`, `second`, `day` (1 to 31), `month` (1 to 12), `year` and `weekday` (0 for Monday to 6 for Sunday), in local time; `clock`, the seconds since local midnight, with their fraction, for smooth hands; `utc_offset`, the local offset from UTC in hours (`5.5` for India, `-4` for New York in summer); and `utc_clock`, the seconds since midnight in UTC, for a clock in another zone. See [the clock](#the-clock).
+- **Photos:** `photos`, how many of the viewer's photos there are to show (see [Photos](#photos)).
 - **Shape:** `aspect`, the stage's width over its height; `screen_aspect`, the screen's.
 - **Constants:** `pi` and `tau`.
 - **Colors:** the theme's, as named in its `colors.toml`:

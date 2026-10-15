@@ -14,8 +14,9 @@ exactly as submitted for review: listing a pack never changes the plugin, and ne
 - **Packs stay in their makers' repositories.** A pack is a folder in a public git repository its maker controls: a
   repository of its own, a theme's `screensafe/` folder, or a folder among others.
 - **The catalog lists them.** Its `packs.toml` holds one entry per pack: where it is, and the exact commit approved.
-  Its `README.md` is generated from that: a page of previews, descriptions and
-  install steps, which GitHub shows on the repository's front page.
+  Its `README.md` and a page for each pack are generated from that: a gallery of previews, shown from each maker's
+  repository at the approved commit, and for each pack its description, license, provenance and one line that
+  installs it.
 - **The plugin never fetches anything.** It doesn't touch the network, run git or install packs. Someone who wants
   a listed pack copies it into their packs folder, as they would any other, and the renderer checks it like any
   local pack.
@@ -23,12 +24,17 @@ exactly as submitted for review: listing a pack never changes the plugin, and ne
 So approving a pack means approving one commit of someone else's repository. Nothing the maker pushes later is
 listed until it's reviewed in turn.
 
+**Updating a pack** is a pull request changing its entry's `commit`. Makers work in their own repositories however
+they like, since nothing they push changes what people install. The checks list the files that changed since the
+approved commit, and the review covers those. Until the update is approved, the previous version stays listed. The
+approved commit must stay reachable in the maker's repository; a tag on it is the simplest way.
+
 ## An entry
 
 ```toml
 [[pack]]
 id = "aquarium"                       # unique here; also the folder name it installs as
-name = "Aquarium"
+name = "Aquarium"                     # exactly the pack's own name
 author = "Jane Doe"
 contact = "https://github.com/janedoe"
 repository = "https://github.com/janedoe/omarchy-aquarium"
@@ -36,8 +42,9 @@ path = "."                            # the pack's folder within the repository
 commit = "4f1c…"                      # the full 40-character commit approved
 license = "CC-BY-4.0"                 # CC0-1.0, CC-BY-4.0 or MIT
 preview = "preview.png"               # within the pack's folder, at that commit
+description = "Fish drift past swaying weed and rising bubbles."   # exactly the pack's own description
 format = 1
-added = "2026-11-02"
+added = 2026-11-02
 provenance = """
 All art drawn by the author in Aseprite. No generated material, no photographs, no likenesses.
 """
@@ -55,7 +62,8 @@ request template asks for:
 
 The pack's own repository must:
 
-- be public, and reachable with plain `git clone` over HTTPS, without submodules or Git LFS;
+- be public on GitHub, without submodules or Git LFS for the pack's files (GitHub's archive of a commit holds
+  neither);
 - hold, at that commit, the pack folder with its `screensafe.toml`, a `preview.png` rendered by `screensafe render`,
   and a `LICENSE` covering the pack (in the folder or at the repository's root).
 
@@ -72,18 +80,18 @@ Automated and deterministic, never decided by a model. A workflow runs on `pull_
    - that its id is unique;
    - that the commit is a full SHA;
    - that the license is one of the three allowed.
-2. **Fetches the pack:** that one commit of the repository, shallowly, without submodules or LFS, into an empty
-   folder. Any check fails if the commit can't be fetched.
+2. **Fetches the pack exactly as it's installed:** GitHub's archive of that one commit, taking only the pack's folder.
+   Any check fails if the commit can't be fetched.
 3. **Checks the files:**
-   - the path exists;
+   - the path exists, with a `screensafe.toml` whose name, license and description match the entry;
    - only allowed file types, identified by their contents, not their names;
-   - no links, hidden files or executables;
+   - no links or executables (hidden files are never installed);
    - total size within the pack limit.
-4. **Runs `screensafe check`** with the binaries of a pinned ScreenSafe release, fetched by its tag and checked
-   against their published digests. This applies every format rule and
-   limit, and the flash check over the whole loop at 960×540 and 2304×1440.
-5. **Renders a contact sheet** of frames across the loop, attached to the run for reviewers. The pack's own preview
-   is shown beside it, so a misleading preview stands out.
+4. **Runs `screensafe check`** with ScreenSafe's renderer at a pinned commit, checked against its digests. This
+   applies every format rule and limit, and the flash check at 960×540 and 2304×1440 for the first 600 seconds, or
+   the whole loop if shorter. Longer loops need additional review beyond this automated coverage.
+5. **Renders frames** from across the loop, attached to the run for reviewers beside the pack's own preview, so a
+   misleading preview stands out.
 6. **For an update:** lists the files that changed between the approved commit and the new one.
 
 ## Human review
@@ -112,8 +120,9 @@ Approval is of the exact commit in the entry.
   - fetches every listed pack at its approved commit;
   - checks it with the current renderer.
 
-  A repository that has gone, been rewritten or fails the check is flagged in an issue. If it isn't fixed within a
-  set time, it's delisted.
+  A pack whose approved commit can no longer be fetched, or that no longer passes, is flagged in an issue. If it
+  isn't fixed within 30 days, it's delisted. A maker pushing new work is never a reason, since the catalog lists the
+  approved commit, not a branch.
 - **On every renderer change**, the same check of every listed pack runs before release. A format change that would
   break a listed pack is either avoided, or noted for its maker in good time.
 - **Delisting** is a pull request that moves the entry into a `[[delisted]]` table with a date and a reason, so the
@@ -122,16 +131,15 @@ Approval is of the exact commit in the entry.
 
 ## Installing
 
-The catalog's `README.md` gives each pack its own steps, copied from its entry:
+Each pack's page in the catalog gives one line to paste, made from its entry:
 
 ```sh
-git clone --filter=blob:none --no-checkout https://github.com/janedoe/omarchy-aquarium /tmp/aquarium
-git -C /tmp/aquarium checkout 4f1c…
-cp -r /tmp/aquarium/. ~/.config/omarchy/screensafe/packs/aquarium
+mkdir -p ~/.config/omarchy/screensafe/packs/aquarium && curl -fsSL https://codeload.github.com/janedoe/omarchy-aquarium/tar.gz/4f1c… | tar -xz --no-same-owner --exclude='.*' -C ~/.config/omarchy/screensafe/packs/aquarium --strip-components=1
 ```
 
-Checking out the approved commit gives exactly the files that were reviewed. The pack appears in the panel the next
-time it's opened, and the renderer checks it as it does any pack.
+It copies the pack's folder from GitHub's archive of the approved commit: exactly the files that were reviewed, and
+nothing runs. The pack appears in the panel the next time it's opened, and the renderer checks it as it does any
+pack.
 
 ## What the plugin doesn't do, and why
 

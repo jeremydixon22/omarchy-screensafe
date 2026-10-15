@@ -61,10 +61,14 @@ Only use art the user made or has permission to use, and record where it came fr
 
   Note where every image, font or likeness comes from, including generated material. The listing pull request will ask for it, along with confirmation that the submitter has the right to share the pack.
 
+  The catalog's `CONTRIBUTING.md` has the steps: the entry repeats the pack's `name`, `license` and `description` exactly, and `python3 scripts/catalog.py verify <id>`, run in a clone of the catalog, fetches the pack as people will install it and checks it.
+
 Before opening the pull request:
 
-- Run `check` at the default size and at `--size 2304x1440` over the pack's whole loop, and include the results.
-- Make sure the pack holds only allowed files (`.toml`, `.txt`, `.png`, `.jpg`, `.jpeg`, `.webp`, `.ttf`, `.otf`), with plain names, no links and no hidden files.
+- Run `check` at the default size and at `--size 2304x1440`, and include the results. Compare `flash.checkedSeconds`
+  with the reported loop length: the default covers 600 seconds, or the whole loop if shorter. For longer loops,
+  `--seconds` accepts up to 3600; state any portion left unchecked rather than claiming full-loop coverage.
+- Make sure the pack holds only allowed files (`.toml`, `.txt`, `.png`, `.jpg`, `.jpeg`, `.webp`, `.ttf`, `.otf`), with plain names, no links, no hidden files and none marked executable.
 - Strip images of metadata.
 
 Always show the user the finished pull request text and get their go-ahead before submitting anything on their behalf.

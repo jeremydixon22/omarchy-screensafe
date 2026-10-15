@@ -79,6 +79,8 @@ pub struct Options {
     pub max_fps: f64,
     /// Where in the pack to begin, in seconds.
     pub start: f64,
+    /// The wall clock packs read; the fixed one if none.
+    pub clock: Option<crate::clock::Clock>,
 }
 
 struct Buffer {
@@ -478,6 +480,9 @@ impl Display {
     pub fn run(mut self, pack: &Pack, options: &Options, raster: &mut Raster) -> Result<&'static str, String> {
         let qh = self.queue.handle();
         let mut eval = Evaluator::new(pack, options.seed, raster.metrics());
+        if let Some(clock) = &options.clock {
+            eval.set_clock(clock.clone());
+        }
         let start = Instant::now();
         self.state.started = start;
         let mut next = start;
@@ -558,6 +563,9 @@ impl Display {
         let mut line: Vec<u8> = Vec::new();
         let mut overlong = false;
         let mut eval = Evaluator::new(&pack, options.seed, raster.metrics());
+        if let Some(clock) = &options.clock {
+            eval.set_clock(clock.clone());
+        }
         let start = Instant::now();
         self.state.started = start;
         let mut next = start;
@@ -652,6 +660,9 @@ impl Display {
                             // values, and every surface drawn again.
                             pack = p;
                             eval = Evaluator::new(&pack, options.seed, raster.metrics());
+                            if let Some(clock) = &options.clock {
+                                eval.set_clock(clock.clone());
+                            }
                             let background = raster.background_decoding;
                             *raster = Raster::new();
                             raster.background_decoding = background;

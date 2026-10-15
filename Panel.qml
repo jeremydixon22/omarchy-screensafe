@@ -77,6 +77,7 @@ Panel {
     if (root.tab === "about") return ["delay", "tabs", "enable", "about:project", "about:find", "about:make", "about:share"]
     if (root.settingsPath !== "") {
       var page = ["delay", "tabs", "enable", "settings:back", "settings:live"]
+      if (root.settingsPhotos >= 0) page.push("settings:photos")
       for (var s = 0; s < root.settingsDecl.length; s++) page.push("set:" + root.settingsDecl[s].name)
       page.push("settings:reset")
       // With a live preview on the page, there's no need for the pinned one.
@@ -108,7 +109,9 @@ Panel {
   property bool keyMoved: false
   // The tabs and the switch report hovering on their own, sometimes as the panel opens under a resting pointer. That
   // moves the cursor only once the pointer has moved in the panel.
-  function hoverPoint(row) { if (root.pointerSeen) root.point(row) }
+  // Not while the keyboard has the cursor: rows scrolled under a resting pointer report hovering too. It's the
+  // keyboard's until the pointer itself moves (see pointFrom).
+  function hoverPoint(row) { if (root.pointerSeen && !root.keyMoved) root.point(row) }
   function point(row) {
     root.keyMoved = false
     root.showChosen = false
@@ -187,9 +190,10 @@ Panel {
     if (cursorActive) lastRow = rows[cursor] || ""
     expandTimer.restart()
   }
+  // Longer for the pointer, so passing over rows on the way somewhere doesn't open each one.
   Timer {
     id: expandTimer
-    interval: 250
+    interval: root.keyMoved ? 250 : 600
     onTriggered: {
       var row = root.cursorActive ? (root.rows[root.cursor] || "") : ""
       root.expandedRow = row.indexOf("pack:") === 0 ? row : ""
@@ -354,6 +358,13 @@ Panel {
     return ""
   }
   function hasSettings(path) { return !!root.svc && root.svc.declarationsOf(path).length > 0 }
+  // How many photos the page's pack has to show, or -1 for a pack that doesn't show photos.
+  readonly property int settingsPhotos: settingsPath !== "" && svc ? svc.photosOf(settingsPath) : -1
+  function openPhotos() {
+    if (!root.svc) return
+    root.close()
+    root.svc.openPhotosFolder()
+  }
 
   function openSettings(row) {
     if (row.indexOf("pack:") !== 0 || row === "pack:auto" || !root.hasSettings(row.slice(5))) return
@@ -431,6 +442,7 @@ Panel {
     else if (row === "delay") stepDelay(1)
     else if (row === "settings:back") closeSettings()
     else if (row === "settings:live") { if (svc) svc.setLivePreviews(!root.liveOn) }
+    else if (row === "settings:photos") openPhotos()
     else if (row === "settings:reset") { if (svc) svc.resetSettings(root.settingsPath) }
     else if (row.indexOf("set:") === 0) stepSetting(row.slice(4), 1, true)
     else if (row === "preview") preview()
@@ -871,6 +883,51 @@ Panel {
                 Layout.alignment: Qt.AlignVCenter
                 onHovered: function(on) { if (on) root.hoverPoint("settings:live") }
                 onToggled: if (root.svc) root.svc.setLivePreviews(!root.liveOn)
+              }
+            }
+          }
+
+          // For a pack that shows photos: where they come from, and a way to add some.
+          CursorSurface {
+            id: photosRow
+            visible: root.settingsPhotos >= 0
+            width: parent.width
+            hasCursor: root.at("settings:photos")
+            foreground: root.foreground
+            implicitHeight: visible ? photosLayout.implicitHeight + Style.spacing.rowPaddingX : 0
+            onHasCursorChanged: if (hasCursor) root.revealInPage(photosRow)
+
+            MouseArea {
+              id: photosHover
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onPositionChanged: function(mouse) { root.pointFrom(photosHover, mouse, "settings:photos") }
+              onClicked: root.openPhotos()
+            }
+
+            RowLayout {
+              id: photosLayout
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              anchors.leftMargin: Style.space(10)
+              anchors.rightMargin: Style.space(10)
+              spacing: Style.space(10)
+
+              RowText {
+                Layout.fillWidth: true
+                title: "Your photos"
+                detail: root.settingsPhotos === 0 ? "None yet: add some to ~/Pictures/Screensaver"
+                  : root.settingsPhotos + (root.settingsPhotos === 1 ? " photo" : " photos") + " in ~/Pictures/Screensaver"
+              }
+
+              Text {
+                text: "Open folder 󰏌"
+                color: photosHover.containsMouse || photosRow.hasCursor ? root.foreground : root.dim
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                Layout.alignment: Qt.AlignVCenter
               }
             }
           }

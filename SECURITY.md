@@ -16,6 +16,8 @@ A pack can only describe pictures. Its format has no commands, no file paths out
 
 **Files are read beneath the pack's folder only.** Each file is opened with `openat2` and `RESOLVE_BENEATH`, `RESOLVE_NO_SYMLINKS`, `RESOLVE_NO_MAGICLINKS` and `RESOLVE_NO_XDEV`. Where the kernel or a sandbox doesn't offer `openat2`, the path is walked one plain name at a time, each opened without following links: still no links and nothing outside the pack's folder, though the walk may cross into another mount. Only regular files of a limited size are read, with names of plain characters. The only other files a pack can ask for are the current theme's background images, your own screensaver art, and your own badge (`~/.config/omarchy/screensafe/badge.png`, `.webp`, `.jpg` or `.jpeg`), all by name rather than by path. Your badge is read with the same limits as a pack's images and decoded only by the confined renderer; the shell never decodes it.
 
+**Your photos and the clock.** A pack that shows photos gets the PNG, JPEG and WebP files directly in `~/Pictures/Screensaver`: each opened beneath that folder without following links, any name that isn't hidden, up to 64 MiB, at most 200 at once. They're opened under the first layer's read-only confinement and read only when shown. These already-open file descriptors remain readable after the second layer prevents new file access. For the clock, the renderer reads the time zone once, before it confines itself: `/etc/localtime`, or the zone `TZ` names under `/usr/share/zoneinfo`.
+
 **Untrusted content is decoded in the renderer, not the shell.** Images, fonts, art and the pack itself are parsed by the renderer, a separate short-lived process written in Rust with `#![forbid(unsafe_code)]`. Image decoding is limited to PNG, JPEG and WebP, 16,384 pixels a side, 64 megapixels, and 512 MiB of memory; sprite sheets to 4,096 pixels a side and 16 megapixels a pack. A pack's fonts (up to 4 TrueType or OpenType files of 4 MiB each) are checked with `ttf-parser` when the pack loads, and read in full only after the renderer has confined itself. The shell sees only the renderer's bounded JSON listing of each pack's name, author, license, description, and any error, which the panel shows as plain text. Its thumbnails are drawn by the renderer too, once it has confined itself, and reach the shell as plain pixels, three bytes each and at most 480 a side, with an exact size and payload-length check before display. The panel adds its own fixed, uncompressed PPM header to those checked RGB pixels and loads the result with Qt's asynchronous Image item. The renderer supplies neither that header nor compressed image data; original pack images and fonts never reach Qt's image loader.
 
 **What the shell's image loader reads.** Qt picks the reader for an image by its first bytes, whatever type the data URL names. Those bytes are always the panel's own header (`P6`, the width and height it asked for, and a maximum value of 255), so the only reader that ever runs is Qt's binary PPM reader, and the only part a pack influences is the pixel values that follow, exactly width × height × 3 bytes. This reader runs in the shell's process, outside the renderer's confinement; loading asynchronously keeps it off the shell's main thread, but isn't a security boundary.
@@ -24,9 +26,9 @@ A pack can only describe pictures. Its format has no commands, no file paths out
 
 The renderer confines itself with [Landlock](https://docs.kernel.org/userspace-api/landlock.html), in two layers, so that it never reads a pack unconfined.
 
-1. **Before it reads anything from a pack,** for every command that reads packs (`run`, `thumbnail`, `catalog`, `check` and `render`), it can only read files beneath the folders and files it was given: the packs, the theme, your screensaver art and Omarchy's logo, and the four files your badge may be (not the folder they're in). It can't write anything, run anything, reach the network, use abstract Unix sockets, or signal processes outside itself. (`render` creates its picture's file before confining itself, and writes to it afterwards.)
+1. **Before it reads anything from a pack,** for every command that reads packs (`run`, `thumbnail`, `catalog`, `check` and `render`), it can only read files beneath the folders and files it was given: the packs, the theme, your screensaver art and Omarchy's logo, your photos folder, and the four files your badge may be (not the folder they're in). It can't write anything, run anything, reach the network, use abstract Unix sockets, or signal processes outside itself. (`render` creates its picture's file before confining itself, and writes to it afterwards.)
 2. **Once the pack is loaded,** and for a screensaver once it has connected to the Wayland compositor, it removes the rest:
-   - **all filesystem access:** it can't read, write, list or run any file;
+   - **new filesystem access:** it can't open files, write, list folders or run programs; the photo descriptors it already holds remain readable, as described above;
    - **TCP connections and listening;**
    - **abstract Unix sockets and signals** to processes outside itself.
 
@@ -40,7 +42,7 @@ It applies the first layer to its own folder, checks that it can read there but 
 
 ## What the plugin does
 
-- **Programs:** it starts only two, each by absolute path, with a cleared environment holding just `HOME`, `XDG_RUNTIME_DIR`, `WAYLAND_DISPLAY` and, if set, `XDG_STATE_HOME`:
+- **Programs:** it starts only two, each by absolute path, with a cleared environment holding just `HOME`, `XDG_RUNTIME_DIR`, `WAYLAND_DISPLAY` and, if set, `XDG_STATE_HOME` and `TZ`:
   - ScreenSafe's own renderer;
   - Omarchy's `omarchy-shell lock isLocked`, which also gets `OMARCHY_PATH` and a `PATH` of Omarchy's `bin` folder, `/usr/bin` and `/bin`.
 
@@ -50,6 +52,7 @@ It applies the first layer to its own folder, checks that it can read there but 
 - **Files it changes:**
   - Omarchy's `~/.local/state/omarchy/toggles/screensaver-off`: created only while you have **Enable** on, and only if it wasn't already there; removed only if ScreenSafe created it.
   - Its own record of that, in `~/.local/state/screensafe/` (folder mode 0700, files 0600, written without following links).
+  - `~/Pictures/Screensaver`, made only when you choose **Your photos** on a photo pack's settings page, if it isn't there (mode 0755, without following links). That folder is then opened in your file manager, the way About opens its links in your browser.
   - Its settings (whether it's on, the pack, its own idle time, the favorite packs, the values chosen for packs' settings, and whether settings pages show a live preview) in its own entry in `~/.config/omarchy/shell.json`, through Omarchy's plugin interface. It reads Omarchy's idle and lock times there but never changes them.
 - **No network.** No downloads, installers, package managers or services, and nothing needs elevated privileges.
 

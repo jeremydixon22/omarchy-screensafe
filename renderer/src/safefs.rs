@@ -104,6 +104,80 @@ impl Dir {
     }
 }
 
+/// A file name in a folder people fill themselves, such as their photos: any one name that isn't hidden, without
+/// control characters. Such files are still opened beneath the folder, never through a link.
+pub fn user_file_name(name: &str) -> bool {
+    !name.is_empty() && name.len() <= 255 && !name.starts_with('.') && !name.contains('/') && !name.chars().any(char::is_control)
+}
+
+/// A regular file opened for reading, kept open: readable later even once the renderer can open nothing more.
+pub struct OpenFile {
+    pub file: File,
+    pub size: u64,
+    /// When it was last changed, in seconds and nanoseconds, so a change shows in the pack's fingerprint.
+    pub modified: (i64, i64),
+}
+
+impl Dir {
+    /// Names of the regular files directly in this directory that `user_file_name` accepts, sorted; at most
+    /// `limit`, and whether there were more.
+    pub fn user_files(&self, limit: usize) -> Result<(Vec<String>, bool), FsError> {
+        let fresh = rustix::fs::openat(&self.fd, ".", OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC, Mode::empty())
+            .map_err(|e| FsError(format!("can't list {}: {e}", self.display)))?;
+        let mut dir = rustix::fs::Dir::new(fresh).map_err(|e| FsError(format!("can't list {}: {e}", self.display)))?;
+        let mut names = Vec::new();
+        let mut more = false;
+        for entry in dir.by_ref() {
+            let entry = entry.map_err(|e| FsError(format!("can't list {}: {e}", self.display)))?;
+            if entry.file_type() != rustix::fs::FileType::RegularFile {
+                continue;
+            }
+            let Ok(name) = entry.file_name().to_str() else { continue };
+            if user_file_name(name) {
+                if names.len() == limit {
+                    more = true;
+                    break;
+                }
+                names.push(name.to_string());
+            }
+        }
+        names.sort();
+        Ok((names, more))
+    }
+
+    /// Opens a regular file directly in this directory, by a name `user_file_name` accepts, refusing links and
+    /// anything larger than `limit` bytes. The file is only opened here; it's read later, when it's needed.
+    pub fn open_user_file(&self, name: &str, limit: u64) -> Result<OpenFile, FsError> {
+        if !user_file_name(name) {
+            return Err(FsError(format!("'{name}' isn't a plain file name")));
+        }
+        let fd = match openat2(&self.fd, name, READ_FLAGS, Mode::empty(), BENEATH) {
+            Err(rustix::io::Errno::NOSYS) => rustix::fs::openat(&self.fd, name, READ_FLAGS | OFlags::NOFOLLOW, Mode::empty()),
+            result => result,
+        }
+        .map_err(|e| FsError(format!("can't open {}/{name}: {e}", self.display)))?;
+        let stat = rustix::fs::fstat(&fd).map_err(|e| FsError(format!("can't read {}/{name}: {e}", self.display)))?;
+        if rustix::fs::FileType::from_raw_mode(stat.st_mode) != rustix::fs::FileType::RegularFile {
+            return Err(FsError(format!("{}/{name} is not a regular file", self.display)));
+        }
+        if stat.st_size as u64 > limit {
+            return Err(FsError(format!("{name} is larger than {} MiB", limit >> 20)));
+        }
+        Ok(OpenFile { file: File::from(fd), size: stat.st_size as u64, modified: (stat.st_mtime as i64, stat.st_mtime_nsec as i64) })
+    }
+}
+
+/// Reads an open file whole, from its start, up to `limit` bytes.
+pub fn read_open(file: &File, size: u64, limit: u64) -> std::io::Result<Vec<u8>> {
+    use std::os::unix::fs::FileExt;
+    if size > limit {
+        return Err(std::io::Error::other("larger than allowed"));
+    }
+    let mut bytes = vec![0; size as usize];
+    file.read_exact_at(&mut bytes, 0)?;
+    Ok(bytes)
+}
+
 /// Reads a single file the user named, refusing a link in its last component.
 pub fn read_file(path: &Path, limit: u64) -> Result<Vec<u8>, FsError> {
     let fd = rustix::fs::openat(CWD, path, OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW | OFlags::NOCTTY | OFlags::NONBLOCK, Mode::empty())

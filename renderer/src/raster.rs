@@ -8,8 +8,8 @@ use std::time::{Duration, Instant};
 use image::{ImageFormat, ImageReader, Limits};
 use tiny_skia::{Color, FillRule, FilterQuality, LineCap, LineJoin, Mask, Paint, PathBuilder, Pixmap, PixmapMut, PixmapPaint, Stroke, Transform};
 
-use crate::eval::{FontMetrics, Frame, ImageRef, Item};
-use crate::pack::{Fit, ImageSource, Pack, Stage};
+use crate::eval::{FontMetrics, Frame, ImageRef, ImageSrc, Item};
+use crate::pack::{Filter, Fit, ImageSource, Pack, Stage};
 
 pub const FONT: &[u8] = include_bytes!("../fonts/JetBrainsMono-Regular.ttf");
 
@@ -19,7 +19,8 @@ const MAX_DECODE_BYTES: u64 = 512 * 1024 * 1024;
 const GLYPH_CACHE: usize = 4096;
 /// And at most this many bytes of coverage, since text whose size changes every frame makes new glyphs every frame.
 const GLYPH_CACHE_BYTES: usize = 64 << 20;
-const IMAGE_CACHE: usize = 3;
+/// Decoded images are kept up to this many bytes, and at least the last two, however large.
+const IMAGE_CACHE_BYTES: usize = 256 << 20;
 /// How many of a frame's glows are kept from one frame to the next.
 const GLOW_CACHE: usize = 32;
 /// Resampled copies kept, one for each image and screen size in use.
@@ -153,8 +154,30 @@ fn pixmap_from_rgba(width: u32, height: u32, rgba: &[u8]) -> Option<Pixmap> {
 
 /// Decodes an image, shrinking it to fit within `max_w` x `max_h`.
 pub fn decode_image(bytes: &[u8], max_w: u32, max_h: u32) -> Result<Pixmap, String> {
+    decode_prepared(bytes, max_w, max_h, 0, Filter::None)
+}
+
+/// Decodes an image upright, as its camera recorded it was held; cuts it to the shape `crop` (width over height in
+/// ten-thousandths, or 0 to keep it whole), around its middle; shrinks it to fit within `max_w` x `max_h`; and gives
+/// it `filter`'s look.
+pub fn decode_prepared(bytes: &[u8], max_w: u32, max_h: u32, crop: u32, filter: Filter) -> Result<Pixmap, String> {
+    use image::ImageDecoder;
     probe_image(bytes)?;
-    let mut rgba = reader(bytes)?.decode().map_err(|e| e.to_string())?.to_rgba8();
+    let mut decoder = reader(bytes)?.into_decoder().map_err(|e| e.to_string())?;
+    let orientation = decoder.orientation().unwrap_or(image::metadata::Orientation::NoTransforms);
+    let mut decoded = image::DynamicImage::from_decoder(decoder).map_err(|e| e.to_string())?;
+    decoded.apply_orientation(orientation);
+    let mut rgba = decoded.to_rgba8();
+    if crop > 0 {
+        let (w, h) = rgba.dimensions();
+        let aspect = crop as f64 / 10_000.0;
+        let (cw, ch) = if w as f64 / h as f64 > aspect {
+            (((h as f64 * aspect).round() as u32).clamp(1, w), h)
+        } else {
+            (w, ((w as f64 / aspect).round() as u32).clamp(1, h))
+        };
+        rgba = image::imageops::crop_imm(&rgba, (w - cw) / 2, (h - ch) / 2, cw, ch).to_image();
+    }
     let (w, h) = rgba.dimensions();
     let shrink = (max_w as f64 / w as f64).min(max_h as f64 / h as f64);
     if shrink < 1.0 {
@@ -163,6 +186,7 @@ pub fn decode_image(bytes: &[u8], max_w: u32, max_h: u32) -> Result<Pixmap, Stri
         rgba = image::imageops::resize(&rgba, nw, nh, image::imageops::FilterType::Triangle);
     }
     let (w, h) = rgba.dimensions();
+    apply_filter(&mut rgba, filter);
     let mut pixmap = Pixmap::new(w, h).ok_or("image is too large")?;
     for (dst, src) in pixmap.data_mut().chunks_exact_mut(4).zip(rgba.as_raw().chunks_exact(4)) {
         let a = src[3] as u16;
@@ -172,6 +196,37 @@ pub fn decode_image(bytes: &[u8], max_w: u32, max_h: u32) -> Result<Pixmap, Stri
         dst[3] = src[3];
     }
     Ok(pixmap)
+}
+
+/// Gives straight RGBA pixels a filter's look.
+fn apply_filter(rgba: &mut image::RgbaImage, filter: Filter) {
+    let luma = |p: &[u8]| (0.2126 * p[0] as f32 + 0.7152 * p[1] as f32 + 0.0722 * p[2] as f32) / 255.0;
+    match filter {
+        Filter::None => {}
+        Filter::Greyscale => {
+            for p in rgba.pixels_mut() {
+                let l = (luma(&p.0) * 255.0).round() as u8;
+                p.0[..3].copy_from_slice(&[l, l, l]);
+            }
+        }
+        Filter::Sepia => {
+            for p in rgba.pixels_mut() {
+                let [r, g, b] = [p.0[0] as f32, p.0[1] as f32, p.0[2] as f32];
+                let out = [0.393 * r + 0.769 * g + 0.189 * b, 0.349 * r + 0.686 * g + 0.168 * b, 0.272 * r + 0.534 * g + 0.131 * b];
+                for (c, v) in p.0[..3].iter_mut().zip(out) {
+                    *c = v.min(255.0).round() as u8;
+                }
+            }
+        }
+        Filter::Theme([dark, middle, light]) => {
+            let mix = |a: [u8; 3], b: [u8; 3], t: f32| [0, 1, 2].map(|i| (a[i] as f32 + (b[i] as f32 - a[i] as f32) * t).round().clamp(0.0, 255.0) as u8);
+            for p in rgba.pixels_mut() {
+                let l = luma(&p.0);
+                let c = if l < 0.5 { mix(dark, middle, l * 2.0) } else { mix(middle, light, l * 2.0 - 1.0) };
+                p.0[..3].copy_from_slice(&c);
+            }
+        }
+    }
 }
 
 /// Where the stage sits on a screen of `width` x `height` pixels.
@@ -356,17 +411,30 @@ impl Raster {
         if self.failed.contains(&source) {
             return None;
         }
-        let (name, bytes) = match source {
-            ImageRef::Pack(i) => match &pack.images[i] {
-                ImageSource::File { name, bytes } => (name.as_str(), bytes.as_slice()),
+        // The bytes: the pack's own or the theme's, held in memory; or a photo, read from its open file only now.
+        enum Bytes<'p> {
+            Held(&'p [u8]),
+            Photo(Arc<std::fs::File>, u64),
+        }
+        let (name, bytes) = match source.src {
+            ImageSrc::Pack(i) => match &pack.images[i] {
+                ImageSource::File { name, bytes } => (name.as_str(), Bytes::Held(bytes.as_slice())),
                 // Prepared images are only ever sprite sheets.
                 ImageSource::Pixels { .. } => return None,
             },
-            ImageRef::Background(i) => (pack.backgrounds[i].0.as_str(), pack.backgrounds[i].1.as_slice()),
+            ImageSrc::Background(i) => (pack.backgrounds[i].0.as_str(), Bytes::Held(pack.backgrounds[i].1.as_slice())),
+            ImageSrc::Photo(i) => {
+                let photo = &pack.photos[i];
+                (photo.name.as_str(), Bytes::Photo(Arc::clone(&photo.file), photo.size))
+            }
         };
         let (w, h) = self.largest;
-        // A little larger than the screen, so a modest zoom stays sharp.
-        let (max_w, max_h) = (w.saturating_mul(6) / 5, h.saturating_mul(6) / 5);
+        // A little larger than the screen, so a modest zoom stays sharp; or as large as its box needs.
+        let (max_w, max_h) = if source.limit > 0 { (source.limit, source.limit) } else { (w.saturating_mul(6) / 5, h.saturating_mul(6) / 5) };
+        let (crop, filter) = (source.crop, source.filter);
+        let decode = move |bytes: &[u8]| decode_prepared(bytes, max_w, max_h, crop, filter);
+        let read_photo =
+            |file: &std::fs::File, size: u64| crate::safefs::read_open(file, size, crate::pack::PHOTO_FILE_LIMIT).map_err(|e| format!("can't be read: {e}"));
         let decoded = if self.background_decoding {
             match self.pending.iter().position(|(r, _)| *r == source) {
                 Some(p) => match self.pending[p].1.try_recv() {
@@ -382,16 +450,28 @@ impl Raster {
                 },
                 None => {
                     let (send, receive) = mpsc::channel();
-                    let bytes = bytes.to_vec();
-                    std::thread::spawn(move || {
-                        let _ = send.send(decode_image(&bytes, max_w, max_h));
-                    });
+                    match bytes {
+                        Bytes::Held(held) => {
+                            let held = held.to_vec();
+                            std::thread::spawn(move || {
+                                let _ = send.send(decode(&held));
+                            });
+                        }
+                        Bytes::Photo(file, size) => {
+                            std::thread::spawn(move || {
+                                let _ = send.send(read_photo(&file, size).and_then(|bytes| decode(&bytes)));
+                            });
+                        }
+                    }
                     self.pending.push((source, receive));
                     return None;
                 }
             }
         } else {
-            decode_image(bytes, max_w, max_h)
+            match bytes {
+                Bytes::Held(held) => decode(held),
+                Bytes::Photo(file, size) => read_photo(&file, size).and_then(|bytes| decode(&bytes)),
+            }
         };
         match decoded {
             Ok(pixmap) => {
@@ -406,8 +486,21 @@ impl Raster {
         }
     }
 
+    /// The image's key with the size it's decoded to: for one in a box, about the box's size on the largest screen,
+    /// in steps of 256 pixels, so a box that changes size a little doesn't decode it again.
+    fn keyed(&self, source: ImageRef, frame: Option<(f32, f32)>) -> ImageRef {
+        match frame {
+            None => source,
+            Some((w, h)) => {
+                let px = (w.max(h) as f64 * self.largest.1 as f64 * 1.2).ceil() as u32;
+                ImageRef { limit: px.div_ceil(256).max(1) * 256, ..source }
+            }
+        }
+    }
+
     fn keep(&mut self, source: ImageRef, pixmap: Pixmap) {
-        if self.images.len() >= IMAGE_CACHE {
+        let bytes = |images: &[(ImageRef, Arc<Pixmap>)]| images.iter().map(|(_, p)| p.data().len()).sum::<usize>();
+        while self.images.len() >= 2 && bytes(&self.images) + pixmap.data().len() > IMAGE_CACHE_BYTES {
             let (gone, _) = self.images.remove(0);
             self.scaled.retain(|(r, _, _, _)| *r != gone);
             self.resampling.retain(|(r, _, _)| *r != gone);
@@ -423,12 +516,13 @@ impl Raster {
             return;
         }
         for item in &frame.items {
-            if let Item::Image { source, fit, zoom, pan_x, pan_y, transform, .. } = item {
-                let Some(index) = self.image(pack, *source) else { continue };
+            if let Item::Image { source, fit, frame, zoom, pan_x, pan_y, transform, .. } = item {
+                let source = self.keyed(*source, *frame);
+                let Some(index) = self.image(pack, source) else { continue };
                 let image = &self.images[index].1;
                 let (iw, ih) = (image.width(), image.height());
                 for view in views {
-                    let p = Placement::new((iw, ih), *fit, *zoom, *pan_x, *pan_y, transform, view);
+                    let p = Placement::new((iw, ih), *fit, *frame, *zoom, *pan_x, *pan_y, transform, view);
                     if let Some(size) = p.whole {
                         self.request_scaled(index, size);
                     }
@@ -823,10 +917,11 @@ impl Raster {
                     draw_sprite(target, mask, &sheet, *src, view.px(*x, *y), *pixel as f64 * view.scale, *flip, *alpha)
                 }
             }
-            Item::Image { source, fit, zoom, pan_x, pan_y, alpha, transform } => {
+            Item::Image { source, fit, frame, zoom, pan_x, pan_y, alpha, transform } => {
+                let source = &self.keyed(*source, *frame);
                 let Some(index) = self.image(pack, *source) else { return Bounds::EMPTY };
                 let image = &self.images[index].1;
-                let p = Placement::new((image.width(), image.height()), *fit, *zoom, *pan_x, *pan_y, transform, &view);
+                let p = Placement::new((image.width(), image.height()), *fit, *frame, *zoom, *pan_x, *pan_y, transform, &view);
                 // Unturned and uniformly scaled: show a copy resampled to its size at whole pixels, rather than
                 // filtering every pixel of every frame. The copy is made once its size has held for a few
                 // frames, or straight away for an image coming into view, which is held back until it's ready.
@@ -1666,17 +1761,26 @@ struct Placement {
 }
 
 impl Placement {
-    fn new((iw, ih): (u32, u32), fit: Fit, zoom: f32, pan_x: f32, pan_y: f32, t: &crate::eval::Affine, view: &View) -> Placement {
+    #[allow(clippy::too_many_arguments)]
+    fn new((iw, ih): (u32, u32), fit: Fit, frame: Option<(f32, f32)>, zoom: f32, pan_x: f32, pan_y: f32, t: &crate::eval::Affine, view: &View) -> Placement {
         let (w, h) = (view.width as f64, view.height as f64);
         let (iw, ih) = (iw as f64, ih as f64);
+        // The whole screen; or a box on the stage, centered on the element's origin. An image cut to fill its box
+        // was cut to the box's shape as it was decoded, so it fits it exactly either way.
+        let (bw, bh) = match frame {
+            None => (w, h),
+            Some((fw, fh)) => (fw as f64 * view.scale, fh as f64 * view.scale),
+        };
         let base = match fit {
-            Fit::Cover => (w / iw).max(h / ih),
-            Fit::Contain => (w / iw).min(h / ih),
+            Fit::Cover => (bw / iw).max(bh / ih),
+            Fit::Contain => (bw / iw).min(bh / ih),
         };
         let scale = base * zoom as f64;
         let (dw, dh) = (iw * scale, ih * scale);
-        let ox = (w - dw) / 2.0 - pan_x as f64 * (dw - w) / 2.0;
-        let oy = (h - dh) / 2.0 - pan_y as f64 * (dh - h) / 2.0;
+        let (ox, oy) = match frame {
+            None => ((w - dw) / 2.0 - pan_x as f64 * (dw - w) / 2.0, (h - dh) / 2.0 - pan_y as f64 * (dh - h) / 2.0),
+            Some(_) => ((w - dw) / 2.0, (h - dh) / 2.0),
+        };
         let x = t.a * (ox - w / 2.0) + t.c * (oy - h / 2.0) + w / 2.0 + t.e * view.scale;
         let y = t.b * (ox - w / 2.0) + t.d * (oy - h / 2.0) + h / 2.0 + t.f * view.scale;
         let upright = t.b == 0.0 && t.c == 0.0 && t.a > 0.0 && (t.a - t.d).abs() < 1e-12;
@@ -2382,6 +2486,24 @@ pub(crate) mod tests {
         let white = (0..60).flat_map(|y| (0..160).map(move |x| (x, y))).filter(|&(x, y)| pixel(&p, x, y)[1] > 200 && pixel(&p, x, y)[0] > 200).count();
         assert!(white > 100, "text drawn ({white} white pixels)");
         assert_eq!(pixel(&p, 160, 162), [0, 255, 0, 255], "line drawn");
+    }
+
+    #[test]
+    fn photos_are_cut_to_shape_and_toned() {
+        let mut out = Vec::new();
+        let img = image::RgbaImage::from_fn(8, 4, |x, _| if x < 4 { image::Rgba([255, 0, 0, 255]) } else { image::Rgba([0, 0, 255, 255]) });
+        image::DynamicImage::ImageRgba8(img).write_to(&mut Cursor::new(&mut out), ImageFormat::Png).unwrap();
+        let square = decode_prepared(&out, 100, 100, 10_000, Filter::None).unwrap();
+        assert_eq!((square.width(), square.height()), (4, 4), "cut around the middle to a square");
+        let grey = decode_prepared(&out, 100, 100, 0, Filter::Greyscale).unwrap();
+        let p = pixel(&grey, 0, 0);
+        assert!(p[0] == p[1] && p[1] == p[2], "{p:?}");
+        let theme = Filter::Theme([[10, 10, 10], [100, 0, 0], [250, 250, 250]]);
+        let mut rgba = image::RgbaImage::from_pixel(2, 1, image::Rgba([0, 0, 0, 255]));
+        rgba.put_pixel(1, 0, image::Rgba([255, 255, 255, 255]));
+        apply_filter(&mut rgba, theme);
+        assert_eq!(rgba.get_pixel(0, 0).0, [10, 10, 10, 255], "black takes the theme's darkest");
+        assert_eq!(rgba.get_pixel(1, 0).0, [250, 250, 250, 255], "white its lightest");
     }
 }
 

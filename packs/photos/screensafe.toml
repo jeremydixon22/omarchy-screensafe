@@ -1,0 +1,302 @@
+# Photos: your own photos, or a set of examples, shown full screen, whole, or dropped onto a pile as prints or
+# Polaroids. Your photos are read from ~/Pictures/Screensaver. The examples are in examples/; see tools/photos for
+# where each came from.
+format = 1
+name = "Photos"
+author = "ScreenSafe"
+license = "MIT"
+description = "Your photos from ~/Pictures/Screensaver, or a set of examples: full screen, whole, or as prints or Polaroids."
+stage = "screen"
+fps = 24
+fade = 0
+background = "black"
+preview = 8
+
+[[setting]]
+name = "source"
+label = "Photos"
+kind = "choice"
+choices = ["Yours", "Examples"]
+values = [0, 1]
+default = 0
+
+[[setting]]
+name = "set"
+label = "Examples"
+kind = "choice"
+choices = ["Nature", "Technology", "Aerospace", "Astronomy"]
+values = [0, 1, 2, 3]
+default = 0
+
+[[setting]]
+name = "style"
+label = "Style"
+kind = "choice"
+choices = ["Full screen", "Whole", "Prints", "Polaroids"]
+values = [0, 1, 2, 3]
+default = 0
+
+[[setting]]
+name = "each"
+label = "Each photo"
+kind = "choice"
+choices = ["5 s", "10 s", "20 s", "45 s"]
+values = [5, 10, 20, 45]
+default = 10
+
+[[setting]]
+name = "tone"
+label = "Tone"
+kind = "choice"
+choices = ["Original", "Greyscale", "Sepia", "Theme"]
+values = [0, 1, 2, 3]
+default = 0
+
+[[setting]]
+name = "hint"
+label = "Example notice"
+kind = "toggle"
+default = true
+
+[[setting]]
+name = "order"
+label = "Order"
+kind = "choice"
+choices = ["Shuffle", "In order"]
+values = [0, 1]
+default = 0
+
+# One photo each time round. Yours when there are any and they're chosen; otherwise the chosen set of examples.
+# Shuffled, each pass through them shows every one once, in an order of its own: a step by a prime larger than the
+# most photos there can be, from a random start, visits them all.
+[[scene]]
+name = "Photos"
+duration = "each"
+let = ["mine = source == 0 && photos > 0", "count = mine ? photos : pick(set, 10, 10, 5, 5)", "base = pick(set, 0, 10, 20, 25)", "seed = rand(3) * 997"]
+
+# The photo before, underneath, as it was when it left.
+[[scene.draw]]
+kind = "group"
+visible = "style == 0 && cycle >= 1"
+let = ["c = cycle - 1", "pass = floor(c / count)", "stride = pick(hash(pass * 3.3 + seed) * 4, 211, 223, 227, 229)", "pk = order == 0 ? mod(mod(c, count) * stride + floor(hash(pass * 1.7 + seed) * count), count) : mod(c, count)", "drift = style == 0 ? (mod(c, 2) * 2 - 1) * (0.7 - 1.4 * 1) : 0"]
+
+
+  [[scene.draw.draw]]
+  kind = "image"
+  source = "photos"
+  visible = "mine"
+  index = "pk"
+  fit = "cover"
+  filter = "tone"
+  zoom = "style == 0 ? 1.08 : 1"
+  pan_x = "drift"
+
+  [[scene.draw.draw]]
+  kind = "image"
+  files = ["examples/landscape-1.webp", "examples/landscape-2.webp", "examples/landscape-3.webp", "examples/landscape-4.webp", "examples/landscape-5.webp", "examples/wildlife-1.webp", "examples/wildlife-2.webp", "examples/wildlife-3.webp", "examples/wildlife-4.webp", "examples/wildlife-5.webp", "examples/technology-1.webp", "examples/technology-2.webp", "examples/technology-3.webp", "examples/technology-4.webp", "examples/technology-5.webp", "examples/computing-1.webp", "examples/computing-2.webp", "examples/computing-3.webp", "examples/computing-4.webp", "examples/computing-5.webp", "examples/aerospace-1.webp", "examples/aerospace-2.webp", "examples/aerospace-3.webp", "examples/aerospace-4.webp", "examples/aerospace-5.webp", "examples/astronomy-1.webp", "examples/astronomy-2.webp", "examples/astronomy-3.webp", "examples/astronomy-4.webp", "examples/astronomy-5.webp"]
+  visible = "!mine"
+  index = "base + pk"
+  fit = "cover"
+  filter = "tone"
+  zoom = "style == 0 ? 1.08 : 1"
+  pan_x = "drift"
+
+# The photo before, underneath, as it was when it left.
+[[scene.draw]]
+kind = "group"
+visible = "style == 1 && cycle >= 1"
+let = ["c = cycle - 1", "pass = floor(c / count)", "stride = pick(hash(pass * 3.3 + seed) * 4, 211, 223, 227, 229)", "pk = order == 0 ? mod(mod(c, count) * stride + floor(hash(pass * 1.7 + seed) * count), count) : mod(c, count)", "drift = style == 0 ? (mod(c, 2) * 2 - 1) * (0.7 - 1.4 * 1) : 0"]
+
+
+  [[scene.draw.draw]]
+  kind = "image"
+  source = "photos"
+  visible = "mine"
+  index = "pk"
+  fit = "contain"
+  filter = "tone"
+  zoom = "style == 0 ? 1.08 : 1"
+  pan_x = "drift"
+
+  [[scene.draw.draw]]
+  kind = "image"
+  files = ["examples/landscape-1.webp", "examples/landscape-2.webp", "examples/landscape-3.webp", "examples/landscape-4.webp", "examples/landscape-5.webp", "examples/wildlife-1.webp", "examples/wildlife-2.webp", "examples/wildlife-3.webp", "examples/wildlife-4.webp", "examples/wildlife-5.webp", "examples/technology-1.webp", "examples/technology-2.webp", "examples/technology-3.webp", "examples/technology-4.webp", "examples/technology-5.webp", "examples/computing-1.webp", "examples/computing-2.webp", "examples/computing-3.webp", "examples/computing-4.webp", "examples/computing-5.webp", "examples/aerospace-1.webp", "examples/aerospace-2.webp", "examples/aerospace-3.webp", "examples/aerospace-4.webp", "examples/aerospace-5.webp", "examples/astronomy-1.webp", "examples/astronomy-2.webp", "examples/astronomy-3.webp", "examples/astronomy-4.webp", "examples/astronomy-5.webp"]
+  visible = "!mine"
+  index = "base + pk"
+  fit = "contain"
+  filter = "tone"
+  zoom = "style == 0 ? 1.08 : 1"
+  pan_x = "drift"
+
+# The photo now, fading in over the one before.
+[[scene.draw]]
+kind = "group"
+visible = "style == 0 && true"
+let = ["c = cycle", "pass = floor(c / count)", "stride = pick(hash(pass * 3.3 + seed) * 4, 211, 223, 227, 229)", "pk = order == 0 ? mod(mod(c, count) * stride + floor(hash(pass * 1.7 + seed) * count), count) : mod(c, count)", "drift = style == 0 ? (mod(c, 2) * 2 - 1) * (0.7 - 1.4 * u) : 0"]
+opacity = "smoothstep(0, 1.2, t)"
+
+  [[scene.draw.draw]]
+  kind = "image"
+  source = "photos"
+  visible = "mine"
+  index = "pk"
+  fit = "cover"
+  filter = "tone"
+  zoom = "style == 0 ? 1.08 : 1"
+  pan_x = "drift"
+
+  [[scene.draw.draw]]
+  kind = "image"
+  files = ["examples/landscape-1.webp", "examples/landscape-2.webp", "examples/landscape-3.webp", "examples/landscape-4.webp", "examples/landscape-5.webp", "examples/wildlife-1.webp", "examples/wildlife-2.webp", "examples/wildlife-3.webp", "examples/wildlife-4.webp", "examples/wildlife-5.webp", "examples/technology-1.webp", "examples/technology-2.webp", "examples/technology-3.webp", "examples/technology-4.webp", "examples/technology-5.webp", "examples/computing-1.webp", "examples/computing-2.webp", "examples/computing-3.webp", "examples/computing-4.webp", "examples/computing-5.webp", "examples/aerospace-1.webp", "examples/aerospace-2.webp", "examples/aerospace-3.webp", "examples/aerospace-4.webp", "examples/aerospace-5.webp", "examples/astronomy-1.webp", "examples/astronomy-2.webp", "examples/astronomy-3.webp", "examples/astronomy-4.webp", "examples/astronomy-5.webp"]
+  visible = "!mine"
+  index = "base + pk"
+  fit = "cover"
+  filter = "tone"
+  zoom = "style == 0 ? 1.08 : 1"
+  pan_x = "drift"
+
+# The photo now, fading in over the one before.
+[[scene.draw]]
+kind = "group"
+visible = "style == 1 && true"
+let = ["c = cycle", "pass = floor(c / count)", "stride = pick(hash(pass * 3.3 + seed) * 4, 211, 223, 227, 229)", "pk = order == 0 ? mod(mod(c, count) * stride + floor(hash(pass * 1.7 + seed) * count), count) : mod(c, count)", "drift = style == 0 ? (mod(c, 2) * 2 - 1) * (0.7 - 1.4 * u) : 0"]
+opacity = "smoothstep(0, 1.2, t)"
+
+  [[scene.draw.draw]]
+  kind = "image"
+  source = "photos"
+  visible = "mine"
+  index = "pk"
+  fit = "contain"
+  filter = "tone"
+  zoom = "style == 0 ? 1.08 : 1"
+  pan_x = "drift"
+
+  [[scene.draw.draw]]
+  kind = "image"
+  files = ["examples/landscape-1.webp", "examples/landscape-2.webp", "examples/landscape-3.webp", "examples/landscape-4.webp", "examples/landscape-5.webp", "examples/wildlife-1.webp", "examples/wildlife-2.webp", "examples/wildlife-3.webp", "examples/wildlife-4.webp", "examples/wildlife-5.webp", "examples/technology-1.webp", "examples/technology-2.webp", "examples/technology-3.webp", "examples/technology-4.webp", "examples/technology-5.webp", "examples/computing-1.webp", "examples/computing-2.webp", "examples/computing-3.webp", "examples/computing-4.webp", "examples/computing-5.webp", "examples/aerospace-1.webp", "examples/aerospace-2.webp", "examples/aerospace-3.webp", "examples/aerospace-4.webp", "examples/aerospace-5.webp", "examples/astronomy-1.webp", "examples/astronomy-2.webp", "examples/astronomy-3.webp", "examples/astronomy-4.webp", "examples/astronomy-5.webp"]
+  visible = "!mine"
+  index = "base + pk"
+  fit = "contain"
+  filter = "tone"
+  zoom = "style == 0 ? 1.08 : 1"
+  pan_x = "drift"
+
+# Prints: a new one dropped onto the pile each time, the newest on top.
+[[scene.draw]]
+kind = "group"
+visible = "style == 2"
+sort = true
+
+  [[scene.draw.draw]]
+  kind = "group"
+  count = 5
+  let = ["c = cycle - i", "pass = floor(c / count)", "stride = pick(hash(pass * 3.3 + seed) * 4, 211, 223, 227, 229)", "pk = order == 0 ? mod(mod(c, count) * stride + floor(hash(pass * 1.7 + seed) * count), count) : mod(c, count)", "drop = i == 0 ? ease_out(clamp(t / 0.7, 0, 1)) : 1"]
+  visible = "c >= 0 && i < count"
+  depth = "-i"
+  x = "(hash(c * 3.1) - 0.5) * (aspect - 0.73)"
+  y = "(hash(c * 5.7) - 0.5) * 0.43"
+  rotate = "(hash(c * 9.2) - 0.5) * 0.45"
+  scale = "1 + 0.25 * (1 - drop)"
+  opacity = "i == 0 ? clamp(t / 0.3, 0, 1) : 1"
+
+    [[scene.draw.draw.draw]]
+    kind = "rect"
+    x = 0.012
+    y = 0.016
+    w = 0.58
+    h = 0.42
+    color = "alpha(black, 0.4)"
+
+    [[scene.draw.draw.draw]]
+    kind = "rect"
+    w = 0.58
+    h = 0.42
+    color = "#f4f1ea"
+
+    [[scene.draw.draw.draw]]
+    kind = "image"
+    y = 0
+    source = "photos"
+    visible = "mine"
+    index = "pk"
+    fit = "cover"
+    w = 0.54
+    h = 0.36
+    filter = "tone"
+
+    [[scene.draw.draw.draw]]
+    kind = "image"
+    y = 0
+    files = ["examples/landscape-1.webp", "examples/landscape-2.webp", "examples/landscape-3.webp", "examples/landscape-4.webp", "examples/landscape-5.webp", "examples/wildlife-1.webp", "examples/wildlife-2.webp", "examples/wildlife-3.webp", "examples/wildlife-4.webp", "examples/wildlife-5.webp", "examples/technology-1.webp", "examples/technology-2.webp", "examples/technology-3.webp", "examples/technology-4.webp", "examples/technology-5.webp", "examples/computing-1.webp", "examples/computing-2.webp", "examples/computing-3.webp", "examples/computing-4.webp", "examples/computing-5.webp", "examples/aerospace-1.webp", "examples/aerospace-2.webp", "examples/aerospace-3.webp", "examples/aerospace-4.webp", "examples/aerospace-5.webp", "examples/astronomy-1.webp", "examples/astronomy-2.webp", "examples/astronomy-3.webp", "examples/astronomy-4.webp", "examples/astronomy-5.webp"]
+    visible = "!mine"
+    index = "base + pk"
+    fit = "cover"
+    w = 0.54
+    h = 0.36
+    filter = "tone"
+
+# Polaroids: a new one dropped onto the pile each time, the newest on top.
+[[scene.draw]]
+kind = "group"
+visible = "style == 3"
+sort = true
+
+  [[scene.draw.draw]]
+  kind = "group"
+  count = 4
+  let = ["c = cycle - i", "pass = floor(c / count)", "stride = pick(hash(pass * 3.3 + seed) * 4, 211, 223, 227, 229)", "pk = order == 0 ? mod(mod(c, count) * stride + floor(hash(pass * 1.7 + seed) * count), count) : mod(c, count)", "drop = i == 0 ? ease_out(clamp(t / 0.7, 0, 1)) : 1"]
+  visible = "c >= 0 && i < count"
+  depth = "-i"
+  x = "(hash(c * 3.1) - 0.5) * (aspect - 0.55)"
+  y = "(hash(c * 5.7) - 0.5) * 0.37"
+  rotate = "(hash(c * 9.2) - 0.5) * 0.45"
+  scale = "1 + 0.25 * (1 - drop)"
+  opacity = "i == 0 ? clamp(t / 0.3, 0, 1) : 1"
+
+    [[scene.draw.draw.draw]]
+    kind = "rect"
+    x = 0.012
+    y = 0.016
+    w = 0.4
+    h = 0.48
+    color = "alpha(black, 0.4)"
+
+    [[scene.draw.draw.draw]]
+    kind = "rect"
+    w = 0.4
+    h = 0.48
+    color = "#f6f3ec"
+
+    [[scene.draw.draw.draw]]
+    kind = "image"
+    y = -0.03
+    source = "photos"
+    visible = "mine"
+    index = "pk"
+    fit = "cover"
+    w = 0.34
+    h = 0.34
+    filter = "tone"
+
+    [[scene.draw.draw.draw]]
+    kind = "image"
+    y = -0.03
+    files = ["examples/landscape-1.webp", "examples/landscape-2.webp", "examples/landscape-3.webp", "examples/landscape-4.webp", "examples/landscape-5.webp", "examples/wildlife-1.webp", "examples/wildlife-2.webp", "examples/wildlife-3.webp", "examples/wildlife-4.webp", "examples/wildlife-5.webp", "examples/technology-1.webp", "examples/technology-2.webp", "examples/technology-3.webp", "examples/technology-4.webp", "examples/technology-5.webp", "examples/computing-1.webp", "examples/computing-2.webp", "examples/computing-3.webp", "examples/computing-4.webp", "examples/computing-5.webp", "examples/aerospace-1.webp", "examples/aerospace-2.webp", "examples/aerospace-3.webp", "examples/aerospace-4.webp", "examples/aerospace-5.webp", "examples/astronomy-1.webp", "examples/astronomy-2.webp", "examples/astronomy-3.webp", "examples/astronomy-4.webp", "examples/astronomy-5.webp"]
+    visible = "!mine"
+    index = "base + pk"
+    fit = "cover"
+    w = 0.34
+    h = 0.34
+    filter = "tone"
+
+# Where to put your own, while the examples stand in for them: for the first few seconds, unless turned off.
+[[scene.draw]]
+kind = "text"
+visible = "hint && source == 0 && photos == 0 && time < 3"
+opacity = "1 - smoothstep(2.4, 3, time)"
+text = "Examples · put your own photos in ~/Pictures/Screensaver"
+x = "-aspect / 2 + 0.03"
+y = 0.46
+size = 0.022
+color = "alpha(white, 0.75)"

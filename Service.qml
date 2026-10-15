@@ -42,6 +42,10 @@ Item {
   readonly property string logo: omarchyPath + "/logo.txt"
   // Someone's own badge, for packs that show one: badge.png, .webp, .jpg or .jpeg here.
   readonly property string badge: home + "/.config/omarchy/screensafe/badge"
+  // Someone's own photos, for packs that show them.
+  readonly property string photos: home + "/Pictures/Screensaver"
+  // The shell's time zone, if it has one set, so a pack's clock shows the same time as the bar's.
+  readonly property string timeZone: Quickshell.env("TZ") || ""
 
   // This instance's name for its claim on Omarchy's screensaver switch, so that a late release from an earlier
   // instance (after a shell reload) can't undo this one's.
@@ -99,6 +103,7 @@ Item {
   function environment(withShell) {
     var env = { HOME: root.home, XDG_RUNTIME_DIR: root.runtimeDir, WAYLAND_DISPLAY: root.waylandDisplay }
     if (root.stateHome !== "") env.XDG_STATE_HOME = root.stateHome
+    if (/^:?[A-Za-z0-9_+\-\/,.<>]{1,64}$/.test(root.timeZone)) env.TZ = root.timeZone
     if (withShell) {
       env.OMARCHY_PATH = root.omarchyPath
       env.PATH = root.omarchyPath + "/bin:/usr/bin:/bin"
@@ -318,7 +323,7 @@ Item {
     }
     if (root.livePending && root.livePending.path === path) return
     var args = ["preview", "--pack", path, "--region", region, "--theme", root.themeDir, "--branding", root.branding,
-                "--logo", root.logo, "--badge", root.badge]
+                "--logo", root.logo, "--badge", root.badge, "--photos", root.photos]
     if (/^[A-Za-z0-9._-]{1,64}$/.test(String(output || ""))) args = args.concat(["--output", String(output)])
     if (livePreviewProc.running) {
       root.livePending = { path: path, args: args, region: region }
@@ -354,6 +359,19 @@ Item {
   function updateLive(path) {
     if (root.liveFailed === path) root.liveFailed = ""
     if (livePreviewProc.running && root.livePath === path && !root.livePending) livePreviewProc.write("settings " + root.settingsArg(path) + "\n")
+  }
+
+  // How many photos a pack has to show, or -1 if it doesn't show photos.
+  function photosOf(path) {
+    for (var i = 0; i < root.packs.length; i++) if (root.packs[i].path === path) return root.packs[i].photos
+    return -1
+  }
+
+  // Opens the photos folder in the file manager, making it first if it isn't there. The renderer makes it, and says
+  // where it is; only that exact folder is opened.
+  function openPhotosFolder() {
+    if (!root.supported || photosFolderProc.running) return
+    runShort(photosFolderProc, ["photos-folder"])
   }
 
   function setPack(path) {
@@ -449,7 +467,7 @@ Item {
 
   function refresh() {
     if (root.supported && !catalogProc.running)
-      runShort(catalogProc, ["catalog", root.builtinPacks, root.userPacks, root.themeDir, "--theme", root.themeDir, "--branding", root.branding, "--logo", root.logo, "--badge", root.badge])
+      runShort(catalogProc, ["catalog", root.builtinPacks, root.userPacks, root.themeDir, "--theme", root.themeDir, "--branding", root.branding, "--logo", root.logo, "--badge", root.badge, "--photos", root.photos])
   }
 
   function catalogResult(out) {
@@ -468,6 +486,8 @@ Item {
         description: String(p.description || "").slice(0, 300),
         error: String(p.error || "").slice(0, 300),
         settings: root.validDeclarations(p.settings),
+        // How many photos it has to show, or -1 for a pack that doesn't show any.
+        photos: typeof p.photos === "number" && isFinite(p.photos) && p.photos >= -1 ? Math.floor(Math.min(p.photos, 100000)) : -1,
         fingerprint: /^[0-9a-f]{16}$/.test(String(p.fingerprint || "")) ? String(p.fingerprint) : "",
         source: p.path === root.themePack ? "theme" : p.path.indexOf(root.builtinPacks + "/") === 0 ? "built-in" : "yours"
       })
@@ -533,7 +553,7 @@ Item {
     if (thumbProc.running || root.thumbQueue.length === 0) return
     var job = root.thumbQueue[0]
     root.thumbQueue = root.thumbQueue.slice(1)
-    var args = ["thumbnail", job.path, "--size", job.size, "--theme", root.themeDir, "--branding", root.branding, "--logo", root.logo, "--badge", root.badge]
+    var args = ["thumbnail", job.path, "--size", job.size, "--theme", root.themeDir, "--branding", root.branding, "--logo", root.logo, "--badge", root.badge, "--photos", root.photos]
     if (job.settings !== "") args = args.concat(["--settings", job.settings])
     var entry = root.thumbnails[job.key]
     if (entry !== undefined && entry.fingerprint !== "") args = args.concat(["--unless", entry.fingerprint])
@@ -636,7 +656,7 @@ Item {
   function launch(packPath) {
     root.launching = packPath
     root.stoppedForLock = false
-    rendererProc.command = [root.renderer, "run", "--pack", packPath, "--theme", root.themeDir, "--branding", root.branding, "--logo", root.logo, "--badge", root.badge, "--settings", root.settingsArg(packPath), "--role", "org.omarchy.screensaver"]
+    rendererProc.command = [root.renderer, "run", "--pack", packPath, "--theme", root.themeDir, "--branding", root.branding, "--logo", root.logo, "--badge", root.badge, "--photos", root.photos, "--settings", root.settingsArg(packPath), "--role", "org.omarchy.screensaver"]
     rendererProc.environment = root.environment(false)
     rendererOut.reset()
     rendererErr.reset()
@@ -677,7 +697,7 @@ Item {
 
   // Short calls: one at a time each, each stopped if it runs for more than ten seconds.
   readonly property int deadlineMs: 10000
-  readonly property var shortProcs: [takeoverProc, catalogProc, statusProc, lockProc, thumbProc]
+  readonly property var shortProcs: [takeoverProc, catalogProc, statusProc, lockProc, thumbProc, photosFolderProc]
 
   function runShort(proc, args) {
     if (proc.running) return
@@ -697,6 +717,7 @@ Item {
     interval: 1000
     repeat: true
     running: takeoverProc.running || catalogProc.running || statusProc.running || lockProc.running || thumbProc.running
+      || photosFolderProc.running
     onTriggered: {
       var now = Date.now()
       for (var i = 0; i < root.shortProcs.length; i++) {
@@ -772,6 +793,17 @@ Item {
     clearEnvironment: true
     stdout: BoundedOutput { id: lockOut; limit: 4096; process: lockProc }
     onExited: function() { root.lockResult(lockOut.over ? "" : lockOut.text, lockProc.purpose) }
+  }
+
+  Process {
+    id: photosFolderProc
+    property real startedAt: 0
+    clearEnvironment: true
+    stdout: BoundedOutput { id: photosFolderOut; limit: 4096; process: photosFolderProc }
+    onExited: function(code) {
+      if (code === 0 && !photosFolderOut.over && lastLine(photosFolderOut.text) === root.photos)
+        Qt.openUrlExternally("file://" + encodeURI(root.photos))
+    }
   }
 
   Process {

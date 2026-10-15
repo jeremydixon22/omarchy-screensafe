@@ -47,9 +47,22 @@ impl Affine {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum ImageRef {
+pub enum ImageSrc {
     Pack(usize),
     Background(usize),
+    Photo(usize),
+}
+
+/// An image as it's shown: where its pixels come from, and how they're prepared as it's decoded. Each distinct one
+/// is decoded and kept on its own.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ImageRef {
+    pub src: ImageSrc,
+    pub filter: pack::Filter,
+    /// The width over the height, in ten-thousandths, of the box the image is cut to fill; 0 for none.
+    pub crop: u32,
+    /// The longest side, in pixels, it's decoded to; 0 for a little more than the screen.
+    pub limit: u32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -83,6 +96,8 @@ pub enum Item {
     Image {
         source: ImageRef,
         fit: Fit,
+        /// The box it's fitted to, `w` by `h` stage units centered on its origin; or none, for the whole screen.
+        frame: Option<(f32, f32)>,
         zoom: f32,
         pan_x: f32,
         pan_y: f32,
@@ -132,6 +147,9 @@ pub struct FontMetrics {
 
 pub struct Evaluator {
     slots: Vec<f64>,
+    /// Where the clock's values come from: fixed unless set otherwise, and its reading for the frame being drawn.
+    clock: crate::clock::Clock,
+    reading: crate::clock::Reading,
     machine: Machine,
     /// The built-in font's, then each of the pack's fonts'.
     metrics: Vec<FontMetrics>,
@@ -156,7 +174,14 @@ fn bound(v: f64) -> f32 {
 
 impl Evaluator {
     pub fn new(pack: &Pack, seed: u64, metrics: Vec<FontMetrics>) -> Evaluator {
-        Evaluator { slots: pack.initial.clone(), machine: Machine::new(seed), metrics, text: String::new() }
+        let clock = crate::clock::Clock::fixed();
+        let reading = clock.at(0.0);
+        Evaluator { slots: pack.initial.clone(), clock, reading, machine: Machine::new(seed), metrics, text: String::new() }
+    }
+
+    /// Shows the clock from `clock` rather than the fixed moment.
+    pub fn set_clock(&mut self, clock: crate::clock::Clock) {
+        self.clock = clock;
     }
 
     fn num(&mut self, p: &Program) -> f64 {
@@ -214,6 +239,22 @@ impl Evaluator {
         self.set(b.cycle, cycle);
         self.set(b.aspect, aspect);
         self.set(b.screen_aspect, screen_aspect);
+        self.reading = self.clock.at(time);
+        let r = &self.reading;
+        for (slot, v) in [
+            (b.hour, r.hour as f64),
+            (b.minute, r.minute as f64),
+            (b.second, r.second as f64),
+            (b.clock, r.clock),
+            (b.day, r.day as f64),
+            (b.month, r.month as f64),
+            (b.year, r.year as f64),
+            (b.weekday, r.weekday as f64),
+            (b.utc_offset, r.offset as f64 / 3600.0),
+            (b.utc_clock, r.utc_clock),
+        ] {
+            self.slots[slot as usize] = v;
+        }
         let scene = &pack.scenes[index];
 
         // Towards the end of a scene its background turns into the next one's, so the change is never sudden.
@@ -360,19 +401,27 @@ impl Evaluator {
                     });
                 }
                 Kind::Image(image) => {
-                    let source = match image.source {
-                        Some(i) => Some(ImageRef::Pack(i)),
-                        None if !pack.backgrounds.is_empty() => {
-                            let count = pack.backgrounds.len() as f64;
-                            let index = self.num(&image.index).floor();
-                            Some(ImageRef::Background((index - count * (index / count).floor()) as usize % pack.backgrounds.len()))
-                        }
-                        None => None,
+                    // `index` chooses among several, counting from 0 and going round.
+                    let mut pick = |count: usize| {
+                        let count_f = count as f64;
+                        let index = self.num(&image.index).floor();
+                        ((index - count_f * (index / count_f).floor()) as usize).min(count - 1)
                     };
-                    if let Some(source) = source {
+                    let src = match &image.source {
+                        pack::ImageFrom::Files(files) => Some(ImageSrc::Pack(files[pick(files.len())])),
+                        pack::ImageFrom::Backgrounds if !pack.backgrounds.is_empty() => Some(ImageSrc::Background(pick(pack.backgrounds.len()))),
+                        pack::ImageFrom::Photos if !pack.photos.is_empty() => Some(ImageSrc::Photo(pick(pack.photos.len()))),
+                        _ => None,
+                    };
+                    if let Some(src) = src {
+                        let crop = match (image.frame, image.fit) {
+                            (Some((w, h)), Fit::Cover) => (w / h * 10_000.0).round() as u32,
+                            _ => 0,
+                        };
                         out.push(Item::Image {
-                            source,
+                            source: ImageRef { src, filter: image.filter, crop, limit: 0 },
                             fit: image.fit,
+                            frame: image.frame.map(|(w, h)| (w as f32, h as f32)),
                             zoom: self.num(&image.zoom).clamp(0.1, 10.0) as f32,
                             pan_x: self.num(&image.pan_x).clamp(-1.0, 1.0) as f32,
                             pan_y: self.num(&image.pan_y).clamp(-1.0, 1.0) as f32,
@@ -532,6 +581,13 @@ impl Evaluator {
                     let v = self.machine.num(p, &self.slots);
                     s.push_str(&pack::format_number(v, *format));
                 }
+                Segment::Clock(word) => match word {
+                    pack::ClockText::Zone => s.push_str(&self.reading.abbreviation),
+                    pack::ClockText::ZoneName => s.push_str(self.clock.name()),
+                    pack::ClockText::Offset => s.push_str(&self.reading.offset_text()),
+                    pack::ClockText::Weekday => s.push_str(self.reading.weekday_name()),
+                    pack::ClockText::Month => s.push_str(self.reading.month_name()),
+                },
             }
         }
         let shown = match &text.reveal {
@@ -937,5 +993,40 @@ mod tests {
         let mut square = vec![(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)];
         truncate_path(&mut square, 0.875, true);
         assert_eq!(square.last(), Some(&(0.0, 0.5)));
+    }
+
+    #[test]
+    fn text_reads_the_clock() {
+        let p = pack(
+            "clock",
+            "fade = 0\n[[scene]]\nduration = 10\n[[scene.draw]]\nkind = \"text\"\ntext = \"{hour;02}:{minute;02} {zone} {offset} {weekday_name} {day} {month_name}\"\n",
+        );
+        let mut e = Evaluator::new(&p, 1, vec![METRICS]);
+        let f = e.frame(&p, 30.0, 16.0 / 9.0);
+        let Item::Glyphs { glyphs, .. } = &f.items[0] else { panic!("{:?}", f.items) };
+        assert_eq!(glyphs.iter().map(|g| g.ch).filter(|c| *c != ' ').collect::<String>(), "10:09UTC+00:00Thursday15January");
+    }
+
+    #[test]
+    fn an_image_chooses_among_its_files() {
+        let png = crate::raster::tests::tiny_png();
+        let dir = temp_pack(
+            "files",
+            "format = 1\nname = \"T\"\n[[scene]]\nduration = 10\n[[scene.draw]]\nkind = \"image\"\nfiles = [\"a.png\", \"b.png\", \"c.png\"]\nindex = \"t\"\nw = 0.4\nh = 0.2\nfilter = \"sepia\"\n",
+            &[("a.png", &png), ("b.png", &png), ("c.png", &png)],
+        );
+        let p = load(&dir, &Environment::default()).unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+        let mut e = Evaluator::new(&p, 1, vec![METRICS]);
+        let chosen = |e: &mut Evaluator, t: f64| match &e.frame(&p, t, 16.0 / 9.0).items[0] {
+            Item::Image { source, frame, .. } => (*source, *frame),
+            other => panic!("{other:?}"),
+        };
+        let (a, frame) = chosen(&mut e, 1.5);
+        assert_eq!(a.src, ImageSrc::Pack(1));
+        assert_eq!(frame, Some((0.4, 0.2)));
+        assert_eq!(a.filter, pack::Filter::Sepia);
+        assert_eq!(a.crop, 20_000, "cut to the box's 2:1 shape");
+        assert_eq!(chosen(&mut e, 4.0).0.src, ImageSrc::Pack(1), "going round");
     }
 }

@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/jeremydixon22/omarchy-screensafe/actions/workflows/ci.yml"><img src="https://github.com/jeremydixon22/omarchy-screensafe/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://img.shields.io/badge/version-0.4.7-9ece6a" alt="Version 0.4.7">
+  <img src="https://img.shields.io/badge/version-0.4.8-9ece6a" alt="Version 0.4.8">
   <img src="https://img.shields.io/badge/Omarchy-4-9ece6a" alt="Omarchy 4">
   <img src="https://img.shields.io/badge/license-MIT-9ece6a" alt="MIT license">
 </p>
@@ -20,7 +20,7 @@
 
 A screensaver in ScreenSafe is a **pack**: a folder with a `screensafe.toml` and its art. A pack describes what to draw and how it moves, with small formulas like `sin(t * 2)` in a language that can't loop, read files or reach the network. ScreenSafe draws the pack itself, and nothing in a pack ever runs as a program, **so a pack from someone else can only describe pictures.**
 
-- **Fourteen packs built in**, from a harmonograph's glowing figures to a rainy Tokyo side street.
+- **Fifteen packs built in**, from a harmonograph's glowing figures to a rainy Tokyo side street, and your own photos.
 - **Your theme, everywhere.** Packs draw in the current theme's palette, and a theme can bring a pack of its own.
 - **Sharp at any size.** Drawn on Wayland's overlay layer at your screen's full resolution, on every screen.
 - **Settings without code.** Packs can offer a speed, a density or a picture; change them in the panel and watch the pack update live.
@@ -34,9 +34,9 @@ A screensaver in ScreenSafe is a **pack**: a folder with a `screensafe.toml` and
 | ![Omnipotence](docs/gallery/omnipotence.webp)<br>**Omnipotence**<br><sub>Figures drawn over the lines of code that draw them, until the Hand of Omnipotence turns the page.</sub> | ![Fibonacci](docs/gallery/fibonacci.webp)<br>**Fibonacci**<br><sub>The sequence in pictures: squares and spirals, a sunflower, rabbits, Pascal's triangle.</sub> | ![Trying To Remember](docs/gallery/trying-to-remember.webp)<br>**Trying To Remember**<br><sub>Thoughts wander through a fog of half-remembered ones, each reaching for an idea just out of reach.</sub> |
 | ![Starfield](docs/gallery/starfield.webp)<br>**Starfield**<br><sub>Flying through stars that streak past as they come close.</sub> | ![Cascade](docs/gallery/cascade.webp)<br>**Cascade**<br><sub>Columns of ever-changing digits falling down the screen.</sub> | ![Constellations](docs/gallery/constellations.webp)<br>**Constellations**<br><sub>Drifting stars, joined by faint lines whenever two pass close.</sub> |
 | ![Echoes](docs/gallery/echoes.webp)<br>**Echoes**<br><sub>Two shapes bouncing around the screen, trailing echoes of where they've been.</sub> | ![Orbits](docs/gallery/orbits.webp)<br>**Orbits**<br><sub>The Omarchy box turning in its orbits, then a slowly changing Lissajous figure.</sub> | ![Badge](docs/gallery/badge.webp)<br>**Badge**<br><sub>ScreenSafe's shield, the Omarchy mark or your own badge: bouncing, shattering, waving and in orbit, smoothly or as pixel art.</sub> |
-| ![Omarchy](docs/gallery/omarchy.webp)<br>**Omarchy**<br><sub>Your screensaver art from <i>Style › Screensaver</i>, revealed a different way each time.</sub> | ![Theme backgrounds](docs/gallery/backgrounds.webp)<br>**Theme backgrounds**<br><sub>Your theme's own backgrounds, one after another, drifting slowly across the screen.</sub> | |
+| ![Omarchy](docs/gallery/omarchy.webp)<br>**Omarchy**<br><sub>Your screensaver art from <i>Style › Screensaver</i>, revealed a different way each time.</sub> | ![Theme backgrounds](docs/gallery/backgrounds.webp)<br>**Theme backgrounds**<br><sub>Your theme's own backgrounds, one after another, drifting slowly across the screen.</sub> | ![Photos](docs/gallery/photos.webp)<br>**Photos**<br><sub>Your photos from <code>~/Pictures/Screensaver</code>, or sets of examples (nature, technology, aerospace, and astronomy from NASA): full screen, whole, or as prints or Polaroids, in their own tones or the theme's.</sub> |
 
-<sub>Frames from the renderer at each pack's own preview moment, in Tokyo Night, Omarchy's default theme, with its first background and Omarchy's own screensaver art. To show your own badge in Badge, put an image at <code>~/.config/omarchy/screensafe/badge.png</code> (or <code>.webp</code>, <code>.jpg</code> or <code>.jpeg</code>).</sub>
+<sub>Frames from the renderer at each pack's own preview moment (Photos as prints, with its examples), in Tokyo Night, Omarchy's default theme, with its first background and Omarchy's own screensaver art. To show your own badge in Badge, put an image at <code>~/.config/omarchy/screensafe/badge.png</code> (or <code>.webp</code>, <code>.jpg</code> or <code>.jpeg</code>).</sub>
 
 ## Install
 
@@ -123,7 +123,7 @@ To share it, see [Community packs](docs/COMMUNITY.md).
 ## Safety
 
 - **Packs are data.** The format has no way to run a program, open a file outside its own folder, reach the network or loop without end. Everything a pack asks for is checked and compiled before it's shown, and every per-frame cost is bounded.
-- **The renderer confines itself.** Before reading a pack it can only read the packs, theme and art it was given; after loading it, it gives up all file access. It can never reach the network or start programs. This uses Linux's Landlock, and the renderer refuses to read a pack if the kernel can't confine it.
+- **The renderer confines itself.** Before reading a pack it can only read the packs, theme, art and photos folder it was given; after loading it, it gives up new file access. Photo files opened while loading remain readable. It can never reach the network or start programs. This uses Linux's Landlock, and the renderer refuses to read a pack if the kernel can't confine it.
 - **Flashing is limited.** The renderer measures every frame and won't show more than three large-area flashes a second, the WCAG 2.2 limit for photosensitivity, whatever a pack asks for.
 - **Stalled frames are stopped.** If drawing a frame stalls for about five seconds, the renderer exits and ScreenSafe falls back to the built-in pack.
 - **The binaries are checkable.** Both renderers are built reproducibly from [`renderer/`](renderer), and CI attests each one; see [how to rebuild and compare them](docs/BINARY-PROVENANCE.md).

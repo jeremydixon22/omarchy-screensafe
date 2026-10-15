@@ -36,6 +36,7 @@ ScreenSafe's own code is in `renderer/src`, with no `unsafe` code (`#![forbid(un
 - `tiny-skia` and `fontdue` for drawing, and `ttf-parser` (through `fontdue`, and directly to check a pack's fonts);
 - `image` for PNG, JPEG and WebP;
 - `toml`;
+- `tz-rs` for time zones;
 - `rustix` for system calls;
 - `landlock` for confinement.
 

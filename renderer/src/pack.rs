@@ -26,6 +26,8 @@ pub const MAX_NESTING: usize = 4;
 pub const MAX_COUNT: i64 = 1024;
 /// The widest or tallest a sprite sheet may be, and the pixels all of a pack's sheets may hold.
 pub const MAX_SHEET_SIDE: u32 = 4096;
+/// The most images an image element's `files` may list.
+pub const MAX_IMAGE_FILES: usize = 64;
 pub const SHEET_PIXELS_LIMIT: u64 = 16 * 1024 * 1024;
 /// The fewest and most canvas pixels to a stage unit, for `pixels`.
 pub const MIN_PIXELS: i64 = 64;
@@ -125,7 +127,38 @@ pub struct Builtins {
     pub ex: u16,
     pub ey: u16,
     pub ez: u16,
+    // The clock, set each frame (see `clock`).
+    pub hour: u16,
+    pub minute: u16,
+    pub second: u16,
+    pub clock: u16,
+    pub day: u16,
+    pub month: u16,
+    pub year: u16,
+    pub weekday: u16,
+    pub utc_offset: u16,
+    pub utc_clock: u16,
+    /// How many photos there are to show, set as the pack loads.
+    pub photos: u16,
 }
+
+/// Words a text's braces may hold for the clock's names, rather than a number.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ClockText {
+    Zone,
+    ZoneName,
+    Offset,
+    Weekday,
+    Month,
+}
+
+pub const CLOCK_TEXT: &[(&str, ClockText)] = &[
+    ("zone", ClockText::Zone),
+    ("zone_name", ClockText::ZoneName),
+    ("offset", ClockText::Offset),
+    ("weekday_name", ClockText::Weekday),
+    ("month_name", ClockText::Month),
+];
 
 pub struct Let {
     pub slot: u16,
@@ -156,6 +189,7 @@ pub struct Format {
 pub enum Segment {
     Literal(String),
     Value(Program, Format),
+    Clock(ClockText),
 }
 
 pub struct Text {
@@ -213,10 +247,35 @@ pub enum Fit {
     Contain,
 }
 
+/// Where an image element's pictures come from.
+pub enum ImageFrom {
+    /// The pack's own files, as indices into `Pack::images`: one, or several that `index` chooses among.
+    Files(Vec<usize>),
+    /// The current theme's backgrounds.
+    Backgrounds,
+    /// The viewer's photos (see `Pack::photos`).
+    Photos,
+}
+
+/// A look applied to an image as it's decoded, so it costs nothing to draw.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Filter {
+    None,
+    Greyscale,
+    Sepia,
+    /// Shadows to highlights in the theme's background, accent and foreground colors.
+    Theme([[u8; 3]; 3]),
+}
+
+pub const FILTERS: &[&str] = &["none", "greyscale", "sepia", "theme"];
+
 pub struct Image {
-    /// An index into `Pack::images`, or `None` for the theme's backgrounds.
-    pub source: Option<usize>,
+    pub source: ImageFrom,
     pub fit: Fit,
+    /// A box `w` by `h` stage units, centered on the element's origin, that the image is fitted to, rather than the
+    /// whole screen.
+    pub frame: Option<(f64, f64)>,
+    pub filter: Filter,
     pub zoom: Program,
     pub pan_x: Program,
     pub pan_y: Program,
@@ -365,11 +424,31 @@ pub struct Pack {
     pub arts: Vec<Vec<Vec<char>>>,
     /// Fonts the pack brings, by file name, checked as TrueType or OpenType.
     pub fonts: Vec<(String, Vec<u8>)>,
+    /// The viewer's photos, for `source = "photos"`: opened as the pack loads and read only when shown.
+    pub photos: Vec<Photo>,
+    /// Whether the pack shows the viewer's photos, whether or not there are any.
+    pub uses_photos: bool,
     pub warnings: Vec<String>,
     /// A digest of everything the pack was made from: its manifest and files, the theme's colors and backgrounds it
     /// uses, the art it shows, and this renderer's version. The panel keeps a pack's thumbnail until it changes.
     pub fingerprint: u64,
 }
+
+/// One of the viewer's photos, held open so it can be read once the renderer can open nothing more.
+pub struct Photo {
+    pub name: String,
+    pub file: std::sync::Arc<std::fs::File>,
+    pub size: u64,
+    pub modified: (i64, i64),
+}
+
+/// The folder people put their photos in, under their home.
+pub const PHOTOS_FOLDER: &str = "Pictures/Screensaver";
+/// The most photos one showing holds open; with more in the folder, a different selection is shown each time.
+pub const PHOTOS_LIMIT: usize = 200;
+/// The largest photo file read.
+pub const PHOTO_FILE_LIMIT: u64 = 64 << 20;
+const PHOTO_EXTENSIONS: &[&str] = &[".png", ".jpg", ".jpeg", ".webp"];
 
 impl Pack {
     pub fn length(&self) -> f64 {
@@ -392,6 +471,10 @@ pub struct Environment<'a> {
     pub settings: &'a [(String, f64)],
     /// Art to show when the user's can't be read: Omarchy's logo.
     pub logo: Option<&'a Path>,
+    /// The viewer's photos folder, for `source = "photos"`.
+    pub photos: Option<&'a Path>,
+    /// With more photos than are held open, which are chosen: by this seed, or else the first by name.
+    pub photo_seed: Option<u64>,
 }
 
 #[derive(Debug)]
@@ -575,6 +658,7 @@ struct Loader<'a> {
     bytes_read: u64,
     elements: usize,
     uses_backgrounds: bool,
+    uses_photos: bool,
     warnings: Vec<String>,
 }
 
@@ -856,24 +940,55 @@ impl Loader<'_> {
             }
             "image" => {
                 let file = f.string("file")?;
+                let files = if f.get("files").is_some() { Some(f.strings("files")?) } else { None };
                 let source = f.string("source")?;
-                let source = match (file, source.as_deref()) {
-                    (Some(file), None) => Some(self.image(&f, &file)?),
-                    (None, Some("theme-backgrounds")) => {
-                        self.uses_backgrounds = true;
-                        None
+                let source = match (file, files, source.as_deref()) {
+                    (Some(file), None, None) => ImageFrom::Files(vec![self.image(&f, &file)?]),
+                    (None, Some(files), None) => {
+                        if files.is_empty() || files.len() > MAX_IMAGE_FILES {
+                            return f.err("files", format!("must list 1 to {MAX_IMAGE_FILES} images"));
+                        }
+                        let mut out = Vec::new();
+                        for file in &files {
+                            out.push(self.image(&f, file)?);
+                        }
+                        ImageFrom::Files(out)
                     }
-                    (None, Some(_)) => return f.err("source", "the only image source is \"theme-backgrounds\""),
-                    (Some(_), Some(_)) => return f.err("source", "use either file or source, not both"),
-                    (None, None) => return f.err("", "an image needs file = \"name.webp\" or source = \"theme-backgrounds\""),
+                    (None, None, Some("theme-backgrounds")) => {
+                        self.uses_backgrounds = true;
+                        ImageFrom::Backgrounds
+                    }
+                    (None, None, Some("photos")) => {
+                        self.uses_photos = true;
+                        ImageFrom::Photos
+                    }
+                    (None, None, Some(_)) => return f.err("source", "an image's source is \"theme-backgrounds\" or \"photos\""),
+                    (None, None, None) => return f.err("", "an image needs file = \"name.webp\", files = [...], or a source"),
+                    _ => return f.err("source", "use one of file, files or source"),
                 };
                 let fit = f.choice("fit", &[("cover", Fit::Cover), ("contain", Fit::Contain)], Fit::Cover)?;
+                let frame = match (f.get("w").is_some(), f.get("h").is_some()) {
+                    (false, false) => None,
+                    (true, true) => Some((f.number("w", 1.0, 0.01, 10.0)?, f.number("h", 1.0, 0.01, 10.0)?)),
+                    _ => return f.err("w", "give both w and h, or neither"),
+                };
+                let filter = match f.get("filter") {
+                    None => Filter::None,
+                    Some(toml::Value::String(name)) if FILTERS.contains(&name.as_str()) => {
+                        let name = name.clone();
+                        self.filter(&name)
+                    }
+                    Some(_) => {
+                        let n = self.fixed(&mut f, "filter", 0.0, 0.0, (FILTERS.len() - 1) as f64, &scope)?;
+                        self.filter(FILTERS[n.round() as usize])
+                    }
+                };
                 let zoom = self.expr(&mut f, "zoom", "1", &scope, Ty::Num, &mut budget)?;
                 let pan_x = self.expr(&mut f, "pan_x", "0", &scope, Ty::Num, &mut budget)?;
                 let pan_y = self.expr(&mut f, "pan_y", "0", &scope, Ty::Num, &mut budget)?;
                 let index = self.expr(&mut f, "index", "0", &scope, Ty::Num, &mut budget)?;
                 budget.points += 4;
-                Kind::Image(Image { source, fit, zoom, pan_x, pan_y, index })
+                Kind::Image(Image { source, fit, frame, filter, zoom, pan_x, pan_y, index })
             }
             "ascii" => {
                 let art_file = f.string("art")?;
@@ -1003,6 +1118,14 @@ impl Loader<'_> {
                 return f.err("text", "has a '{' without a '}'; write {{ for a brace");
             };
             let inside = &brace[1..end];
+            if let Some((_, word)) = CLOCK_TEXT.iter().find(|(name, _)| *name == inside.trim()) {
+                if !literal.is_empty() {
+                    segments.push(Segment::Literal(std::mem::take(&mut literal)));
+                }
+                segments.push(Segment::Clock(*word));
+                rest = &brace[end + 1..];
+                continue;
+            }
             let (src, spec) = match inside.split_once(';') {
                 Some((src, spec)) => (src, Some(spec.trim())),
                 None => (inside, None),
@@ -1025,6 +1148,23 @@ impl Loader<'_> {
             segments.push(Segment::Literal(literal));
         }
         Ok(segments)
+    }
+
+    /// The filter named `name`, with the theme's colors for "theme".
+    fn filter(&self, name: &str) -> Filter {
+        match name {
+            "greyscale" => Filter::Greyscale,
+            "sepia" => Filter::Sepia,
+            "theme" => {
+                let palette = self.env.palette.cloned().unwrap_or_else(Palette::default_theme);
+                let rgb = |name: &str| {
+                    let c = palette.colors.iter().find(|(n, _)| *n == name).map(|(_, c)| *c).unwrap_or([0.5, 0.5, 0.5, 1.0]);
+                    [(c[0] * 255.0).round() as u8, (c[1] * 255.0).round() as u8, (c[2] * 255.0).round() as u8]
+                };
+                Filter::Theme([rgb("background"), rgb("accent"), rgb("foreground")])
+            }
+            _ => Filter::None,
+        }
     }
 
     fn image(&mut self, f: &Fields, file: &str) -> Result<usize> {
@@ -1449,6 +1589,13 @@ fn fingerprint(manifest: &str, pack: &Pack, env: &Environment) -> u64 {
         h.bytes(name.as_bytes());
         h.bytes(bytes);
     }
+    // Photos by name, size and time changed: reading them all would be slow, and these change when they do.
+    for photo in &pack.photos {
+        h.bytes(photo.name.as_bytes());
+        h.bytes(&photo.size.to_le_bytes());
+        h.bytes(&photo.modified.0.to_le_bytes());
+        h.bytes(&photo.modified.1.to_le_bytes());
+    }
     for art in &pack.arts {
         for row in art {
             h.bytes(row.iter().collect::<String>().as_bytes());
@@ -1548,6 +1695,17 @@ fn load_manifest(dir: Dir, text: &str, env: &Environment) -> Result<Pack> {
             ex: 0,
             ey: 0,
             ez: 0,
+            hour: 0,
+            minute: 0,
+            second: 0,
+            clock: 0,
+            day: 0,
+            month: 0,
+            year: 0,
+            weekday: 0,
+            utc_offset: 0,
+            utc_clock: 0,
+            photos: 0,
         },
         images: Vec::new(),
         image_names: Vec::new(),
@@ -1562,6 +1720,7 @@ fn load_manifest(dir: Dir, text: &str, env: &Environment) -> Result<Pack> {
         bytes_read: 0,
         elements: 0,
         uses_backgrounds: false,
+        uses_photos: false,
         warnings: Vec::new(),
     };
     let mut b = loader.builtins;
@@ -1583,6 +1742,17 @@ fn load_manifest(dir: Dir, text: &str, env: &Environment) -> Result<Pack> {
         &mut b.ex,
         &mut b.ey,
         &mut b.ez,
+        &mut b.hour,
+        &mut b.minute,
+        &mut b.second,
+        &mut b.clock,
+        &mut b.day,
+        &mut b.month,
+        &mut b.year,
+        &mut b.weekday,
+        &mut b.utc_offset,
+        &mut b.utc_clock,
+        &mut b.photos,
     ] {
         *slot = loader.alloc(1)?;
     }
@@ -1592,6 +1762,24 @@ fn load_manifest(dir: Dir, text: &str, env: &Environment) -> Result<Pack> {
     scope.bind("cycle", b.cycle, Ty::Num);
     scope.bind("aspect", b.aspect, Ty::Num);
     scope.bind("screen_aspect", b.screen_aspect, Ty::Num);
+    for (name, slot) in [
+        ("hour", b.hour),
+        ("minute", b.minute),
+        ("second", b.second),
+        ("clock", b.clock),
+        ("day", b.day),
+        ("month", b.month),
+        ("year", b.year),
+        ("weekday", b.weekday),
+        ("utc_offset", b.utc_offset),
+        ("utc_clock", b.utc_clock),
+        ("photos", b.photos),
+    ] {
+        scope.bind(name, slot, Ty::Num);
+    }
+    for (name, _) in CLOCK_TEXT {
+        scope.reserve(name, "is only for text, in braces: {zone}");
+    }
     // Reserved so a pack value can't take a name that a scene, element or curve provides.
     for name in ["t", "u", "dur"] {
         scope.reserve(name, "is only available inside a scene");
@@ -1701,6 +1889,11 @@ fn load_manifest(dir: Dir, text: &str, env: &Environment) -> Result<Pack> {
             Some(theme) => backgrounds = read_backgrounds(theme, &mut loader.warnings),
         }
     }
+    let photos = match (loader.uses_photos, env.photos) {
+        (true, Some(folder)) => open_photos(folder, env.photo_seed, &mut loader.warnings),
+        _ => Vec::new(),
+    };
+    loader.initial[loader.builtins.photos as usize] = photos.len() as f64;
     Ok(Pack {
         meta,
         stage,
@@ -1711,9 +1904,54 @@ fn load_manifest(dir: Dir, text: &str, env: &Environment) -> Result<Pack> {
         backgrounds,
         arts: loader.arts,
         fonts: loader.fonts,
+        photos,
+        uses_photos: loader.uses_photos,
         warnings: loader.warnings,
         fingerprint: 0,
     })
+}
+
+/// The viewer's photos: PNG, JPEG and WebP files directly in `folder`, opened but not yet read. A folder that's
+/// missing or empty gives none, quietly: the pack shows what it shows without them. With more than `PHOTOS_LIMIT`,
+/// a selection is held open: by `seed`, so each showing differs, or else the first by name.
+fn open_photos(folder: &Path, seed: Option<u64>, warnings: &mut Vec<String>) -> Vec<Photo> {
+    let Ok(dir) = Dir::open(folder) else { return Vec::new() };
+    let (mut names, _) = match dir.user_files(20_000) {
+        Ok(listed) => listed,
+        Err(e) => {
+            warnings.push(e.0);
+            return Vec::new();
+        }
+    };
+    names.retain(|n| {
+        let lower = n.to_ascii_lowercase();
+        PHOTO_EXTENSIONS.iter().any(|ext| lower.ends_with(ext))
+    });
+    if names.len() > PHOTOS_LIMIT {
+        if let Some(seed) = seed {
+            // A partial Fisher-Yates shuffle with a small generator: the first PHOTOS_LIMIT become a random selection.
+            let mut state = seed | 1;
+            for i in 0..PHOTOS_LIMIT {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                let j = i + (state % (names.len() - i) as u64) as usize;
+                names.swap(i, j);
+            }
+            names.truncate(PHOTOS_LIMIT);
+            names.sort();
+        } else {
+            names.truncate(PHOTOS_LIMIT);
+        }
+    }
+    let mut photos = Vec::new();
+    for name in names {
+        match dir.open_user_file(&name, PHOTO_FILE_LIMIT) {
+            Ok(open) => photos.push(Photo { name, file: std::sync::Arc::new(open.file), size: open.size, modified: open.modified }),
+            Err(e) => warnings.push(e.0),
+        }
+    }
+    photos
 }
 
 /// The theme's background images, sorted by name. Unreadable ones are skipped with a warning.
@@ -2067,7 +2305,8 @@ colors = ["accent", "foreground"]
         std::fs::create_dir_all(theme.join("backgrounds")).unwrap();
         std::fs::write(theme.join("backgrounds/1.png"), crate::raster::tests::tiny_png()).unwrap();
         std::fs::write(theme.join("backgrounds/notes.md"), "x").unwrap();
-        let env = Environment { palette: None, theme: Some(&theme), branding: Some(&art), logo: None, badge: None, settings: &[] };
+        let env =
+            Environment { palette: None, theme: Some(&theme), branding: Some(&art), logo: None, badge: None, settings: &[], photos: None, photo_seed: None };
         let pack = load(&dir, &env).unwrap();
         assert_eq!(pack.arts[0], vec!["OMARCHY".chars().collect::<Vec<_>>()]);
         assert_eq!(pack.backgrounds.len(), 1);
@@ -2077,9 +2316,79 @@ colors = ["accent", "foreground"]
         let logo = dir.join("logo.txt");
         std::fs::write(&logo, "LOGO").unwrap();
         let missing = dir.join("missing.txt");
-        let env = Environment { palette: None, theme: None, branding: Some(&missing), logo: Some(&logo), badge: None, settings: &[] };
+        let env =
+            Environment { palette: None, theme: None, branding: Some(&missing), logo: Some(&logo), badge: None, settings: &[], photos: None, photo_seed: None };
         let pack = load(&dir, &env).unwrap();
         assert_eq!(pack.arts[0], vec!["LOGO".chars().collect::<Vec<_>>()]);
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    fn photos_folder(name: &str, names: &[&str]) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("screensafe-photos-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        for n in names {
+            std::fs::write(dir.join(n), crate::raster::tests::tiny_png()).unwrap();
+        }
+        dir
+    }
+
+    const PHOTOS_PACK: &str = "format = 1\nname = \"T\"\n[[scene]]\nduration = 2\n[[scene.draw]]\nkind = \"image\"\nsource = \"photos\"\n";
+
+    #[test]
+    fn photos_are_held_open_by_name() {
+        let folder = photos_folder("names", &["b c (1).PNG", "a.jpg", ".hidden.png", "notes.txt"]);
+        std::os::unix::fs::symlink("/etc/hostname", folder.join("link.png")).unwrap();
+        let dir = temp_pack("photos", PHOTOS_PACK, &[]);
+        let env = Environment { photos: Some(&folder), ..Environment::default() };
+        let pack = load(&dir, &env).unwrap();
+        let names: Vec<&str> = pack.photos.iter().map(|p| p.name.as_str()).collect();
+        assert_eq!(names, ["a.jpg", "b c (1).PNG"], "images by name; hidden files, other files and links left out");
+        assert!(pack.uses_photos);
+        assert_eq!(pack.initial[pack.builtins.photos as usize], 2.0);
+        let none = load(&dir, &Environment::default()).unwrap();
+        assert!(none.photos.is_empty() && none.uses_photos, "no folder: no photos, quietly");
+        let missing = std::env::temp_dir().join("screensafe-no-such-photos");
+        assert!(load(&dir, &Environment { photos: Some(&missing), ..Environment::default() }).unwrap().photos.is_empty());
+        std::fs::remove_dir_all(&dir).unwrap();
+        std::fs::remove_dir_all(&folder).unwrap();
+    }
+
+    #[test]
+    fn many_photos_are_chosen_among() {
+        let names: Vec<String> = (0..PHOTOS_LIMIT + 30).map(|i| format!("{i:04}.png")).collect();
+        let refs: Vec<&str> = names.iter().map(String::as_str).collect();
+        let folder = photos_folder("many", &refs);
+        let dir = temp_pack("many-photos", PHOTOS_PACK, &[]);
+        let first = load(&dir, &Environment { photos: Some(&folder), ..Environment::default() }).unwrap();
+        assert_eq!(first.photos.len(), PHOTOS_LIMIT);
+        assert_eq!(first.photos.last().unwrap().name, format!("{:04}.png", PHOTOS_LIMIT - 1), "without a seed, the first by name");
+        let a = load(&dir, &Environment { photos: Some(&folder), photo_seed: Some(1), ..Environment::default() }).unwrap();
+        let b = load(&dir, &Environment { photos: Some(&folder), photo_seed: Some(2), ..Environment::default() }).unwrap();
+        let names = |p: &Pack| p.photos.iter().map(|p| p.name.clone()).collect::<Vec<_>>();
+        assert_eq!(a.photos.len(), PHOTOS_LIMIT);
+        assert_ne!(names(&a), names(&b), "each seed, its own selection");
+        assert_ne!(names(&a), names(&first));
+        std::fs::remove_dir_all(&dir).unwrap();
+        std::fs::remove_dir_all(&folder).unwrap();
+    }
+
+    #[test]
+    fn image_boxes_and_filters() {
+        let png = crate::raster::tests::tiny_png();
+        let image = |extra: &str| {
+            format!("format = 1\nname = \"T\"\n[[setting]]\nname = \"tone\"\nlabel = \"Tone\"\nkind = \"choice\"\nchoices = [\"A\", \"B\"]\nvalues = [0, 3]\ndefault = 3\n[[scene]]\nduration = 2\n[[scene.draw]]\nkind = \"image\"\nfile = \"a.png\"\n{extra}")
+        };
+        let only_w = temp_pack("box-w", &image("w = 0.5\n"), &[("a.png", &png)]);
+        assert!(matches!(load(&only_w, &Environment::default()), Err(e) if e.0.contains("both w and h")));
+        let toned = temp_pack("tone", &image("filter = \"tone\"\n"), &[("a.png", &png)]);
+        let pack = load(&toned, &Environment::default()).unwrap();
+        let Kind::Image(img) = &pack.scenes[0].draw[0].kind else { panic!() };
+        assert!(matches!(img.filter, Filter::Theme(_)), "a setting can choose the filter");
+        let bad = temp_pack("bad-filter", &image("filter = \"vivid\"\n"), &[("a.png", &png)]);
+        assert!(load(&bad, &Environment::default()).is_err());
+        for d in [only_w, toned, bad] {
+            std::fs::remove_dir_all(d).unwrap();
+        }
     }
 }

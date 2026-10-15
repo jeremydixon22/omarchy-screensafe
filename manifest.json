@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.jeremydixon22.screensafe",
   "name": "ScreenSafe",
-  "version": "0.4.7",
+  "version": "0.4.8",
   "author": "Jeremy Dixon",
   "license": "MIT",
   "description": "Screensavers made of data, not code: ASCII art, line art and images, drawn sharp on every screen.",

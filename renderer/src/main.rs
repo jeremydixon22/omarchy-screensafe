@@ -22,6 +22,7 @@ macro_rules! tell {
     }};
 }
 
+mod clock;
 mod eval;
 mod expr;
 mod flash;
@@ -42,13 +43,14 @@ use palette::Palette;
 use raster::{Raster, View};
 
 const USAGE: &str = "usage:
-  screensafe run --pack DIR [--theme DIR] [--branding FILE] [--logo FILE] [--badge PATH] [--settings NAME=VALUE,...] [--seed N] [--max-fps N] [--start SECONDS] [--exit-after SECONDS]
-  screensafe check DIR [--theme DIR] [--branding FILE] [--logo FILE] [--badge PATH] [--settings NAME=VALUE,...] [--seconds N] [--size WxH]
-  screensafe render DIR --time SECONDS --out FILE.png [--size WxH] [--theme DIR] [--branding FILE] [--logo FILE] [--badge PATH] [--settings NAME=VALUE,...]
-  screensafe catalog DIR... [--theme DIR] [--branding FILE] [--logo FILE] [--badge PATH]
-  screensafe preview --pack DIR --region X,Y,W,H [--output NAME] [--theme DIR] [--branding FILE] [--logo FILE] [--badge PATH] [--settings NAME=VALUE,...]
-  screensafe thumbnail DIR [--size WxH] [--time SECONDS] [--unless FINGERPRINT] [--theme DIR] [--branding FILE] [--logo FILE] [--badge PATH] [--settings NAME=VALUE,...]
+  screensafe run --pack DIR [--theme DIR] [--branding FILE] [--logo FILE] [--badge PATH] [--photos DIR] [--settings NAME=VALUE,...] [--seed N] [--max-fps N] [--start SECONDS] [--exit-after SECONDS]
+  screensafe check DIR [--theme DIR] [--branding FILE] [--logo FILE] [--badge PATH] [--photos DIR] [--settings NAME=VALUE,...] [--seconds N] [--size WxH]
+  screensafe render DIR --time SECONDS --out FILE.png [--size WxH] [--theme DIR] [--branding FILE] [--logo FILE] [--badge PATH] [--photos DIR] [--settings NAME=VALUE,...]
+  screensafe catalog DIR... [--theme DIR] [--branding FILE] [--logo FILE] [--badge PATH] [--photos DIR]
+  screensafe preview --pack DIR --region X,Y,W,H [--output NAME] [--theme DIR] [--branding FILE] [--logo FILE] [--badge PATH] [--photos DIR] [--settings NAME=VALUE,...]
+  screensafe thumbnail DIR [--size WxH] [--time SECONDS] [--unless FINGERPRINT] [--theme DIR] [--branding FILE] [--logo FILE] [--badge PATH] [--photos DIR] [--settings NAME=VALUE,...]
   screensafe takeover claim TOKEN | release [TOKEN] | status
+  screensafe photos-folder
   screensafe sandbox-test
   screensafe version";
 
@@ -154,7 +156,7 @@ fn theme_palette(theme: Option<&Path>) -> Result<Option<Palette>, String> {
 /// Confines the renderer to reading `dirs` and the theme and art it was given, before it parses anything.
 fn confine_reading(args: &Args, dirs: &[PathBuf]) -> Result<&'static str, String> {
     let mut paths: Vec<PathBuf> = dirs.to_vec();
-    paths.extend(["theme", "branding", "logo"].iter().filter_map(|k| args.path(k)));
+    paths.extend(["theme", "branding", "logo", "photos"].iter().filter_map(|k| args.path(k)));
     // Someone's badge: only the few files it may be, not the folder they're in.
     if let Some(badge) = args.path("badge") {
         paths.extend(pack::BADGE_EXTENSIONS.iter().map(|ext| badge.with_extension(ext)));
@@ -193,14 +195,17 @@ fn parse_settings(text: &str) -> Result<Vec<(String, f64)>, String> {
 }
 
 fn load(dir: &Path, args: &Args) -> Result<Pack, String> {
-    load_with(dir, args, &settings(args)?)
+    load_with(dir, args, &settings(args)?, None)
 }
 
-fn load_with(dir: &Path, args: &Args, chosen: &[(String, f64)]) -> Result<Pack, String> {
+/// Loads a pack with the settings `chosen`. With more photos than are held open, `photo_seed` picks which; without
+/// one, it's the first by name, so the result, and the pack's fingerprint, is the same every time.
+fn load_with(dir: &Path, args: &Args, chosen: &[(String, f64)], photo_seed: Option<u64>) -> Result<Pack, String> {
     let theme = args.path("theme");
     let branding = args.path("branding");
     let logo = args.path("logo");
     let badge = args.path("badge");
+    let photos = args.path("photos");
     let palette = theme_palette(theme.as_deref())?;
     let env = Environment {
         palette: palette.as_ref(),
@@ -209,6 +214,8 @@ fn load_with(dir: &Path, args: &Args, chosen: &[(String, f64)]) -> Result<Pack, 
         logo: logo.as_deref(),
         badge: badge.as_deref(),
         settings: chosen,
+        photos: photos.as_deref(),
+        photo_seed,
     };
     pack::load(dir, &env).map_err(|e| e.0)
 }
@@ -217,23 +224,31 @@ fn load_with(dir: &Path, args: &Args, chosen: &[(String, f64)]) -> Result<Pack, 
 const PACK_UNUSABLE: u8 = 3;
 
 fn run(args: &Args) -> Result<Result<(), String>, String> {
-    args.only(&["pack", "theme", "branding", "logo", "badge", "settings", "seed", "max-fps", "exit-after", "start", "role"])?;
+    args.only(&["pack", "theme", "branding", "logo", "badge", "photos", "settings", "seed", "max-fps", "exit-after", "start", "role"])?;
     let dir = args.path("pack").ok_or(USAGE)?;
-    confine_reading(args, std::slice::from_ref(&dir))?;
-    let pack = match load(&dir, args) {
-        Ok(p) => p,
-        Err(e) => return Ok(Err(e)),
-    };
     let seed = match args.number("seed")? {
         Some(s) => s as u64,
         None => std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos() as u64).unwrap_or(1),
     };
+    let start = args.number("start")?.unwrap_or(0.0).clamp(0.0, 86400.0);
+    // The time zone is read before the renderer confines itself.
+    let mut clock_warnings = Vec::new();
+    let clock = clock::Clock::local(&mut clock_warnings).starting_at(start);
     let options = wayland::Options {
         seed,
         exit_after: args.number("exit-after")?.map(|s| Duration::from_secs_f64(s.clamp(0.0, 86400.0))),
         max_fps: args.number("max-fps")?.unwrap_or(pack::MAX_FPS).clamp(1.0, pack::MAX_FPS),
-        start: args.number("start")?.unwrap_or(0.0).clamp(0.0, 86400.0),
+        start,
+        clock: Some(clock),
     };
+    confine_reading(args, std::slice::from_ref(&dir))?;
+    let pack = match load_with(&dir, args, &settings(args)?, Some(seed)) {
+        Ok(p) => p,
+        Err(e) => return Ok(Err(e)),
+    };
+    for w in &clock_warnings {
+        tell!("screensafe: {w}");
+    }
     let mut raster = Raster::new();
     raster.background_decoding = true;
     let display = wayland::connect()?;
@@ -257,19 +272,27 @@ fn run(args: &Args) -> Result<Result<(), String>, String> {
 /// its pack's folder and the theme and art it was given, but not past that: a change of settings reads the pack again.
 /// It still can't write anything, run anything or reach the network, and it ends with the panel that started it.
 fn live_preview(args: &Args) -> Result<(), String> {
-    args.only(&["pack", "theme", "branding", "logo", "badge", "settings", "region", "output", "seed"])?;
+    args.only(&["pack", "theme", "branding", "logo", "badge", "photos", "settings", "region", "output", "seed"])?;
     let dir = args.path("pack").ok_or(USAGE)?;
     let output = args.get("output").map(|o| o.chars().take(64).collect());
     let region = wayland::Region::parse(args.get("region").ok_or(USAGE)?, output)?;
+    let mut clock_warnings = Vec::new();
+    let clock = clock::Clock::local(&mut clock_warnings);
     let confinement = confine_reading(args, std::slice::from_ref(&dir))?;
     let pack = load(&dir, args)?;
-    let options = wayland::Options { seed: args.number("seed")?.map(|s| s as u64).unwrap_or(1), exit_after: None, max_fps: pack::MAX_FPS, start: 0.0 };
+    let options = wayland::Options {
+        seed: args.number("seed")?.map(|s| s as u64).unwrap_or(1),
+        exit_after: None,
+        max_fps: pack::MAX_FPS,
+        start: 0.0,
+        clock: Some(clock),
+    };
     let mut raster = Raster::new();
     raster.background_decoding = true;
     raster.load_fonts(&pack);
     let display = wayland::connect_preview(region)?;
     tell!("screensafe: previewing {}; {confinement}, reading only; {}", pack.meta.name, display.format());
-    let mut reload = |given: &str| load_with(&dir, args, &parse_settings(given)?);
+    let mut reload = |given: &str| load_with(&dir, args, &parse_settings(given)?, None);
     let why = display.preview(pack, &options, &mut raster, &mut reload)?;
     say!("{why}");
     Ok(())
@@ -323,7 +346,7 @@ fn flash_report(pack: &Pack, seconds: f64, (w, h): (u32, u32)) -> (String, bool)
 }
 
 fn check(args: &Args) -> Result<bool, String> {
-    args.only(&["theme", "branding", "logo", "badge", "settings", "seconds", "size"])?;
+    args.only(&["theme", "branding", "logo", "badge", "photos", "settings", "seconds", "size"])?;
     let dir = args.positional.get(1).map(PathBuf::from).ok_or(USAGE)?;
     let size = parse_size(args.get("size"), (960, 540))?;
     confine_reading(args, std::slice::from_ref(&dir))?;
@@ -377,7 +400,7 @@ fn parse_size(value: Option<&str>, default: (u32, u32)) -> Result<(u32, u32), St
 }
 
 fn render(args: &Args) -> Result<(), String> {
-    args.only(&["theme", "branding", "logo", "badge", "settings", "time", "out", "size"])?;
+    args.only(&["theme", "branding", "logo", "badge", "photos", "settings", "time", "out", "size"])?;
     let dir = args.positional.get(1).map(PathBuf::from).ok_or(USAGE)?;
     let out = args.path("out").ok_or(USAGE)?;
     let time = args.number("time")?.unwrap_or(0.0).max(0.0);
@@ -407,7 +430,7 @@ fn render(args: &Args) -> Result<(), String> {
 /// a pack whose fingerprint is that one isn't drawn again: the second line is `unchanged`. Nothing is written to
 /// disk, and the renderer is confined before it draws.
 fn thumbnail(args: &Args) -> Result<(), String> {
-    args.only(&["theme", "branding", "logo", "badge", "settings", "time", "size", "unless"])?;
+    args.only(&["theme", "branding", "logo", "badge", "photos", "settings", "time", "size", "unless"])?;
     let dir = args.positional.get(1).map(PathBuf::from).ok_or(USAGE)?;
     let (w, h) = parse_size(args.get("size"), (320, 200))?;
     if w > THUMBNAIL_SIDE || h > THUMBNAIL_SIDE {
@@ -465,7 +488,7 @@ fn base64(bytes: &[u8]) -> String {
 
 /// Lists the packs in each directory, one per subdirectory holding a screensafe.toml, as JSON for the plugin.
 fn catalog(args: &Args) -> Result<(), String> {
-    args.only(&["theme", "branding", "logo", "badge"])?;
+    args.only(&["theme", "branding", "logo", "badge", "photos"])?;
     let roots: Vec<PathBuf> = args.positional.iter().skip(1).map(PathBuf::from).collect();
     confine_reading(args, &roots)?;
     let mut entries = Vec::new();
@@ -492,7 +515,7 @@ fn catalog(args: &Args) -> Result<(), String> {
             }
             let entry = match load(&path, args) {
                 Ok(p) => format!(
-                    "{{\"path\":{},\"ok\":true,\"name\":{},\"author\":{},\"license\":{},\"description\":{},\"fingerprint\":\"{:016x}\",\"warnings\":{},\"settings\":{}}}",
+                    "{{\"path\":{},\"ok\":true,\"name\":{},\"author\":{},\"license\":{},\"description\":{},\"fingerprint\":\"{:016x}\",\"warnings\":{},\"settings\":{},\"photos\":{}}}",
                     json(&path.display().to_string()),
                     json(&p.meta.name),
                     json(&p.meta.author),
@@ -500,7 +523,9 @@ fn catalog(args: &Args) -> Result<(), String> {
                     json(&p.meta.description),
                     p.fingerprint,
                     p.warnings.len(),
-                    settings_json(&p.meta.settings)
+                    settings_json(&p.meta.settings),
+                    // How many photos it has to show, or -1 for a pack that doesn't show any.
+                    if p.uses_photos { p.photos.len() as i64 } else { -1 }
                 ),
                 Err(e) => {
                     let short: String = e.lines().next().unwrap_or("").chars().take(300).collect();
@@ -515,6 +540,28 @@ fn catalog(args: &Args) -> Result<(), String> {
         }
     }
     say!("[{}]", entries.join(","));
+    Ok(())
+}
+
+/// Makes the photos folder, `~/Pictures/Screensaver`, if it isn't there, and prints its path, so the panel can open it
+/// for someone to add photos. Each folder is made, or opened, without following a link.
+fn photos_folder(args: &Args) -> Result<(), String> {
+    use rustix::fs::{Mode, OFlags};
+    args.only(&[])?;
+    let home = std::env::var_os("HOME").filter(|h| !h.is_empty()).ok_or("HOME isn't set")?;
+    let open = |parent: &std::os::fd::OwnedFd, name: &str| {
+        rustix::fs::openat(parent, name, OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC, Mode::empty())
+    };
+    let mut dir = rustix::fs::open(Path::new(&home), OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC, Mode::empty())
+        .map_err(|e| format!("can't open {}: {e}", Path::new(&home).display()))?;
+    for name in pack::PHOTOS_FOLDER.split('/') {
+        match rustix::fs::mkdirat(&dir, name, Mode::from_raw_mode(0o755)) {
+            Ok(()) | Err(rustix::io::Errno::EXIST) => {}
+            Err(e) => return Err(format!("can't make {name}: {e}")),
+        }
+        dir = open(&dir, name).map_err(|e| format!("can't open {name}: {e}"))?;
+    }
+    say!("{}", Path::new(&home).join(pack::PHOTOS_FOLDER).display());
     Ok(())
 }
 
@@ -565,7 +612,7 @@ fn failsafes(command: Option<&str>) {
     if command != Some("takeover") {
         let _ = rustix::process::set_parent_process_death_signal(Some(rustix::process::Signal::TERM));
     }
-    if matches!(command, Some("catalog" | "thumbnail" | "takeover" | "version" | "sandbox-test")) {
+    if matches!(command, Some("catalog" | "thumbnail" | "takeover" | "photos-folder" | "version" | "sandbox-test")) {
         std::thread::spawn(|| {
             std::thread::sleep(QUICK_LIMIT);
             tell!("screensafe: gave up after {} seconds", QUICK_LIMIT.as_secs());
@@ -623,6 +670,7 @@ fn main() -> ExitCode {
         Some("thumbnail") => thumbnail(&args).map(|_| true),
         Some("preview") => live_preview(&args).map(|_| true),
         Some("takeover") => takeover_command(&args).map(|_| true),
+        Some("photos-folder") => photos_folder(&args).map(|_| true),
         Some("sandbox-test") => sandbox_test(),
         Some("version") => {
             say!("screensafe {} (pack format {}, expressions 1)", env!("CARGO_PKG_VERSION"), pack::FORMAT);

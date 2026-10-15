@@ -1,6 +1,6 @@
 [package]
 name = "screensafe"
-version = "0.4.7"
+version = "0.4.8"
 edition = "2021"
 rust-version = "1.97"
 license = "MIT"
@@ -14,6 +14,7 @@ landlock = "0.4"
 rustix = { version = "1", features = ["fs", "mm", "process", "time", "event"] }
 tiny-skia = { version = "0.11", default-features = false, features = ["std", "simd"] }
 ttf-parser = { version = "0.25", default-features = false, features = ["opentype-layout", "no-std-float"] }
+tz-rs = { version = "0.7", default-features = false, features = ["std"] }
 toml = { version = "0.9", default-features = false, features = ["parse", "serde", "std"] }
 wayland-client = "0.31"
 wayland-protocols = { version = "0.32", features = ["client", "staging"] }

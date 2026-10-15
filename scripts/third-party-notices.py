@@ -56,5 +56,6 @@ for title, text in texts:
 for text, titles in grouped.items():
     out.append("\n### " + "; ".join(titles) + f"\n\n```text\n{text}\n```\n")
 with open(os.path.join(root, "THIRD_PARTY_NOTICES.md"), "w") as f:
-    f.write("".join(out))
+    # Trailing spaces in a license file carry no meaning; dropping them keeps the file clean in diffs.
+    f.write("\n".join(line.rstrip() for line in "".join(out).split("\n")))
 print(len(linked), "crates,", len(texts), "license files")

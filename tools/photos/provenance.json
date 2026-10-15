@@ -1,0 +1,217 @@
+[
+ {
+  "file": "examples/landscape-1.webp",
+  "source": "AI-generated: Codex image generation",
+  "prompt": "A still alpine lake at dawn, mist drifting over the water, pine-covered slopes and snowy peaks reflected in it. A realistic photograph, as if taken by a skilled photographer on a full-frame camera: natural light, true colors, fine detail, gentle depth of field, no filters or heavy processing. No people or human figures, no text, letters, signs, logos, brands or watermarks, and no recognizable real landmarks. Wide 3:2 landscape.",
+  "original_sha256": "2e588c7fc6817947c53c0f47f7ce2081ebe85bf964203192de31c64eda1fd410",
+  "license": "MIT, with the pack"
+ },
+ {
+  "file": "examples/landscape-2.webp",
+  "source": "AI-generated: Codex image generation",
+  "prompt": "Rolling sand dunes at golden hour, long soft shadows, wind ripples across the sand, a clear pale sky. A realistic photograph, as if taken by a skilled photographer on a full-frame camera: natural light, true colors, fine detail, gentle depth of field, no filters or heavy processing. No people or human figures, no text, letters, signs, logos, brands or watermarks, and no recognizable real landmarks. Wide 3:2 landscape.",
+  "original_sha256": "335bc4a2a14def11a2829b90434bd52b03e2010d300069cb13aac3140243132d",
+  "license": "MIT, with the pack"
+ },
+ {
+  "file": "examples/landscape-3.webp",
+  "source": "AI-generated: Codex image generation",
+  "prompt": "Rugged sea cliffs under an overcast sky, waves breaking white against dark rocks, green grass on the clifftops. A realistic photograph, as if taken by a skilled photographer on a full-frame camera: natural light, true colors, fine detail, gentle depth of field, no filters or heavy processing. No people or human figures, no text, letters, signs, logos, brands or watermarks, and no recognizable real landmarks. Wide 3:2 landscape.",
+  "original_sha256": "17ca4d78bc6e962f84117e9c1913f7f76b76b544067c7d3fc7c20540fb3e9685",
+  "license": "MIT, with the pack"
+ },
+ {
+  "file": "examples/landscape-4.webp",
+  "source": "AI-generated: Codex image generation",
+  "prompt": "A quiet road curving through an autumn forest, red and gold leaves overhead and scattered on the ground, soft morning light. A realistic photograph, as if taken by a skilled photographer on a full-frame camera: natural light, true colors, fine detail, gentle depth of field, no filters or heavy processing. No people or human figures, no text, letters, signs, logos, brands or watermarks, and no recognizable real landmarks. Wide 3:2 landscape.",
+  "original_sha256": "5f5a46a9d10462f8b9df2c33fc070017e83237fbbff0fcc8efd9536db22e467a",
+  "license": "MIT, with the pack"
+ },
+ {
+  "file": "examples/landscape-5.webp",
+  "source": "AI-generated: Codex image generation",
+  "prompt": "Green northern lights over snowy mountains and a frozen lake at night, stars overhead. A realistic photograph, as if taken by a skilled photographer on a full-frame camera: natural light, true colors, fine detail, gentle depth of field, no filters or heavy processing. No people or human figures, no text, letters, signs, logos, brands or watermarks, and no recognizable real landmarks. Wide 3:2 landscape.",
+  "original_sha256": "680bdd496993136b7fd9dc0be871a81adf89710c24fc89fc16b56758b0223772",
+  "license": "MIT, with the pack"
+ },
+ {
+  "file": "examples/wildlife-1.webp",
+  "source": "AI-generated: Codex image generation",
+  "prompt": "A red fox standing alert in a snowy meadow, its breath faintly visible, soft winter light. A realistic photograph, as if taken by a skilled photographer on a full-frame camera: natural light, true colors, fine detail, gentle depth of field, no filters or heavy processing. No people or human figures, no text, letters, signs, logos, brands or watermarks, and no recognizable real landmarks. Wide 3:2 landscape.",
+  "original_sha256": "24c8c047b6c260a805bc20f294a4c20347752c78cbd3214f549c93f48817bd9e",
+  "license": "MIT, with the pack"
+ },
+ {
+  "file": "examples/wildlife-2.webp",
+  "source": "AI-generated: Codex image generation",
+  "prompt": "A humpback whale breaching from a dark ocean, spray glittering in late afternoon sun. A realistic photograph, as if taken by a skilled photographer on a full-frame camera: natural light, true colors, fine detail, gentle depth of field, no filters or heavy processing. No people or human figures, no text, letters, signs, logos, brands or watermarks, and no recognizable real landmarks. Wide 3:2 landscape.",
+  "original_sha256": "43c1cafb7f0e04bd55f95ccd2863a636e61d2e277ba828a0293dbdad68891a51",
+  "license": "MIT, with the pack"
+ },
+ {
+  "file": "examples/wildlife-3.webp",
+  "source": "AI-generated: Codex image generation",
+  "prompt": "A kingfisher perched on a branch over a clear stream, its blue and orange feathers sharp against a blurred green background. A realistic photograph, as if taken by a skilled photographer on a full-frame camera: natural light, true colors, fine detail, gentle depth of field, no filters or heavy processing. No people or human figures, no text, letters, signs, logos, brands or watermarks, and no recognizable real landmarks. Wide 3:2 landscape.",
+  "original_sha256": "904b9134aa6ff26cfe9978948b779b7a19957035fb5694be0bb7f97a6f4f34a3",
+  "license": "MIT, with the pack"
+ },
+ {
+  "file": "examples/wildlife-4.webp",
+  "source": "AI-generated: Codex image generation",
+  "prompt": "A small herd of elephants walking across a savanna at sunset, dust in the warm light, acacia trees on the horizon. A realistic photograph, as if taken by a skilled photographer on a full-frame camera: natural light, true colors, fine detail, gentle depth of field, no filters or heavy processing. No people or human figures, no text, letters, signs, logos, brands or watermarks, and no recognizable real landmarks. Wide 3:2 landscape.",
+  "original_sha256": "8421883b148846ff21c0f6b53388da96c3ec909230f5be2e1af2c907606da478",
+  "license": "MIT, with the pack"
+ },
+ {
+  "file": "examples/wildlife-5.webp",
+  "source": "AI-generated: Codex image generation",
+  "prompt": "A barn owl in flight through a forest clearing at dusk, wings spread wide. A realistic photograph, as if taken by a skilled photographer on a full-frame camera: natural light, true colors, fine detail, gentle depth of field, no filters or heavy processing. No people or human figures, no text, letters, signs, logos, brands or watermarks, and no recognizable real landmarks. Wide 3:2 landscape.",
+  "original_sha256": "9ad86c2d64da33719c4efa2c0d739b98cd914634f991a2635f038485e433963e",
+  "license": "MIT, with the pack"
+ },
+ {
+  "file": "examples/technology-1.webp",
+  "source": "AI-generated: Codex image generation",
+  "prompt": "Macro photograph of a circuit board: tiny components and gold traces, shallow depth of field, cool blue light. A realistic photograph, as if taken by a skilled photographer on a full-frame camera: natural light, true colors, fine detail, gentle depth of field, no filters or heavy processing. No people or human figures, no text, letters, signs, logos, brands or watermarks, and no recognizable real landmarks. Wide 3:2 landscape.",
+  "original_sha256": "1c56981ea58a0139f13e341f642cfc747a9fcbf083476803a8ddccd0cbbb2728",
+  "license": "MIT, with the pack"
+ },
+ {
+  "file": "examples/technology-2.webp",
+  "source": "AI-generated: Codex image generation",
+  "prompt": "Rows of wind turbines on rolling green hills at sunrise, mist in the valleys. A realistic photograph, as if taken by a skilled photographer on a full-frame camera: natural light, true colors, fine detail, gentle depth of field, no filters or heavy processing. No people or human figures, no text, letters, signs, logos, brands or watermarks, and no recognizable real landmarks. Wide 3:2 landscape.",
+  "original_sha256": "1843520484071df16c5d41d92c1d90ac6ffead35e04742303289a170d3723e9d",
+  "license": "MIT, with the pack"
+ },
+ {
+  "file": "examples/technology-3.webp",
+  "source": "AI-generated: Codex image generation",
+  "prompt": "Strands of fiber-optic cable glowing at their tips against a dark background, points of blue and violet light. A realistic photograph, as if taken by a skilled photographer on a full-frame camera: natural light, true colors, fine detail, gentle depth of field, no filters or heavy processing. No people or human figures, no text, letters, signs, logos, brands or watermarks, and no recognizable real landmarks. Wide 3:2 landscape.",
+  "original_sha256": "1c804282b2278ef1a3f5513a84b2e4d6259d829955551bcfed2ed4caaf7e09ff",
+  "license": "MIT, with the pack"
+ },
+ {
+  "file": "examples/technology-4.webp",
+  "source": "AI-generated: Codex image generation",
+  "prompt": "A white industrial robot arm in a clean, softly lit workshop, poised mid-motion. A realistic photograph, as if taken by a skilled photographer on a full-frame camera: natural light, true colors, fine detail, gentle depth of field, no filters or heavy processing. No people or human figures, no text, letters, signs, logos, brands or watermarks, and no recognizable real landmarks. Wide 3:2 landscape.",
+  "original_sha256": "9108c1793a1ea68830b344fe587fdd25dbcdd81119ccec4a4bb6e7ba8b71149f",
+  "license": "MIT, with the pack"
+ },
+ {
+  "file": "examples/technology-5.webp",
+  "source": "AI-generated: Codex image generation",
+  "prompt": "A large solar farm stretching to the horizon in a desert at golden hour, panels catching the light. A realistic photograph, as if taken by a skilled photographer on a full-frame camera: natural light, true colors, fine detail, gentle depth of field, no filters or heavy processing. No people or human figures, no text, letters, signs, logos, brands or watermarks, and no recognizable real landmarks. Wide 3:2 landscape.",
+  "original_sha256": "25c8e6b8eedddc980e09e4cf4420ae42849c4ad42a7f0761c0751dcbf472705f",
+  "license": "MIT, with the pack"
+ },
+ {
+  "file": "examples/aerospace-1.webp",
+  "source": "AI-generated: Codex image generation",
+  "prompt": "A rocket lifting off from a launch pad at dusk, a bright plume of fire and billowing exhaust lit orange from below; no markings. A realistic photograph, as if taken by a skilled photographer on a full-frame camera: natural light, true colors, fine detail, gentle depth of field, no filters or heavy processing. No people or human figures, no text, letters, signs, logos, brands or watermarks, and no recognizable real landmarks. Wide 3:2 landscape.",
+  "original_sha256": "f17148cb7c87c9c15618f8bc9d87788a4afad5df9079f4bae371310b0343ce55",
+  "license": "MIT, with the pack"
+ },
+ {
+  "file": "examples/aerospace-2.webp",
+  "source": "AI-generated: Codex image generation",
+  "prompt": "A jet airliner high in a deep blue sky, two long white contrails behind it, seen from far below; no markings. A realistic photograph, as if taken by a skilled photographer on a full-frame camera: natural light, true colors, fine detail, gentle depth of field, no filters or heavy processing. No people or human figures, no text, letters, signs, logos, brands or watermarks, and no recognizable real landmarks. Wide 3:2 landscape.",
+  "original_sha256": "a0b6d3add3a7324dc4f729e542bb3bc12e779a6f990c223341b6e680a32a0c36",
+  "license": "MIT, with the pack"
+ },
+ {
+  "file": "examples/aerospace-3.webp",
+  "source": "AI-generated: Codex image generation",
+  "prompt": "A satellite with wide solar panels in orbit above Earth, the curve of the planet and its thin blue atmosphere below. A realistic photograph, as if taken by a skilled photographer on a full-frame camera: natural light, true colors, fine detail, gentle depth of field, no filters or heavy processing. No people or human figures, no text, letters, signs, logos, brands or watermarks, and no recognizable real landmarks. Wide 3:2 landscape.",
+  "original_sha256": "82c6a6ecca42371f31b7730b8a5ea037c9d101a57aa54a7128acbca6f8f2329b",
+  "license": "MIT, with the pack"
+ },
+ {
+  "file": "examples/aerospace-4.webp",
+  "source": "AI-generated: Codex image generation",
+  "prompt": "A sleek jet aircraft in a vast, softly lit hangar at night, polished floor reflecting the light; no markings. A realistic photograph, as if taken by a skilled photographer on a full-frame camera: natural light, true colors, fine detail, gentle depth of field, no filters or heavy processing. No people or human figures, no text, letters, signs, logos, brands or watermarks, and no recognizable real landmarks. Wide 3:2 landscape.",
+  "original_sha256": "ba866b30fef60270662a88713bf78708592f5f2d89a2434e254894361a09078a",
+  "license": "MIT, with the pack"
+ },
+ {
+  "file": "examples/aerospace-5.webp",
+  "source": "AI-generated: Codex image generation",
+  "prompt": "A spacecraft capsule descending under large orange-and-white parachutes over the ocean at sunrise; no markings. A realistic photograph, as if taken by a skilled photographer on a full-frame camera: natural light, true colors, fine detail, gentle depth of field, no filters or heavy processing. No people or human figures, no text, letters, signs, logos, brands or watermarks, and no recognizable real landmarks. Wide 3:2 landscape.",
+  "original_sha256": "b15a27c0b5ac108955a68848357f61261baf52a025eadc09604e1faf3d4994a7",
+  "license": "MIT, with the pack"
+ },
+ {
+  "file": "examples/computing-1.webp",
+  "source": "AI-generated: Codex image generation",
+  "prompt": "A vintage home computer with a beige keyboard and a small monitor glowing green, on a wooden desk in a dim room; no legible text. A realistic photograph, as if taken by a skilled photographer on a full-frame camera: natural light, true colors, fine detail, gentle depth of field, no filters or heavy processing. No people or human figures, no text, letters, signs, logos, brands or watermarks, and no recognizable real landmarks. Wide 3:2 landscape.",
+  "original_sha256": "512ff9b29c6e5590f08784877193b910659b422fec57de90fd34fd2be416b561",
+  "license": "MIT, with the pack"
+ },
+ {
+  "file": "examples/computing-2.webp",
+  "source": "AI-generated: Codex image generation",
+  "prompt": "Rows of server racks in a data center aisle, blue and green status lights receding into the distance. A realistic photograph, as if taken by a skilled photographer on a full-frame camera: natural light, true colors, fine detail, gentle depth of field, no filters or heavy processing. No people or human figures, no text, letters, signs, logos, brands or watermarks, and no recognizable real landmarks. Wide 3:2 landscape.",
+  "original_sha256": "52c4a5dda0c3449ea5f06facc09cdc41b1e39e299d3a3f9b8c07baac373187fb",
+  "license": "MIT, with the pack"
+ },
+ {
+  "file": "examples/computing-3.webp",
+  "source": "AI-generated: Codex image generation",
+  "prompt": "Close-up of a mechanical keyboard with warm backlighting in a dark room, shallow depth of field; no legible text. A realistic photograph, as if taken by a skilled photographer on a full-frame camera: natural light, true colors, fine detail, gentle depth of field, no filters or heavy processing. No people or human figures, no text, letters, signs, logos, brands or watermarks, and no recognizable real landmarks. Wide 3:2 landscape.",
+  "original_sha256": "c07443c78e6511b3665d3b2c7c5e7648662b7586902c47751e9e0b292fd925d0",
+  "license": "MIT, with the pack"
+ },
+ {
+  "file": "examples/computing-4.webp",
+  "source": "AI-generated: Codex image generation",
+  "prompt": "Macro photograph of a silicon wafer covered in tiny chips, rainbow light diffracting across its surface. A realistic photograph, as if taken by a skilled photographer on a full-frame camera: natural light, true colors, fine detail, gentle depth of field, no filters or heavy processing. No people or human figures, no text, letters, signs, logos, brands or watermarks, and no recognizable real landmarks. Wide 3:2 landscape.",
+  "original_sha256": "527c9f7d4bee7ecad663a5348c8f40efde418a01a693e41c9072d037923faffb",
+  "license": "MIT, with the pack"
+ },
+ {
+  "file": "examples/computing-5.webp",
+  "source": "AI-generated: Codex image generation",
+  "prompt": "A modern desk setup at night: a laptop and a large monitor showing soft abstract colors, a lamp and a plant; no legible text. A realistic photograph, as if taken by a skilled photographer on a full-frame camera: natural light, true colors, fine detail, gentle depth of field, no filters or heavy processing. No people or human figures, no text, letters, signs, logos, brands or watermarks, and no recognizable real landmarks. Wide 3:2 landscape.",
+  "original_sha256": "c54dcc96f91b97d28b18196fdfaa5998851fbf8ba3ba44d3da96e243d14c9789",
+  "license": "MIT, with the pack"
+ },
+ {
+  "file": "examples/astronomy-1.webp",
+  "source": "NASA Image and Video Library, art002e021278: https://images.nasa.gov/details/art002e021278",
+  "about": "Earthset, seen by the Artemis II crew from Orion during the lunar flyby, 6 April 2026",
+  "credit": "NASA",
+  "original_sha256": "22687d173e1fcd9a334f93a3074de1470365c314e2d25e9fbcb229f4f5fb507d",
+  "license": "Public domain (NASA); see https://www.nasa.gov/nasa-brand-center/images-and-media/"
+ },
+ {
+  "file": "examples/astronomy-2.webp",
+  "source": "NASA Image and Video Library, iss058e005282: https://images.nasa.gov/details/iss058e005282",
+  "about": "An aurora over Earth's limb, from the International Space Station, 19 January 2019",
+  "credit": "NASA",
+  "original_sha256": "6c94af4b4617619862e0e8685087143aa021fa678a8e83a797f58d3b3413b091",
+  "license": "Public domain (NASA); see https://www.nasa.gov/nasa-brand-center/images-and-media/"
+ },
+ {
+  "file": "examples/astronomy-3.webp",
+  "source": "NASA Image and Video Library, PIA03653: https://images.nasa.gov/details/PIA03653",
+  "about": "The dusty center of the Milky Way in infrared, from the Spitzer Space Telescope, 2006",
+  "credit": "NASA/JPL-Caltech",
+  "original_sha256": "a07c42bb7d00efe6393b8a1d0109a2d37e9bf141b1bd79beed1f124dac1e1b93",
+  "license": "Public domain (NASA); see https://www.nasa.gov/nasa-brand-center/images-and-media/"
+ },
+ {
+  "file": "examples/astronomy-4.webp",
+  "source": "NASA Image and Video Library, as08-14-2506: https://images.nasa.gov/details/as08-14-2506",
+  "about": "A nearly full Moon, from Apollo 8, December 1968",
+  "credit": "NASA",
+  "original_sha256": "bcb520bb43818064a495c48d339bae7f3d66b20a264482a7bf4bbaee0ad08858",
+  "license": "Public domain (NASA); see https://www.nasa.gov/nasa-brand-center/images-and-media/"
+ },
+ {
+  "file": "examples/astronomy-5.webp",
+  "source": "NASA Image and Video Library, AFRC2017-0233-009: https://images.nasa.gov/details/AFRC2017-0233-009",
+  "about": "The diamond ring at the total solar eclipse of 21 August 2017",
+  "credit": "NASA/Carla Thomas",
+  "original_sha256": "becb549dc070a5f2f92b7313ff7b4883c21138c04e7ba6ee66dbda80262ed05a",
+  "license": "Public domain (NASA); see https://www.nasa.gov/nasa-brand-center/images-and-media/"
+ }
+]
