@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# Builds the renderer from renderer/ reproducibly, for x86-64 and 64-bit ARM: bin/screensafe-x86_64 and
+# bin/screensafe-aarch64. The toolchain is pinned by renderer/rust-toolchain.toml and every dependency by
+# renderer/Cargo.lock. Each result is a static, stripped Linux executable linked by the toolchain's own linker, with
+# build paths replaced, so the same commit gives the same bytes on any machine.
+#
+#   scripts/build-release [OUT_DIR]     (default: bin/)
+set -euo pipefail
+
+root=$(cd "$(dirname "$0")/.." && pwd)
+out=${1:-$root/bin}
+cargo_home=${CARGO_HOME:-$HOME/.cargo}
+rustup_home=${RUSTUP_HOME:-$HOME/.rustup}
+target_dir=${CARGO_TARGET_DIR:-$root/renderer/target}
+
+export SOURCE_DATE_EPOCH=0
+export CARGO_INCREMENTAL=0
+export RUSTFLAGS="-C linker=rust-lld -C link-self-contained=yes -C target-feature=+crt-static -C link-arg=--build-id=none \
+--remap-path-prefix=$root=/screensafe --remap-path-prefix=$cargo_home=/cargo --remap-path-prefix=$rustup_home=/rustup"
+
+cd "$root/renderer"
+mkdir -p "$out"
+for arch in x86_64 aarch64; do
+  target=$arch-unknown-linux-musl
+  cargo build --release --locked --target "$target" --target-dir "$target_dir"
+  install -m 755 "$target_dir/$target/release/screensafe" "$out/screensafe-$arch"
+done
+(cd "$out" && sha256sum screensafe-x86_64 screensafe-aarch64)

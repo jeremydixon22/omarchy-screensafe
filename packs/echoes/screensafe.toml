@@ -1,0 +1,70 @@
+# Two four-sided shapes whose corners bounce off the edges of the screen, each trailing echoes of where it's been,
+# slowly changing color. The corners' speeds are different each time ScreenSafe opens.
+format = 1
+name = "Echoes"
+author = "ScreenSafe"
+license = "MIT"
+description = "Two shapes bounce around the screen, trailing echoes of where they've been and slowly changing color."
+stage = "screen"
+fps = 30
+fade = 0
+background = "background"
+
+[params]
+# Seconds between one echo and the next.
+gap = 0.22
+
+# What can be changed in the panel: how quickly the shapes move, and how many echoes trail them.
+[[setting]]
+name = "pace"
+label = "Speed"
+kind = "choice"
+choices = ["Slow", "Normal", "Fast"]
+values = [0.6, 1, 1.6]
+default = 1
+
+[[setting]]
+name = "echoes"
+label = "Echoes"
+kind = "choice"
+choices = ["Few", "Many"]
+values = [4, 9]
+default = 9
+
+
+[[scene]]
+name = "Bounce"
+duration = 600
+fade = 0
+
+[[scene.draw]]
+kind = "group"
+count = 2
+let = ["shape = i"]
+# Fade in when the screensaver opens.
+opacity = "smoothstep(0, 2, time)"
+
+  [[scene.draw.draw]]
+  kind = "lines"
+  count = 9
+  samples = 4
+  let = [
+    "at = time * pace - i * gap",
+    "w = aspect - 0.06",
+    # Each corner bounces with its own speed across and down.
+    "x0 = (tri(at * (0.031 + rand(shape * 8 + 1) * 0.04) + rand(shape * 8 + 2)) - 0.5) * w",
+    "y0 = (tri(at * (0.043 + rand(shape * 8 + 3) * 0.05) + rand(shape * 8 + 4)) - 0.5) * 0.94",
+    "x1 = (tri(at * (0.037 + rand(shape * 8 + 5) * 0.04) + rand(shape * 8 + 6)) - 0.5) * w",
+    "y1 = (tri(at * (0.029 + rand(shape * 8 + 7) * 0.05) + rand(shape * 8 + 8)) - 0.5) * 0.94",
+    "x2 = (tri(at * (0.026 + rand(shape * 8 + 9) * 0.04) + rand(shape * 8 + 10)) - 0.5) * w",
+    "y2 = (tri(at * (0.047 + rand(shape * 8 + 11) * 0.05) + rand(shape * 8 + 12)) - 0.5) * 0.94",
+    "x3 = (tri(at * (0.041 + rand(shape * 8 + 13) * 0.04) + rand(shape * 8 + 14)) - 0.5) * w",
+    "y3 = (tri(at * (0.033 + rand(shape * 8 + 15) * 0.05) + rand(shape * 8 + 16)) - 0.5) * 0.94",
+  ]
+  closed = true
+  visible = "i < echoes"
+  px = "pick(j, x0, x1, x2, x3)"
+  py = "pick(j, y0, y1, y2, y3)"
+  width = "i == 0 ? 0.0026 : 0.0018"
+  color = "shape == 0 ? mix(accent, magenta, tri(time * 0.013)) : mix(cyan, yellow, tri(time * 0.011))"
+  opacity = "pow(1 - i / echoes, 1.6)"

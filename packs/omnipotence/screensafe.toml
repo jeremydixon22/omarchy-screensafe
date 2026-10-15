@@ -1,0 +1,6032 @@
+# Omnipotence: each figure is drawn over the very lines of this file that draw it, and the Hand of Omnipotence
+# turns the page to the next. Written by tools/omnipotence/build.py; the hand is released with the pack under its
+# MIT license.
+format = 1
+name = "Omnipotence"
+author = "ScreenSafe"
+license = "MIT"
+description = "Figures drawn over the very code that draws them, each line lighting up as it works, until the Hand of Omnipotence turns the page."
+preview = 36.7
+fps = 30
+fade = 0
+background = "#080B16"
+
+[[scene]]
+name = "Page I: The Fern"
+duration = 40
+fade = 0
+let = ["codeop = t < 5 ? 1 : mix(1, 0.3, smoothstep(5, 7, t)) * (1 - smoothstep(34.5, 35.1, t))", "sky = smoothstep(5, 9, t)", "fold = t < 34.5 ? -4 : t >= 39.5 ? 4 : interp(t, 34.5, -1.0358, 35.2, -0.92, 36.4, -0.5, 37.6, 0, 38.5, 0.55, 39.4, 1.2458)", "dm = max(0, fold - -1.0158)", "rr = interp(fold, -1.0358, 0.05, -0.7, 0.15)", "bend = interp(fold, -1.0358, 0.7, -0.8, 2, -0.6, 2.8, -0.4, 2.9, 0, 2.9, 0.3, 2.3, 0.6, 1.9, 1.2458, 1.7)", "near = interp(fold, 0, 0.4, 0.3, 1.2, 0.6, 1.7, 1.2458, 2)", "cq = dm", "ca = min(cq / rr, bend)", "cr = max(0, cq - bend * rr)", "cm = -1.0158 + cq - rr * sin(ca) - cr * cos(bend)", "cz = rr * (1 - cos(ca)) + cr * sin(bend)", "ck = min(3, 1 + near * cz)", "ct = 0.0912", "gl = 1 - smoothstep(34.1, 35.1, t)", "reach = t < 33 ? 1 : 1 - ease_out((t - 33) / 1.5)"]
+
+# Beneath the page: the next page's code, shown where the page has been pulled away. (Clipping this, rather than
+# covering it with the page, saves drawing a whole screen of page through a mask.)
+[[scene.draw]]
+kind = "group"
+visible = "t >= 34.5"
+rotate = -2.7187
+clip = ["-9", "-9", "fold", "9"]
+
+  [[scene.draw.draw]]
+  kind = "group"
+  rotate = 2.7187
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "# Page II: The Harmonograph"
+    size = 0.021
+    x = -0.8389
+    y = -0.445
+    color = "#8A7FB0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "# Two damped pendulums, swinging at nearly the same rate."
+    size = 0.021
+    x = -0.8389
+    y = -0.4167
+    color = "#8A7FB0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "[[scene.draw.draw.draw.draw]]"
+    size = 0.021
+    x = -0.8389
+    y = -0.3883
+    color = "#56D4F5"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "kind = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3599
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"lines\""
+    size = 0.021
+    x = -0.7507
+    y = -0.3599
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "samples = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3316
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "3200"
+    size = 0.021
+    x = -0.7129
+    y = -0.3316
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "px = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3033
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"0.3 + 0.36 * exp(-s * 2.2) * sin(s * 92 + 0.4) + 0.05 * "
+    size = 0.021
+    x = -0.7759
+    y = -0.3033
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "exp(-s * 1.6) * sin(s * 61)\""
+    size = 0.021
+    x = -0.7885
+    y = -0.2749
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "py = "
+    size = 0.021
+    x = -0.8389
+    y = -0.2465
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"0.02 + 0.36 * exp(-s * 2.0) * sin(s * 88.4 + 1.3)\""
+    size = 0.021
+    x = -0.7759
+    y = -0.2465
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "width = "
+    size = 0.021
+    x = -0.8389
+    y = -0.2182
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "0.0018"
+    size = 0.021
+    x = -0.7381
+    y = -0.2182
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "color = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1898
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"#C9A7FF\""
+    size = 0.021
+    x = -0.7381
+    y = -0.1898
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "draw = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1615
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"ease_in_out((t - 7) / 14)\""
+    size = 0.021
+    x = -0.7507
+    y = -0.1615
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "# A third, faster and fainter, crossing the first."
+    size = 0.021
+    x = -0.8389
+    y = -0.1048
+    color = "#8A7FB0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "[[scene.draw.draw.draw.draw]]"
+    size = 0.021
+    x = -0.8389
+    y = -0.0764
+    color = "#56D4F5"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "kind = "
+    size = 0.021
+    x = -0.8389
+    y = -0.0481
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"lines\""
+    size = 0.021
+    x = -0.7507
+    y = -0.0481
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "samples = "
+    size = 0.021
+    x = -0.8389
+    y = -0.0197
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "2400"
+    size = 0.021
+    x = -0.7129
+    y = -0.0197
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "px = "
+    size = 0.021
+    x = -0.8389
+    y = 0.0086
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"0.3 + 0.24 * exp(-s * 1.8) * sin(s * 70 + 2.1)\""
+    size = 0.021
+    x = -0.7759
+    y = 0.0086
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "py = "
+    size = 0.021
+    x = -0.8389
+    y = 0.037
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"0.02 + 0.24 * exp(-s * 1.7) * sin(s * 71.3)\""
+    size = 0.021
+    x = -0.7759
+    y = 0.037
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "width = "
+    size = 0.021
+    x = -0.8389
+    y = 0.0653
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "0.0016"
+    size = 0.021
+    x = -0.7381
+    y = 0.0653
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "color = "
+    size = 0.021
+    x = -0.8389
+    y = 0.0937
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"#5EF2E0\""
+    size = 0.021
+    x = -0.7381
+    y = 0.0937
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "draw = "
+    size = 0.021
+    x = -0.8389
+    y = 0.122
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"ease_in_out((t - 16) / 12)\""
+    size = 0.021
+    x = -0.7507
+    y = 0.122
+    color = "#7CF5A8"
+
+# The page as written, until the hand takes it: its sky,
+[[scene.draw]]
+kind = "group"
+visible = "t < 34.5"
+
+  [[scene.draw.draw]]
+  kind = "rect"
+  count = 160
+  x = "(hash(i * 1.37) * 2 - 1) * 0.88"
+  y = "(hash(i * 4.11) * 2 - 1) * 0.5"
+  w = "0.002 + 0.002 * hash(i * 9.1)"
+  h = "0.002 + 0.002 * hash(i * 9.1)"
+  color = "alpha(#FFFFFF, sky * (0.25 + 0.55 * noise(t * 0.25 + i * 3.3)))"
+
+  [[scene.draw.draw]]
+  kind = "lines"
+  samples = 48
+  px = "-0.8889 + 1.7778 * s"
+  py = "0.13"
+  width = 0.0016
+  color = "alpha(#F2A65A, sky * 0.55)"
+glow = "1.5 * gl"
+glow_radius = 0.012
+
+# its code, which fades as the hand takes the page (text isn't carried round the curl, so it's gone before the fold
+# comes near it),
+[[scene.draw]]
+kind = "group"
+visible = "t < 35.1"
+y = "-0.6521 * smoothstep(7, 27, t)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "# Page I: The Fern"
+    size = 0.021
+    x = -0.8389
+    y = -0.445
+    color = "alpha(#8A7FB0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "# Three fronds rise from one root, each leaning its own way."
+    size = 0.021
+    x = -0.8389
+    y = -0.4167
+    color = "t >= 7 && t < 13 ? #FFFFFF : alpha(#8A7FB0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "[[scene.draw.draw.draw.draw]]"
+    size = 0.021
+    x = -0.8389
+    y = -0.3883
+    color = "t >= 7 && t < 13 ? #FFFFFF : alpha(#56D4F5, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "kind = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3599
+    color = "t >= 7 && t < 13 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"lines\""
+    size = 0.021
+    x = -0.7507
+    y = -0.3599
+    color = "t >= 7 && t < 13 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "count = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3316
+    color = "t >= 7 && t < 13 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "3"
+    size = 0.021
+    x = -0.7381
+    y = -0.3316
+    color = "t >= 7 && t < 13 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "let = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3033
+    color = "t >= 7 && t < 13 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "[\"bx = 0.3\", \"by = 0.46\", \"a = pick(i, -0.55, 0.05, "
+    size = 0.021
+    x = -0.7633
+    y = -0.3033
+    color = "t >= 7 && t < 13 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "0.6)\", \"ln = pick(i, 0.62, 0.86, 0.66)\", \"c = pick(i, -0.4, "
+    size = 0.021
+    x = -0.7885
+    y = -0.2749
+    color = "t >= 7 && t < 13 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "0.15, 0.45)\"]"
+    size = 0.021
+    x = -0.7885
+    y = -0.2465
+    color = "t >= 7 && t < 13 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "samples = "
+    size = 0.021
+    x = -0.8389
+    y = -0.2182
+    color = "t >= 7 && t < 13 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "120"
+    size = 0.021
+    x = -0.7129
+    y = -0.2182
+    color = "t >= 7 && t < 13 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "px = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1898
+    color = "t >= 7 && t < 13 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"bx + ln * s * sin(a + c * s * 0.5)\""
+    size = 0.021
+    x = -0.7759
+    y = -0.1898
+    color = "t >= 7 && t < 13 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "py = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1615
+    color = "t >= 7 && t < 13 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"by - ln * s * cos(a + c * s * 0.5)\""
+    size = 0.021
+    x = -0.7759
+    y = -0.1615
+    color = "t >= 7 && t < 13 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "width = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1331
+    color = "t >= 7 && t < 13 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "0.0034"
+    size = 0.021
+    x = -0.7381
+    y = -0.1331
+    color = "t >= 7 && t < 13 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "color = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1048
+    color = "t >= 7 && t < 13 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"#5EF2E0\""
+    size = 0.021
+    x = -0.7381
+    y = -0.1048
+    color = "t >= 7 && t < 13 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "draw = "
+    size = 0.021
+    x = -0.8389
+    y = -0.0764
+    color = "t >= 7 && t < 13 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"ease_in_out((t - 7) / 6)\""
+    size = 0.021
+    x = -0.7507
+    y = -0.0764
+    color = "t >= 7 && t < 13 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "# Leaflets open along each frond, from its root to its tip."
+    size = 0.021
+    x = -0.8389
+    y = -0.0197
+    color = "t >= 9 && t < 27 ? #FFFFFF : alpha(#8A7FB0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "[[scene.draw.draw.draw.draw]]"
+    size = 0.021
+    x = -0.8389
+    y = 0.0086
+    color = "t >= 9 && t < 27 ? #FFFFFF : alpha(#56D4F5, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "kind = "
+    size = 0.021
+    x = -0.8389
+    y = 0.037
+    color = "t >= 9 && t < 27 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"lines\""
+    size = 0.021
+    x = -0.7507
+    y = 0.037
+    color = "t >= 9 && t < 27 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "count = "
+    size = 0.021
+    x = -0.8389
+    y = 0.0653
+    color = "t >= 9 && t < 27 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "132"
+    size = 0.021
+    x = -0.7381
+    y = 0.0653
+    color = "t >= 9 && t < 27 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "let = "
+    size = 0.021
+    x = -0.8389
+    y = 0.0937
+    color = "t >= 9 && t < 27 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "[\"f = floor(i / 44)\", \"v = 0.06 + 0.92 * mod(i, 44) / "
+    size = 0.021
+    x = -0.7633
+    y = 0.0937
+    color = "t >= 9 && t < 27 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "44\", \"side = mod(i, 2) * 2 - 1\", \"bx = 0.3\", \"by = 0.46\", "
+    size = 0.021
+    x = -0.7885
+    y = 0.122
+    color = "t >= 9 && t < 27 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"a = pick(f, -0.55, 0.05, 0.6)\", \"ln = pick(f, 0.62, 0.86, "
+    size = 0.021
+    x = -0.7885
+    y = 0.1504
+    color = "t >= 9 && t < 27 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "0.66)\", \"c = pick(f, -0.4, 0.15, 0.45)\", \"sx = bx + ln * v "
+    size = 0.021
+    x = -0.7885
+    y = 0.1787
+    color = "t >= 9 && t < 27 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "* sin(a + c * v * 0.5)\", \"sy = by - ln * v * cos(a + c * v "
+    size = 0.021
+    x = -0.7885
+    y = 0.2071
+    color = "t >= 9 && t < 27 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "* 0.5)\", \"th = a + c * v\", \"len = 0.15 * ln * sin(pi * "
+    size = 0.021
+    x = -0.7885
+    y = 0.2354
+    color = "t >= 9 && t < 27 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "(0.08 + 0.88 * v)) * (1 - 0.45 * v)\"]"
+    size = 0.021
+    x = -0.7885
+    y = 0.2638
+    color = "t >= 9 && t < 27 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "samples = "
+    size = 0.021
+    x = -0.8389
+    y = 0.2921
+    color = "t >= 9 && t < 27 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "14"
+    size = 0.021
+    x = -0.7129
+    y = 0.2921
+    color = "t >= 9 && t < 27 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "px = "
+    size = 0.021
+    x = -0.8389
+    y = 0.3205
+    color = "t >= 9 && t < 27 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"sx + len * s * sin(th + side * (1.15 - 0.7 * s))\""
+    size = 0.021
+    x = -0.7759
+    y = 0.3205
+    color = "t >= 9 && t < 27 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "py = "
+    size = 0.021
+    x = -0.8389
+    y = 0.3488
+    color = "t >= 9 && t < 27 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"sy - len * s * cos(th + side * (1.15 - 0.7 * s))\""
+    size = 0.021
+    x = -0.7759
+    y = 0.3488
+    color = "t >= 9 && t < 27 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "width = "
+    size = 0.021
+    x = -0.8389
+    y = 0.3772
+    color = "t >= 9 && t < 27 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "0.0021"
+    size = 0.021
+    x = -0.7381
+    y = 0.3772
+    color = "t >= 9 && t < 27 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "color = "
+    size = 0.021
+    x = -0.8389
+    y = 0.4055
+    color = "t >= 9 && t < 27 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"mix(#2FB7B0, #A8F7FF, v)\""
+    size = 0.021
+    x = -0.7381
+    y = 0.4055
+    color = "t >= 9 && t < 27 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "draw = "
+    size = 0.021
+    x = -0.8389
+    y = 0.4339
+    color = "t >= 9 && t < 27 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"clamp((t - 9 - v * 12) / 1.4, 0, 1)\""
+    size = 0.021
+    x = -0.7507
+    y = 0.4339
+    color = "t >= 9 && t < 27 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "# Each leaflet feathers into seven smaller ones as it grows."
+    size = 0.021
+    x = -0.8389
+    y = 0.4906
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#8A7FB0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "[[scene.draw.draw.draw.draw]]"
+    size = 0.021
+    x = -0.8389
+    y = 0.5189
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#56D4F5, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "kind = "
+    size = 0.021
+    x = -0.8389
+    y = 0.5473
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"lines\""
+    size = 0.021
+    x = -0.7507
+    y = 0.5473
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "count = "
+    size = 0.021
+    x = -0.8389
+    y = 0.5756
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "924"
+    size = 0.021
+    x = -0.7381
+    y = 0.5756
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "let = "
+    size = 0.021
+    x = -0.8389
+    y = 0.6039
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "[\"leaf = floor(i / 7)\", \"w = (mod(i, 7) + 1) / 8\", \"f = "
+    size = 0.021
+    x = -0.7633
+    y = 0.6039
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "floor(leaf / 44)\", \"v = 0.06 + 0.92 * mod(leaf, 44) / 44\", "
+    size = 0.021
+    x = -0.7885
+    y = 0.6323
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"side = mod(leaf, 2) * 2 - 1\", \"sub = mod(i, 2) * 2 - 1\", "
+    size = 0.021
+    x = -0.7885
+    y = 0.6607
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"bx = 0.3\", \"by = 0.46\", \"a = pick(f, -0.55, 0.05, 0.6)\", "
+    size = 0.021
+    x = -0.7885
+    y = 0.689
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"ln = pick(f, 0.62, 0.86, 0.66)\", \"c = pick(f, -0.4, 0.15, "
+    size = 0.021
+    x = -0.7885
+    y = 0.7174
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "0.45)\", \"sx = bx + ln * v * sin(a + c * v * 0.5)\", \"sy = by "
+    size = 0.021
+    x = -0.7885
+    y = 0.7457
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "- ln * v * cos(a + c * v * 0.5)\", \"th = a + c * v\", \"len = "
+    size = 0.021
+    x = -0.7885
+    y = 0.7741
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "0.15 * ln * sin(pi * (0.08 + 0.88 * v)) * (1 - 0.45 * v)\", "
+    size = 0.021
+    x = -0.7885
+    y = 0.8024
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"phi = th + side * (1.15 - 0.7 * w)\", \"lx = sx + len * w * "
+    size = 0.021
+    x = -0.7885
+    y = 0.8308
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "sin(phi)\", \"ly = sy - len * w * cos(phi)\", \"grow = 9 + v * "
+    size = 0.021
+    x = -0.7885
+    y = 0.8591
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "12 + 1.4 * w\"]"
+    size = 0.021
+    x = -0.7885
+    y = 0.8875
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "samples = "
+    size = 0.021
+    x = -0.8389
+    y = 0.9158
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "5"
+    size = 0.021
+    x = -0.7129
+    y = 0.9158
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "px = "
+    size = 0.021
+    x = -0.8389
+    y = 0.9442
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"lx + len * 0.3 * (1 - w) * s * sin(phi + sub * 0.95)\""
+    size = 0.021
+    x = -0.7759
+    y = 0.9442
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "py = "
+    size = 0.021
+    x = -0.8389
+    y = 0.9725
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"ly - len * 0.3 * (1 - w) * s * cos(phi + sub * 0.95)\""
+    size = 0.021
+    x = -0.7759
+    y = 0.9725
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "width = "
+    size = 0.021
+    x = -0.8389
+    y = 1.0009
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "0.0012"
+    size = 0.021
+    x = -0.7381
+    y = 1.0009
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "color = "
+    size = 0.021
+    x = -0.8389
+    y = 1.0292
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"alpha(mix(#2FB7B0, #A8F7FF, v), 0.85)\""
+    size = 0.021
+    x = -0.7381
+    y = 1.0292
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "draw = "
+    size = 0.021
+    x = -0.8389
+    y = 1.0576
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"clamp((t - grow) / 0.9, 0, 1)\""
+    size = 0.021
+    x = -0.7507
+    y = 1.0576
+    color = "t >= 10 && t < 28 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+# and the figure, drawn over its code.
+[[scene.draw]]
+kind = "group"
+visible = "t < 34.5"
+glow = "1.4 * gl"
+glow_radius = 0.006
+
+  # Three fronds rise from one root, each leaning its own way.
+      [[scene.draw.draw]]
+      kind = "lines"
+      count = 3
+      let = ["bx = 0.3", "by = 0.46", "a = pick(i, -0.55, 0.05, 0.6)", "ln = pick(i, 0.62, 0.86, 0.66)", "c = pick(i, -0.4, 0.15, 0.45)"]
+      samples = 120
+      px = "bx + ln * s * sin(a + c * s * 0.5)"
+      py = "by - ln * s * cos(a + c * s * 0.5)"
+      width = 0.0034
+      color = "#5EF2E0"
+      draw = "ease_in_out((t - 7) / 6)"
+
+  # Leaflets open along each frond, from its root to its tip.
+      [[scene.draw.draw]]
+      kind = "lines"
+      count = 132
+      let = ["f = floor(i / 44)", "v = 0.06 + 0.92 * mod(i, 44) / 44", "side = mod(i, 2) * 2 - 1", "bx = 0.3", "by = 0.46", "a = pick(f, -0.55, 0.05, 0.6)", "ln = pick(f, 0.62, 0.86, 0.66)", "c = pick(f, -0.4, 0.15, 0.45)", "sx = bx + ln * v * sin(a + c * v * 0.5)", "sy = by - ln * v * cos(a + c * v * 0.5)", "th = a + c * v", "len = 0.15 * ln * sin(pi * (0.08 + 0.88 * v)) * (1 - 0.45 * v)"]
+      samples = 14
+      px = "sx + len * s * sin(th + side * (1.15 - 0.7 * s))"
+      py = "sy - len * s * cos(th + side * (1.15 - 0.7 * s))"
+      width = 0.0021
+      color = "mix(#2FB7B0, #A8F7FF, v)"
+      draw = "clamp((t - 9 - v * 12) / 1.4, 0, 1)"
+
+  # Each leaflet feathers into seven smaller ones as it grows.
+      [[scene.draw.draw]]
+      kind = "lines"
+      count = 924
+      let = ["leaf = floor(i / 7)", "w = (mod(i, 7) + 1) / 8", "f = floor(leaf / 44)", "v = 0.06 + 0.92 * mod(leaf, 44) / 44", "side = mod(leaf, 2) * 2 - 1", "sub = mod(i, 2) * 2 - 1", "bx = 0.3", "by = 0.46", "a = pick(f, -0.55, 0.05, 0.6)", "ln = pick(f, 0.62, 0.86, 0.66)", "c = pick(f, -0.4, 0.15, 0.45)", "sx = bx + ln * v * sin(a + c * v * 0.5)", "sy = by - ln * v * cos(a + c * v * 0.5)", "th = a + c * v", "len = 0.15 * ln * sin(pi * (0.08 + 0.88 * v)) * (1 - 0.45 * v)", "phi = th + side * (1.15 - 0.7 * w)", "lx = sx + len * w * sin(phi)", "ly = sy - len * w * cos(phi)", "grow = 9 + v * 12 + 1.4 * w"]
+      samples = 5
+      px = "lx + len * 0.3 * (1 - w) * s * sin(phi + sub * 0.95)"
+      py = "ly - len * 0.3 * (1 - w) * s * cos(phi + sub * 0.95)"
+      width = 0.0012
+      color = "alpha(mix(#2FB7B0, #A8F7FF, v), 0.85)"
+      draw = "clamp((t - grow) / 0.9, 0, 1)"
+
+# The curl's front, rising toward us: the page itself, which its figure is drawn on next.
+[[scene.draw]]
+kind = "lines"
+count = 8
+visible = "t >= 34.5 && t < 39.5 && min(dm, rr * 1.5708) > 0 + 0.0005"
+let = ["qa = 0", "qb = min(dm, rr * 1.5708)", "q0 = mix(qa, qb, i / n)", "q1 = min(qb, mix(qa, qb, (i + 1) / n) + 0.003)", "c0 = fold - q0", "ax0 = (-0.8889 - -0.9119 * c0) / -0.4104", "bx0 = (0.8889 - -0.9119 * c0) / -0.4104", "ay0 = (-0.5 - -0.4104 * c0) / 0.9119", "by0 = (0.5 - -0.4104 * c0) / 0.9119", "lo0 = max(min(ax0, bx0), min(ay0, by0))", "hi0 = max(lo0, min(max(ax0, bx0), max(ay0, by0)))", "a0 = min(q0 / rr, bend)", "r0 = max(0, q0 - bend * rr)", "m0 = fold - rr * sin(a0) - r0 * cos(bend)", "k0 = min(3, 1 + near * (rr * (1 - cos(a0)) + r0 * sin(bend)))", "c1 = fold - q1", "ax1 = (-0.8889 - -0.9119 * c1) / -0.4104", "bx1 = (0.8889 - -0.9119 * c1) / -0.4104", "ay1 = (-0.5 - -0.4104 * c1) / 0.9119", "by1 = (0.5 - -0.4104 * c1) / 0.9119", "lo1 = max(min(ax1, bx1), min(ay1, by1))", "hi1 = max(lo1, min(max(ax1, bx1), max(ay1, by1)))", "a1 = min(q1 / rr, bend)", "r1 = max(0, q1 - bend * rr)", "m1 = fold - rr * sin(a1) - r1 * cos(bend)", "k1 = min(3, 1 + near * (rr * (1 - cos(a1)) + r1 * sin(bend)))", "am = (a0 + a1) / 2"]
+samples = 4
+closed = true
+px = "pick(j, (-0.9119 * m0 + -0.4104 * lo0) * k0, (-0.9119 * m0 + -0.4104 * hi0) * k0, (-0.9119 * m1 + -0.4104 * hi1) * k1, (-0.9119 * m1 + -0.4104 * lo1) * k1)"
+py = "pick(j, (-0.4104 * m0 + 0.9119 * lo0) * k0, (-0.4104 * m0 + 0.9119 * hi0) * k0, (-0.4104 * m1 + 0.9119 * hi1) * k1, (-0.4104 * m1 + 0.9119 * lo1) * k1)"
+width = 0
+fill = "mix(#080B16, #222A4A, 0.7 * sin(am))"
+
+# The shadow the curl casts on what it uncovers.
+[[scene.draw]]
+kind = "lines"
+visible = "t >= 34.5 && t < 39.5"
+samples = 2
+px = "-0.9119 * (fold - rr - 0.03) + -0.4104 * (s * 6 - 3)"
+py = "-0.4104 * (fold - rr - 0.03) + 0.9119 * (s * 6 - 3)"
+width = 0.06
+color = "alpha(#000000, 0.35 * min(1, dm * 8))"
+
+# The page, carried by the turn: flat beyond the fold, round the curl and on toward us before it.
+[[scene.draw]]
+kind = "group"
+visible = "t >= 34.5 && t < 39.5"
+
+  [[scene.draw.draw]]
+  kind = "rect"
+  count = 160
+  w = "(0.002 + 0.002 * hash(i * 9.1)) * wk"
+  h = "(0.002 + 0.002 * hash(i * 9.1)) * wk"
+  color = "alpha(#FFFFFF, sky * (0.25 + 0.55 * noise(t * 0.25 + i * 3.3)))"
+  let = ["wx0 = (hash(i * 1.37) * 2 - 1) * 0.88", "wy0 = (hash(i * 4.11) * 2 - 1) * 0.5", "wu = -0.9119 * wx0 + -0.4104 * wy0", "wv = -0.4104 * wx0 + 0.9119 * wy0", "wq = max(0, fold - wu)", "wa = min(wq / rr, bend)", "wr = max(0, wq - bend * rr)", "wm = wu + wq - rr * sin(wa) - wr * cos(bend)", "wz = rr * (1 - cos(wa)) + wr * sin(bend)", "wk = min(3, 1 + near * wz)"]
+  x = "(-0.9119 * wm + -0.4104 * wv) * wk"
+  y = "(-0.4104 * wm + 0.9119 * wv) * wk"
+
+  [[scene.draw.draw]]
+  kind = "lines"
+  samples = 48
+  width = 0.0016
+  color = "alpha(#F2A65A, sky * 0.55)"
+  sample_let = ["wx0 = -0.8889 + 1.7778 * s", "wy0 = 0.13", "wu = -0.9119 * wx0 + -0.4104 * wy0", "wv = -0.4104 * wx0 + 0.9119 * wy0", "wq = max(0, fold - wu)", "wa = min(wq / rr, bend)", "wr = max(0, wq - bend * rr)", "wm = wu + wq - rr * sin(wa) - wr * cos(bend)", "wz = rr * (1 - cos(wa)) + wr * sin(bend)", "wk = min(3, 1 + near * wz)"]
+  px = "(-0.9119 * wm + -0.4104 * wv) * wk"
+  py = "(-0.4104 * wm + 0.9119 * wv) * wk"
+glow = "1.5 * gl"
+glow_radius = 0.012
+
+  # The figure, carried along with its page.
+  [[scene.draw.draw]]
+  kind = "group"
+  glow = "1.4 * gl"
+  glow_radius = 0.006
+
+        [[scene.draw.draw.draw]]
+    kind = "lines"
+    count = 3
+    let = ["bx = 0.3", "by = 0.46", "a = pick(i, -0.55, 0.05, 0.6)", "ln = pick(i, 0.62, 0.86, 0.66)", "c = pick(i, -0.4, 0.15, 0.45)"]
+    samples = 120
+    width = 0.0034
+    color = "#5EF2E0"
+    draw = "ease_in_out((t - 7) / 6)"
+    sample_let = ["wx0 = bx + ln * s * sin(a + c * s * 0.5)", "wy0 = by - ln * s * cos(a + c * s * 0.5)", "wu = -0.9119 * wx0 + -0.4104 * wy0", "wv = -0.4104 * wx0 + 0.9119 * wy0", "wq = max(0, fold - wu)", "wa = min(wq / rr, bend)", "wr = max(0, wq - bend * rr)", "wm = wu + wq - rr * sin(wa) - wr * cos(bend)", "wz = rr * (1 - cos(wa)) + wr * sin(bend)", "wk = min(3, 1 + near * wz)"]
+    px = "(-0.9119 * wm + -0.4104 * wv) * wk"
+    py = "(-0.4104 * wm + 0.9119 * wv) * wk"
+
+        [[scene.draw.draw.draw]]
+    kind = "lines"
+    count = 132
+    let = ["f = floor(i / 44)", "v = 0.06 + 0.92 * mod(i, 44) / 44", "side = mod(i, 2) * 2 - 1", "bx = 0.3", "by = 0.46", "a = pick(f, -0.55, 0.05, 0.6)", "ln = pick(f, 0.62, 0.86, 0.66)", "c = pick(f, -0.4, 0.15, 0.45)", "sx = bx + ln * v * sin(a + c * v * 0.5)", "sy = by - ln * v * cos(a + c * v * 0.5)", "th = a + c * v", "len = 0.15 * ln * sin(pi * (0.08 + 0.88 * v)) * (1 - 0.45 * v)"]
+    samples = 14
+    width = 0.0021
+    color = "mix(#2FB7B0, #A8F7FF, v)"
+    draw = "clamp((t - 9 - v * 12) / 1.4, 0, 1)"
+    sample_let = ["wx0 = sx + len * s * sin(th + side * (1.15 - 0.7 * s))", "wy0 = sy - len * s * cos(th + side * (1.15 - 0.7 * s))", "wu = -0.9119 * wx0 + -0.4104 * wy0", "wv = -0.4104 * wx0 + 0.9119 * wy0", "wq = max(0, fold - wu)", "wa = min(wq / rr, bend)", "wr = max(0, wq - bend * rr)", "wm = wu + wq - rr * sin(wa) - wr * cos(bend)", "wz = rr * (1 - cos(wa)) + wr * sin(bend)", "wk = min(3, 1 + near * wz)"]
+    px = "(-0.9119 * wm + -0.4104 * wv) * wk"
+    py = "(-0.4104 * wm + 0.9119 * wv) * wk"
+    visible = "fold - (-0.9119 * sx + -0.4104 * sy) < rr * 1.5708 + 0.06"
+
+        [[scene.draw.draw.draw]]
+    kind = "lines"
+    count = 924
+    let = ["leaf = floor(i / 7)", "w = (mod(i, 7) + 1) / 8", "f = floor(leaf / 44)", "v = 0.06 + 0.92 * mod(leaf, 44) / 44", "side = mod(leaf, 2) * 2 - 1", "sub = mod(i, 2) * 2 - 1", "bx = 0.3", "by = 0.46", "a = pick(f, -0.55, 0.05, 0.6)", "ln = pick(f, 0.62, 0.86, 0.66)", "c = pick(f, -0.4, 0.15, 0.45)", "sx = bx + ln * v * sin(a + c * v * 0.5)", "sy = by - ln * v * cos(a + c * v * 0.5)", "th = a + c * v", "len = 0.15 * ln * sin(pi * (0.08 + 0.88 * v)) * (1 - 0.45 * v)", "phi = th + side * (1.15 - 0.7 * w)", "lx = sx + len * w * sin(phi)", "ly = sy - len * w * cos(phi)", "grow = 9 + v * 12 + 1.4 * w"]
+    samples = 5
+    width = 0.0012
+    color = "alpha(mix(#2FB7B0, #A8F7FF, v), 0.85)"
+    draw = "clamp((t - grow) / 0.9, 0, 1)"
+    sample_let = ["wx0 = lx + len * 0.3 * (1 - w) * s * sin(phi + sub * 0.95)", "wy0 = ly - len * 0.3 * (1 - w) * s * cos(phi + sub * 0.95)", "wu = -0.9119 * wx0 + -0.4104 * wy0", "wv = -0.4104 * wx0 + 0.9119 * wy0", "wq = max(0, fold - wu)", "wa = min(wq / rr, bend)", "wr = max(0, wq - bend * rr)", "wm = wu + wq - rr * sin(wa) - wr * cos(bend)", "wz = rr * (1 - cos(wa)) + wr * sin(bend)", "wk = min(3, 1 + near * wz)"]
+    px = "(-0.9119 * wm + -0.4104 * wv) * wk"
+    py = "(-0.4104 * wm + 0.9119 * wv) * wk"
+    visible = "fold - (-0.9119 * lx + -0.4104 * ly) < rr * 1.5708 + 0.06"
+
+# The lifted page's shadow, falling on the page beyond the fold.
+[[scene.draw]]
+kind = "lines"
+count = 3
+visible = "t >= 34.5 && t < 39.5"
+samples = 2
+px = "-0.9119 * (fold + 0.012 + i * 0.022) + -0.4104 * (s * 6 - 3)"
+py = "-0.4104 * (fold + 0.012 + i * 0.022) + 0.9119 * (s * 6 - 3)"
+width = "0.022 + i * 0.012"
+color = "alpha(#000000, (0.34 - i * 0.1) * min(1, dm * 8))"
+
+# The curl past edge-on, where the page shows its back.
+[[scene.draw]]
+kind = "lines"
+count = 6
+visible = "t >= 34.5 && t < 39.5 && min(dm, rr * bend) > min(dm, rr * 1.5708) + 0.0005"
+let = ["qa = min(dm, rr * 1.5708)", "qb = min(dm, rr * bend)", "q0 = mix(qa, qb, i / n)", "q1 = min(qb, mix(qa, qb, (i + 1) / n) + 0.003)", "c0 = fold - q0", "ax0 = (-0.8889 - -0.9119 * c0) / -0.4104", "bx0 = (0.8889 - -0.9119 * c0) / -0.4104", "ay0 = (-0.5 - -0.4104 * c0) / 0.9119", "by0 = (0.5 - -0.4104 * c0) / 0.9119", "lo0 = max(min(ax0, bx0), min(ay0, by0))", "hi0 = max(lo0, min(max(ax0, bx0), max(ay0, by0)))", "a0 = min(q0 / rr, bend)", "r0 = max(0, q0 - bend * rr)", "m0 = fold - rr * sin(a0) - r0 * cos(bend)", "k0 = min(3, 1 + near * (rr * (1 - cos(a0)) + r0 * sin(bend)))", "c1 = fold - q1", "ax1 = (-0.8889 - -0.9119 * c1) / -0.4104", "bx1 = (0.8889 - -0.9119 * c1) / -0.4104", "ay1 = (-0.5 - -0.4104 * c1) / 0.9119", "by1 = (0.5 - -0.4104 * c1) / 0.9119", "lo1 = max(min(ax1, bx1), min(ay1, by1))", "hi1 = max(lo1, min(max(ax1, bx1), max(ay1, by1)))", "a1 = min(q1 / rr, bend)", "r1 = max(0, q1 - bend * rr)", "m1 = fold - rr * sin(a1) - r1 * cos(bend)", "k1 = min(3, 1 + near * (rr * (1 - cos(a1)) + r1 * sin(bend)))", "am = (a0 + a1) / 2"]
+samples = 4
+closed = true
+px = "pick(j, (-0.9119 * m0 + -0.4104 * lo0) * k0, (-0.9119 * m0 + -0.4104 * hi0) * k0, (-0.9119 * m1 + -0.4104 * hi1) * k1, (-0.9119 * m1 + -0.4104 * lo1) * k1)"
+py = "pick(j, (-0.4104 * m0 + 0.9119 * lo0) * k0, (-0.4104 * m0 + 0.9119 * hi0) * k0, (-0.4104 * m1 + 0.9119 * hi1) * k1, (-0.4104 * m1 + 0.9119 * lo1) * k1)"
+width = 0
+fill = "mix(#4E4668, #F1EBFA, 0.42 + 0.55 * cos(am - 0.75))"
+
+# The rest of the lifted page, its back to us, rising straight on toward us.
+[[scene.draw]]
+kind = "lines"
+count = 4
+visible = "t >= 34.5 && t < 39.5 && dm > min(dm, rr * bend) + 0.0005"
+let = ["qa = min(dm, rr * bend)", "qb = dm", "q0 = mix(qa, qb, i / n)", "q1 = min(qb, mix(qa, qb, (i + 1) / n) + 0.003)", "c0 = fold - q0", "ax0 = (-0.8889 - -0.9119 * c0) / -0.4104", "bx0 = (0.8889 - -0.9119 * c0) / -0.4104", "ay0 = (-0.5 - -0.4104 * c0) / 0.9119", "by0 = (0.5 - -0.4104 * c0) / 0.9119", "lo0 = max(min(ax0, bx0), min(ay0, by0))", "hi0 = max(lo0, min(max(ax0, bx0), max(ay0, by0)))", "a0 = min(q0 / rr, bend)", "r0 = max(0, q0 - bend * rr)", "m0 = fold - rr * sin(a0) - r0 * cos(bend)", "k0 = min(3, 1 + near * (rr * (1 - cos(a0)) + r0 * sin(bend)))", "c1 = fold - q1", "ax1 = (-0.8889 - -0.9119 * c1) / -0.4104", "bx1 = (0.8889 - -0.9119 * c1) / -0.4104", "ay1 = (-0.5 - -0.4104 * c1) / 0.9119", "by1 = (0.5 - -0.4104 * c1) / 0.9119", "lo1 = max(min(ax1, bx1), min(ay1, by1))", "hi1 = max(lo1, min(max(ax1, bx1), max(ay1, by1)))", "a1 = min(q1 / rr, bend)", "r1 = max(0, q1 - bend * rr)", "m1 = fold - rr * sin(a1) - r1 * cos(bend)", "k1 = min(3, 1 + near * (rr * (1 - cos(a1)) + r1 * sin(bend)))", "am = (a0 + a1) / 2"]
+samples = 4
+closed = true
+px = "pick(j, (-0.9119 * m0 + -0.4104 * lo0) * k0, (-0.9119 * m0 + -0.4104 * hi0) * k0, (-0.9119 * m1 + -0.4104 * hi1) * k1, (-0.9119 * m1 + -0.4104 * lo1) * k1)"
+py = "pick(j, (-0.4104 * m0 + 0.9119 * lo0) * k0, (-0.4104 * m0 + 0.9119 * hi0) * k0, (-0.4104 * m1 + 0.9119 * hi1) * k1, (-0.4104 * m1 + 0.9119 * lo1) * k1)"
+width = 0
+fill = "mix(#4E4668, #F1EBFA, 0.42 + 0.55 * cos(am - 0.75))"
+
+# The Hand of Omnipotence: it reaches in, takes the page's corner, and pulls the page up and away.
+[[scene.draw]]
+kind = "sprite"
+file = "hands.png"
+frame_size = [809, 643]
+anchor = [619, 572]
+smooth = true
+visible = "t >= 33 && t < 39.5"
+frame = "t < 34.25 ? 0 : 1"
+x = "(-0.9119 * cm + -0.4104 * ct) * ck + 0.45 * reach"
+y = "(-0.4104 * cm + 0.9119 * ct) * ck + 0.4 * reach"
+pixel = "0.0006 * min(1.8, ck)"
+
+[[scene]]
+name = "Page II: The Harmonograph"
+duration = 40
+fade = 0
+let = ["codeop = t < 5 ? 1 : mix(1, 0.3, smoothstep(5, 7, t)) * (1 - smoothstep(34.5, 35.1, t))", "sky = smoothstep(5, 9, t)", "fold = t < 34.5 ? -4 : t >= 39.5 ? 4 : interp(t, 34.5, -1.0358, 35.2, -0.92, 36.4, -0.5, 37.6, 0, 38.5, 0.55, 39.4, 1.2458)", "dm = max(0, fold - -1.0158)", "rr = interp(fold, -1.0358, 0.05, -0.7, 0.15)", "bend = interp(fold, -1.0358, 0.7, -0.8, 2, -0.6, 2.8, -0.4, 2.9, 0, 2.9, 0.3, 2.3, 0.6, 1.9, 1.2458, 1.7)", "near = interp(fold, 0, 0.4, 0.3, 1.2, 0.6, 1.7, 1.2458, 2)", "cq = dm", "ca = min(cq / rr, bend)", "cr = max(0, cq - bend * rr)", "cm = -1.0158 + cq - rr * sin(ca) - cr * cos(bend)", "cz = rr * (1 - cos(ca)) + cr * sin(bend)", "ck = min(3, 1 + near * cz)", "ct = 0.0912", "gl = 1 - smoothstep(34.1, 35.1, t)", "reach = t < 33 ? 1 : 1 - ease_out((t - 33) / 1.5)"]
+
+# Beneath the page: the next page's code, shown where the page has been pulled away. (Clipping this, rather than
+# covering it with the page, saves drawing a whole screen of page through a mask.)
+[[scene.draw]]
+kind = "group"
+visible = "t >= 34.5"
+rotate = -2.7187
+clip = ["-9", "-9", "fold", "9"]
+
+  [[scene.draw.draw]]
+  kind = "group"
+  rotate = 2.7187
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "# Page III: The Spirograph"
+    size = 0.021
+    x = -0.8389
+    y = -0.445
+    color = "#8A7FB0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "# A wheel of 3 rolling inside a ring of 5, its pen at 5."
+    size = 0.021
+    x = -0.8389
+    y = -0.4167
+    color = "#8A7FB0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "[[scene.draw.draw.draw.draw]]"
+    size = 0.021
+    x = -0.8389
+    y = -0.3883
+    color = "#56D4F5"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "kind = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3599
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"lines\""
+    size = 0.021
+    x = -0.7507
+    y = -0.3599
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "samples = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3316
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "2400"
+    size = 0.021
+    x = -0.7129
+    y = -0.3316
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "px = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3033
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"0.3 + 0.062 * (2 * cos(s * tau * 3) + 5 * cos(s * tau * "
+    size = 0.021
+    x = -0.7759
+    y = -0.3033
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "2))\""
+    size = 0.021
+    x = -0.7885
+    y = -0.2749
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "py = "
+    size = 0.021
+    x = -0.8389
+    y = -0.2465
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"0.02 + 0.062 * (2 * sin(s * tau * 3) - 5 * sin(s * tau * "
+    size = 0.021
+    x = -0.7759
+    y = -0.2465
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "2))\""
+    size = 0.021
+    x = -0.7885
+    y = -0.2182
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "width = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1898
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "0.0022"
+    size = 0.021
+    x = -0.7381
+    y = -0.1898
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "color = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1615
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"#FFC86B\""
+    size = 0.021
+    x = -0.7381
+    y = -0.1615
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "draw = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1331
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"ease_in_out((t - 7) / 13)\""
+    size = 0.021
+    x = -0.7507
+    y = -0.1331
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "# A rose of seven petals inside it."
+    size = 0.021
+    x = -0.8389
+    y = -0.0764
+    color = "#8A7FB0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "[[scene.draw.draw.draw.draw]]"
+    size = 0.021
+    x = -0.8389
+    y = -0.0481
+    color = "#56D4F5"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "kind = "
+    size = 0.021
+    x = -0.8389
+    y = -0.0197
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"lines\""
+    size = 0.021
+    x = -0.7507
+    y = -0.0197
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "samples = "
+    size = 0.021
+    x = -0.8389
+    y = 0.0086
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "1800"
+    size = 0.021
+    x = -0.7129
+    y = 0.0086
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "px = "
+    size = 0.021
+    x = -0.8389
+    y = 0.037
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"0.3 + 0.17 * cos(7 / 3 * s * tau * 3) * cos(s * tau * 3)\""
+    size = 0.021
+    x = -0.7759
+    y = 0.037
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "py = "
+    size = 0.021
+    x = -0.8389
+    y = 0.0653
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"0.02 + 0.17 * cos(7 / 3 * s * tau * 3) * sin(s * tau * 3)\""
+    size = 0.021
+    x = -0.7759
+    y = 0.0653
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "width = "
+    size = 0.021
+    x = -0.8389
+    y = 0.0937
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "0.002"
+    size = 0.021
+    x = -0.7381
+    y = 0.0937
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "color = "
+    size = 0.021
+    x = -0.8389
+    y = 0.122
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"#F25FD0\""
+    size = 0.021
+    x = -0.7381
+    y = 0.122
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "draw = "
+    size = 0.021
+    x = -0.8389
+    y = 0.1504
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"ease_in_out((t - 17) / 11)\""
+    size = 0.021
+    x = -0.7507
+    y = 0.1504
+    color = "#7CF5A8"
+
+# The page as written, until the hand takes it: its sky,
+[[scene.draw]]
+kind = "group"
+visible = "t < 34.5"
+
+  [[scene.draw.draw]]
+  kind = "rect"
+  count = 160
+  x = "(hash(i * 1.37) * 2 - 1) * 0.88"
+  y = "(hash(i * 4.11) * 2 - 1) * 0.5"
+  w = "0.002 + 0.002 * hash(i * 9.1)"
+  h = "0.002 + 0.002 * hash(i * 9.1)"
+  color = "alpha(#FFFFFF, sky * (0.25 + 0.55 * noise(t * 0.25 + i * 3.3)))"
+
+  [[scene.draw.draw]]
+  kind = "lines"
+  samples = 48
+  px = "-0.8889 + 1.7778 * s"
+  py = "0.13"
+  width = 0.0016
+  color = "alpha(#F2A65A, sky * 0.55)"
+glow = "1.5 * gl"
+glow_radius = 0.012
+
+# its code, which fades as the hand takes the page (text isn't carried round the curl, so it's gone before the fold
+# comes near it),
+[[scene.draw]]
+kind = "group"
+visible = "t < 35.1"
+y = "0"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "# Page II: The Harmonograph"
+    size = 0.021
+    x = -0.8389
+    y = -0.445
+    color = "alpha(#8A7FB0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "# Two damped pendulums, swinging at nearly the same rate."
+    size = 0.021
+    x = -0.8389
+    y = -0.4167
+    color = "t >= 7 && t < 21 ? #FFFFFF : alpha(#8A7FB0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "[[scene.draw.draw.draw.draw]]"
+    size = 0.021
+    x = -0.8389
+    y = -0.3883
+    color = "t >= 7 && t < 21 ? #FFFFFF : alpha(#56D4F5, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "kind = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3599
+    color = "t >= 7 && t < 21 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"lines\""
+    size = 0.021
+    x = -0.7507
+    y = -0.3599
+    color = "t >= 7 && t < 21 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "samples = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3316
+    color = "t >= 7 && t < 21 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "3200"
+    size = 0.021
+    x = -0.7129
+    y = -0.3316
+    color = "t >= 7 && t < 21 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "px = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3033
+    color = "t >= 7 && t < 21 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"0.3 + 0.36 * exp(-s * 2.2) * sin(s * 92 + 0.4) + 0.05 * "
+    size = 0.021
+    x = -0.7759
+    y = -0.3033
+    color = "t >= 7 && t < 21 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "exp(-s * 1.6) * sin(s * 61)\""
+    size = 0.021
+    x = -0.7885
+    y = -0.2749
+    color = "t >= 7 && t < 21 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "py = "
+    size = 0.021
+    x = -0.8389
+    y = -0.2465
+    color = "t >= 7 && t < 21 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"0.02 + 0.36 * exp(-s * 2.0) * sin(s * 88.4 + 1.3)\""
+    size = 0.021
+    x = -0.7759
+    y = -0.2465
+    color = "t >= 7 && t < 21 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "width = "
+    size = 0.021
+    x = -0.8389
+    y = -0.2182
+    color = "t >= 7 && t < 21 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "0.0018"
+    size = 0.021
+    x = -0.7381
+    y = -0.2182
+    color = "t >= 7 && t < 21 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "color = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1898
+    color = "t >= 7 && t < 21 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"#C9A7FF\""
+    size = 0.021
+    x = -0.7381
+    y = -0.1898
+    color = "t >= 7 && t < 21 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "draw = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1615
+    color = "t >= 7 && t < 21 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"ease_in_out((t - 7) / 14)\""
+    size = 0.021
+    x = -0.7507
+    y = -0.1615
+    color = "t >= 7 && t < 21 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "# A third, faster and fainter, crossing the first."
+    size = 0.021
+    x = -0.8389
+    y = -0.1048
+    color = "t >= 16 && t < 28 ? #FFFFFF : alpha(#8A7FB0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "[[scene.draw.draw.draw.draw]]"
+    size = 0.021
+    x = -0.8389
+    y = -0.0764
+    color = "t >= 16 && t < 28 ? #FFFFFF : alpha(#56D4F5, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "kind = "
+    size = 0.021
+    x = -0.8389
+    y = -0.0481
+    color = "t >= 16 && t < 28 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"lines\""
+    size = 0.021
+    x = -0.7507
+    y = -0.0481
+    color = "t >= 16 && t < 28 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "samples = "
+    size = 0.021
+    x = -0.8389
+    y = -0.0197
+    color = "t >= 16 && t < 28 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "2400"
+    size = 0.021
+    x = -0.7129
+    y = -0.0197
+    color = "t >= 16 && t < 28 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "px = "
+    size = 0.021
+    x = -0.8389
+    y = 0.0086
+    color = "t >= 16 && t < 28 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"0.3 + 0.24 * exp(-s * 1.8) * sin(s * 70 + 2.1)\""
+    size = 0.021
+    x = -0.7759
+    y = 0.0086
+    color = "t >= 16 && t < 28 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "py = "
+    size = 0.021
+    x = -0.8389
+    y = 0.037
+    color = "t >= 16 && t < 28 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"0.02 + 0.24 * exp(-s * 1.7) * sin(s * 71.3)\""
+    size = 0.021
+    x = -0.7759
+    y = 0.037
+    color = "t >= 16 && t < 28 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "width = "
+    size = 0.021
+    x = -0.8389
+    y = 0.0653
+    color = "t >= 16 && t < 28 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "0.0016"
+    size = 0.021
+    x = -0.7381
+    y = 0.0653
+    color = "t >= 16 && t < 28 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "color = "
+    size = 0.021
+    x = -0.8389
+    y = 0.0937
+    color = "t >= 16 && t < 28 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"#5EF2E0\""
+    size = 0.021
+    x = -0.7381
+    y = 0.0937
+    color = "t >= 16 && t < 28 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "draw = "
+    size = 0.021
+    x = -0.8389
+    y = 0.122
+    color = "t >= 16 && t < 28 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"ease_in_out((t - 16) / 12)\""
+    size = 0.021
+    x = -0.7507
+    y = 0.122
+    color = "t >= 16 && t < 28 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+# and the figure, drawn over its code.
+[[scene.draw]]
+kind = "group"
+visible = "t < 34.5"
+glow = "1.4 * gl"
+glow_radius = 0.006
+
+  # Two damped pendulums, swinging at nearly the same rate.
+      [[scene.draw.draw]]
+      kind = "lines"
+      samples = 3200
+      px = "0.3 + 0.36 * exp(-s * 2.2) * sin(s * 92 + 0.4) + 0.05 * exp(-s * 1.6) * sin(s * 61)"
+      py = "0.02 + 0.36 * exp(-s * 2.0) * sin(s * 88.4 + 1.3)"
+      width = 0.0018
+      color = "#C9A7FF"
+      draw = "ease_in_out((t - 7) / 14)"
+
+  # A third, faster and fainter, crossing the first.
+      [[scene.draw.draw]]
+      kind = "lines"
+      samples = 2400
+      px = "0.3 + 0.24 * exp(-s * 1.8) * sin(s * 70 + 2.1)"
+      py = "0.02 + 0.24 * exp(-s * 1.7) * sin(s * 71.3)"
+      width = 0.0016
+      color = "#5EF2E0"
+      draw = "ease_in_out((t - 16) / 12)"
+
+# The curl's front, rising toward us: the page itself, which its figure is drawn on next.
+[[scene.draw]]
+kind = "lines"
+count = 8
+visible = "t >= 34.5 && t < 39.5 && min(dm, rr * 1.5708) > 0 + 0.0005"
+let = ["qa = 0", "qb = min(dm, rr * 1.5708)", "q0 = mix(qa, qb, i / n)", "q1 = min(qb, mix(qa, qb, (i + 1) / n) + 0.003)", "c0 = fold - q0", "ax0 = (-0.8889 - -0.9119 * c0) / -0.4104", "bx0 = (0.8889 - -0.9119 * c0) / -0.4104", "ay0 = (-0.5 - -0.4104 * c0) / 0.9119", "by0 = (0.5 - -0.4104 * c0) / 0.9119", "lo0 = max(min(ax0, bx0), min(ay0, by0))", "hi0 = max(lo0, min(max(ax0, bx0), max(ay0, by0)))", "a0 = min(q0 / rr, bend)", "r0 = max(0, q0 - bend * rr)", "m0 = fold - rr * sin(a0) - r0 * cos(bend)", "k0 = min(3, 1 + near * (rr * (1 - cos(a0)) + r0 * sin(bend)))", "c1 = fold - q1", "ax1 = (-0.8889 - -0.9119 * c1) / -0.4104", "bx1 = (0.8889 - -0.9119 * c1) / -0.4104", "ay1 = (-0.5 - -0.4104 * c1) / 0.9119", "by1 = (0.5 - -0.4104 * c1) / 0.9119", "lo1 = max(min(ax1, bx1), min(ay1, by1))", "hi1 = max(lo1, min(max(ax1, bx1), max(ay1, by1)))", "a1 = min(q1 / rr, bend)", "r1 = max(0, q1 - bend * rr)", "m1 = fold - rr * sin(a1) - r1 * cos(bend)", "k1 = min(3, 1 + near * (rr * (1 - cos(a1)) + r1 * sin(bend)))", "am = (a0 + a1) / 2"]
+samples = 4
+closed = true
+px = "pick(j, (-0.9119 * m0 + -0.4104 * lo0) * k0, (-0.9119 * m0 + -0.4104 * hi0) * k0, (-0.9119 * m1 + -0.4104 * hi1) * k1, (-0.9119 * m1 + -0.4104 * lo1) * k1)"
+py = "pick(j, (-0.4104 * m0 + 0.9119 * lo0) * k0, (-0.4104 * m0 + 0.9119 * hi0) * k0, (-0.4104 * m1 + 0.9119 * hi1) * k1, (-0.4104 * m1 + 0.9119 * lo1) * k1)"
+width = 0
+fill = "mix(#080B16, #222A4A, 0.7 * sin(am))"
+
+# The shadow the curl casts on what it uncovers.
+[[scene.draw]]
+kind = "lines"
+visible = "t >= 34.5 && t < 39.5"
+samples = 2
+px = "-0.9119 * (fold - rr - 0.03) + -0.4104 * (s * 6 - 3)"
+py = "-0.4104 * (fold - rr - 0.03) + 0.9119 * (s * 6 - 3)"
+width = 0.06
+color = "alpha(#000000, 0.35 * min(1, dm * 8))"
+
+# The page, carried by the turn: flat beyond the fold, round the curl and on toward us before it.
+[[scene.draw]]
+kind = "group"
+visible = "t >= 34.5 && t < 39.5"
+
+  [[scene.draw.draw]]
+  kind = "rect"
+  count = 160
+  w = "(0.002 + 0.002 * hash(i * 9.1)) * wk"
+  h = "(0.002 + 0.002 * hash(i * 9.1)) * wk"
+  color = "alpha(#FFFFFF, sky * (0.25 + 0.55 * noise(t * 0.25 + i * 3.3)))"
+  let = ["wx0 = (hash(i * 1.37) * 2 - 1) * 0.88", "wy0 = (hash(i * 4.11) * 2 - 1) * 0.5", "wu = -0.9119 * wx0 + -0.4104 * wy0", "wv = -0.4104 * wx0 + 0.9119 * wy0", "wq = max(0, fold - wu)", "wa = min(wq / rr, bend)", "wr = max(0, wq - bend * rr)", "wm = wu + wq - rr * sin(wa) - wr * cos(bend)", "wz = rr * (1 - cos(wa)) + wr * sin(bend)", "wk = min(3, 1 + near * wz)"]
+  x = "(-0.9119 * wm + -0.4104 * wv) * wk"
+  y = "(-0.4104 * wm + 0.9119 * wv) * wk"
+
+  [[scene.draw.draw]]
+  kind = "lines"
+  samples = 48
+  width = 0.0016
+  color = "alpha(#F2A65A, sky * 0.55)"
+  sample_let = ["wx0 = -0.8889 + 1.7778 * s", "wy0 = 0.13", "wu = -0.9119 * wx0 + -0.4104 * wy0", "wv = -0.4104 * wx0 + 0.9119 * wy0", "wq = max(0, fold - wu)", "wa = min(wq / rr, bend)", "wr = max(0, wq - bend * rr)", "wm = wu + wq - rr * sin(wa) - wr * cos(bend)", "wz = rr * (1 - cos(wa)) + wr * sin(bend)", "wk = min(3, 1 + near * wz)"]
+  px = "(-0.9119 * wm + -0.4104 * wv) * wk"
+  py = "(-0.4104 * wm + 0.9119 * wv) * wk"
+glow = "1.5 * gl"
+glow_radius = 0.012
+
+  # The figure, carried along with its page.
+  [[scene.draw.draw]]
+  kind = "group"
+  glow = "1.4 * gl"
+  glow_radius = 0.006
+
+        [[scene.draw.draw.draw]]
+    kind = "lines"
+    samples = 3200
+    width = 0.0018
+    color = "#C9A7FF"
+    draw = "ease_in_out((t - 7) / 14)"
+    sample_let = ["wx0 = 0.3 + 0.36 * exp(-s * 2.2) * sin(s * 92 + 0.4) + 0.05 * exp(-s * 1.6) * sin(s * 61)", "wy0 = 0.02 + 0.36 * exp(-s * 2.0) * sin(s * 88.4 + 1.3)", "wu = -0.9119 * wx0 + -0.4104 * wy0", "wv = -0.4104 * wx0 + 0.9119 * wy0", "wq = max(0, fold - wu)", "wa = min(wq / rr, bend)", "wr = max(0, wq - bend * rr)", "wm = wu + wq - rr * sin(wa) - wr * cos(bend)", "wz = rr * (1 - cos(wa)) + wr * sin(bend)", "wk = min(3, 1 + near * wz)"]
+    px = "(-0.9119 * wm + -0.4104 * wv) * wk"
+    py = "(-0.4104 * wm + 0.9119 * wv) * wk"
+
+        [[scene.draw.draw.draw]]
+    kind = "lines"
+    samples = 2400
+    width = 0.0016
+    color = "#5EF2E0"
+    draw = "ease_in_out((t - 16) / 12)"
+    sample_let = ["wx0 = 0.3 + 0.24 * exp(-s * 1.8) * sin(s * 70 + 2.1)", "wy0 = 0.02 + 0.24 * exp(-s * 1.7) * sin(s * 71.3)", "wu = -0.9119 * wx0 + -0.4104 * wy0", "wv = -0.4104 * wx0 + 0.9119 * wy0", "wq = max(0, fold - wu)", "wa = min(wq / rr, bend)", "wr = max(0, wq - bend * rr)", "wm = wu + wq - rr * sin(wa) - wr * cos(bend)", "wz = rr * (1 - cos(wa)) + wr * sin(bend)", "wk = min(3, 1 + near * wz)"]
+    px = "(-0.9119 * wm + -0.4104 * wv) * wk"
+    py = "(-0.4104 * wm + 0.9119 * wv) * wk"
+
+# The lifted page's shadow, falling on the page beyond the fold.
+[[scene.draw]]
+kind = "lines"
+count = 3
+visible = "t >= 34.5 && t < 39.5"
+samples = 2
+px = "-0.9119 * (fold + 0.012 + i * 0.022) + -0.4104 * (s * 6 - 3)"
+py = "-0.4104 * (fold + 0.012 + i * 0.022) + 0.9119 * (s * 6 - 3)"
+width = "0.022 + i * 0.012"
+color = "alpha(#000000, (0.34 - i * 0.1) * min(1, dm * 8))"
+
+# The curl past edge-on, where the page shows its back.
+[[scene.draw]]
+kind = "lines"
+count = 6
+visible = "t >= 34.5 && t < 39.5 && min(dm, rr * bend) > min(dm, rr * 1.5708) + 0.0005"
+let = ["qa = min(dm, rr * 1.5708)", "qb = min(dm, rr * bend)", "q0 = mix(qa, qb, i / n)", "q1 = min(qb, mix(qa, qb, (i + 1) / n) + 0.003)", "c0 = fold - q0", "ax0 = (-0.8889 - -0.9119 * c0) / -0.4104", "bx0 = (0.8889 - -0.9119 * c0) / -0.4104", "ay0 = (-0.5 - -0.4104 * c0) / 0.9119", "by0 = (0.5 - -0.4104 * c0) / 0.9119", "lo0 = max(min(ax0, bx0), min(ay0, by0))", "hi0 = max(lo0, min(max(ax0, bx0), max(ay0, by0)))", "a0 = min(q0 / rr, bend)", "r0 = max(0, q0 - bend * rr)", "m0 = fold - rr * sin(a0) - r0 * cos(bend)", "k0 = min(3, 1 + near * (rr * (1 - cos(a0)) + r0 * sin(bend)))", "c1 = fold - q1", "ax1 = (-0.8889 - -0.9119 * c1) / -0.4104", "bx1 = (0.8889 - -0.9119 * c1) / -0.4104", "ay1 = (-0.5 - -0.4104 * c1) / 0.9119", "by1 = (0.5 - -0.4104 * c1) / 0.9119", "lo1 = max(min(ax1, bx1), min(ay1, by1))", "hi1 = max(lo1, min(max(ax1, bx1), max(ay1, by1)))", "a1 = min(q1 / rr, bend)", "r1 = max(0, q1 - bend * rr)", "m1 = fold - rr * sin(a1) - r1 * cos(bend)", "k1 = min(3, 1 + near * (rr * (1 - cos(a1)) + r1 * sin(bend)))", "am = (a0 + a1) / 2"]
+samples = 4
+closed = true
+px = "pick(j, (-0.9119 * m0 + -0.4104 * lo0) * k0, (-0.9119 * m0 + -0.4104 * hi0) * k0, (-0.9119 * m1 + -0.4104 * hi1) * k1, (-0.9119 * m1 + -0.4104 * lo1) * k1)"
+py = "pick(j, (-0.4104 * m0 + 0.9119 * lo0) * k0, (-0.4104 * m0 + 0.9119 * hi0) * k0, (-0.4104 * m1 + 0.9119 * hi1) * k1, (-0.4104 * m1 + 0.9119 * lo1) * k1)"
+width = 0
+fill = "mix(#4E4668, #F1EBFA, 0.42 + 0.55 * cos(am - 0.75))"
+
+# The rest of the lifted page, its back to us, rising straight on toward us.
+[[scene.draw]]
+kind = "lines"
+count = 4
+visible = "t >= 34.5 && t < 39.5 && dm > min(dm, rr * bend) + 0.0005"
+let = ["qa = min(dm, rr * bend)", "qb = dm", "q0 = mix(qa, qb, i / n)", "q1 = min(qb, mix(qa, qb, (i + 1) / n) + 0.003)", "c0 = fold - q0", "ax0 = (-0.8889 - -0.9119 * c0) / -0.4104", "bx0 = (0.8889 - -0.9119 * c0) / -0.4104", "ay0 = (-0.5 - -0.4104 * c0) / 0.9119", "by0 = (0.5 - -0.4104 * c0) / 0.9119", "lo0 = max(min(ax0, bx0), min(ay0, by0))", "hi0 = max(lo0, min(max(ax0, bx0), max(ay0, by0)))", "a0 = min(q0 / rr, bend)", "r0 = max(0, q0 - bend * rr)", "m0 = fold - rr * sin(a0) - r0 * cos(bend)", "k0 = min(3, 1 + near * (rr * (1 - cos(a0)) + r0 * sin(bend)))", "c1 = fold - q1", "ax1 = (-0.8889 - -0.9119 * c1) / -0.4104", "bx1 = (0.8889 - -0.9119 * c1) / -0.4104", "ay1 = (-0.5 - -0.4104 * c1) / 0.9119", "by1 = (0.5 - -0.4104 * c1) / 0.9119", "lo1 = max(min(ax1, bx1), min(ay1, by1))", "hi1 = max(lo1, min(max(ax1, bx1), max(ay1, by1)))", "a1 = min(q1 / rr, bend)", "r1 = max(0, q1 - bend * rr)", "m1 = fold - rr * sin(a1) - r1 * cos(bend)", "k1 = min(3, 1 + near * (rr * (1 - cos(a1)) + r1 * sin(bend)))", "am = (a0 + a1) / 2"]
+samples = 4
+closed = true
+px = "pick(j, (-0.9119 * m0 + -0.4104 * lo0) * k0, (-0.9119 * m0 + -0.4104 * hi0) * k0, (-0.9119 * m1 + -0.4104 * hi1) * k1, (-0.9119 * m1 + -0.4104 * lo1) * k1)"
+py = "pick(j, (-0.4104 * m0 + 0.9119 * lo0) * k0, (-0.4104 * m0 + 0.9119 * hi0) * k0, (-0.4104 * m1 + 0.9119 * hi1) * k1, (-0.4104 * m1 + 0.9119 * lo1) * k1)"
+width = 0
+fill = "mix(#4E4668, #F1EBFA, 0.42 + 0.55 * cos(am - 0.75))"
+
+# The Hand of Omnipotence: it reaches in, takes the page's corner, and pulls the page up and away.
+[[scene.draw]]
+kind = "sprite"
+file = "hands.png"
+frame_size = [809, 643]
+anchor = [619, 572]
+smooth = true
+visible = "t >= 33 && t < 39.5"
+frame = "t < 34.25 ? 0 : 1"
+x = "(-0.9119 * cm + -0.4104 * ct) * ck + 0.45 * reach"
+y = "(-0.4104 * cm + 0.9119 * ct) * ck + 0.4 * reach"
+pixel = "0.0006 * min(1.8, ck)"
+
+[[scene]]
+name = "Page III: The Spirograph"
+duration = 40
+fade = 0
+let = ["codeop = t < 5 ? 1 : mix(1, 0.3, smoothstep(5, 7, t)) * (1 - smoothstep(34.5, 35.1, t))", "sky = smoothstep(5, 9, t)", "fold = t < 34.5 ? -4 : t >= 39.5 ? 4 : interp(t, 34.5, -1.0358, 35.2, -0.92, 36.4, -0.5, 37.6, 0, 38.5, 0.55, 39.4, 1.2458)", "dm = max(0, fold - -1.0158)", "rr = interp(fold, -1.0358, 0.05, -0.7, 0.15)", "bend = interp(fold, -1.0358, 0.7, -0.8, 2, -0.6, 2.8, -0.4, 2.9, 0, 2.9, 0.3, 2.3, 0.6, 1.9, 1.2458, 1.7)", "near = interp(fold, 0, 0.4, 0.3, 1.2, 0.6, 1.7, 1.2458, 2)", "cq = dm", "ca = min(cq / rr, bend)", "cr = max(0, cq - bend * rr)", "cm = -1.0158 + cq - rr * sin(ca) - cr * cos(bend)", "cz = rr * (1 - cos(ca)) + cr * sin(bend)", "ck = min(3, 1 + near * cz)", "ct = 0.0912", "gl = 1 - smoothstep(34.1, 35.1, t)", "reach = t < 33 ? 1 : 1 - ease_out((t - 33) / 1.5)"]
+
+# Beneath the page: the next page's code, shown where the page has been pulled away. (Clipping this, rather than
+# covering it with the page, saves drawing a whole screen of page through a mask.)
+[[scene.draw]]
+kind = "group"
+visible = "t >= 34.5"
+rotate = -2.7187
+clip = ["-9", "-9", "fold", "9"]
+
+  [[scene.draw.draw]]
+  kind = "group"
+  rotate = 2.7187
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "# Page IV: The Knot"
+    size = 0.021
+    x = -0.8389
+    y = -0.445
+    color = "#8A7FB0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "# A torus knot, three times around and seven through, turning "
+    size = 0.021
+    x = -0.8389
+    y = -0.4167
+    color = "#8A7FB0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "as it's drawn."
+    size = 0.021
+    x = -0.7885
+    y = -0.3883
+    color = "#8A7FB0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "[[scene.draw.draw.draw.draw]]"
+    size = 0.021
+    x = -0.8389
+    y = -0.3599
+    color = "#56D4F5"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "kind = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3316
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"lines\""
+    size = 0.021
+    x = -0.7507
+    y = -0.3316
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "samples = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3033
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "2000"
+    size = 0.021
+    x = -0.7129
+    y = -0.3033
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "let = "
+    size = 0.021
+    x = -0.8389
+    y = -0.2749
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "[\"spin = t * 0.22\"]"
+    size = 0.021
+    x = -0.7633
+    y = -0.2749
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "px = "
+    size = 0.021
+    x = -0.8389
+    y = -0.2465
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"0.3 + 0.12 * ((2 + cos(7 * s * tau)) * cos(3 * s * tau) * "
+    size = 0.021
+    x = -0.7759
+    y = -0.2465
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "cos(spin) + sin(7 * s * tau) * sin(spin))\""
+    size = 0.021
+    x = -0.7885
+    y = -0.2182
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "py = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1898
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"0.02 + 0.12 * (2 + cos(7 * s * tau)) * sin(3 * s * tau)\""
+    size = 0.021
+    x = -0.7759
+    y = -0.1898
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "width = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1615
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "0.0026"
+    size = 0.021
+    x = -0.7381
+    y = -0.1615
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "color = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1331
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"mix(#F25FD0, #56D4F5, 0.5 + 0.5 * sin(t * 0.4))\""
+    size = 0.021
+    x = -0.7381
+    y = -0.1331
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "draw = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1048
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"ease_in_out((t - 7) / 19)\""
+    size = 0.021
+    x = -0.7507
+    y = -0.1048
+    color = "#7CF5A8"
+
+# The page as written, until the hand takes it: its sky,
+[[scene.draw]]
+kind = "group"
+visible = "t < 34.5"
+
+  [[scene.draw.draw]]
+  kind = "rect"
+  count = 160
+  x = "(hash(i * 1.37) * 2 - 1) * 0.88"
+  y = "(hash(i * 4.11) * 2 - 1) * 0.5"
+  w = "0.002 + 0.002 * hash(i * 9.1)"
+  h = "0.002 + 0.002 * hash(i * 9.1)"
+  color = "alpha(#FFFFFF, sky * (0.25 + 0.55 * noise(t * 0.25 + i * 3.3)))"
+
+  [[scene.draw.draw]]
+  kind = "lines"
+  samples = 48
+  px = "-0.8889 + 1.7778 * s"
+  py = "0.13"
+  width = 0.0016
+  color = "alpha(#F2A65A, sky * 0.55)"
+glow = "1.5 * gl"
+glow_radius = 0.012
+
+# its code, which fades as the hand takes the page (text isn't carried round the curl, so it's gone before the fold
+# comes near it),
+[[scene.draw]]
+kind = "group"
+visible = "t < 35.1"
+y = "0"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "# Page III: The Spirograph"
+    size = 0.021
+    x = -0.8389
+    y = -0.445
+    color = "alpha(#8A7FB0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "# A wheel of 3 rolling inside a ring of 5, its pen at 5."
+    size = 0.021
+    x = -0.8389
+    y = -0.4167
+    color = "t >= 7 && t < 20 ? #FFFFFF : alpha(#8A7FB0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "[[scene.draw.draw.draw.draw]]"
+    size = 0.021
+    x = -0.8389
+    y = -0.3883
+    color = "t >= 7 && t < 20 ? #FFFFFF : alpha(#56D4F5, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "kind = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3599
+    color = "t >= 7 && t < 20 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"lines\""
+    size = 0.021
+    x = -0.7507
+    y = -0.3599
+    color = "t >= 7 && t < 20 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "samples = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3316
+    color = "t >= 7 && t < 20 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "2400"
+    size = 0.021
+    x = -0.7129
+    y = -0.3316
+    color = "t >= 7 && t < 20 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "px = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3033
+    color = "t >= 7 && t < 20 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"0.3 + 0.062 * (2 * cos(s * tau * 3) + 5 * cos(s * tau * "
+    size = 0.021
+    x = -0.7759
+    y = -0.3033
+    color = "t >= 7 && t < 20 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "2))\""
+    size = 0.021
+    x = -0.7885
+    y = -0.2749
+    color = "t >= 7 && t < 20 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "py = "
+    size = 0.021
+    x = -0.8389
+    y = -0.2465
+    color = "t >= 7 && t < 20 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"0.02 + 0.062 * (2 * sin(s * tau * 3) - 5 * sin(s * tau * "
+    size = 0.021
+    x = -0.7759
+    y = -0.2465
+    color = "t >= 7 && t < 20 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "2))\""
+    size = 0.021
+    x = -0.7885
+    y = -0.2182
+    color = "t >= 7 && t < 20 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "width = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1898
+    color = "t >= 7 && t < 20 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "0.0022"
+    size = 0.021
+    x = -0.7381
+    y = -0.1898
+    color = "t >= 7 && t < 20 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "color = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1615
+    color = "t >= 7 && t < 20 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"#FFC86B\""
+    size = 0.021
+    x = -0.7381
+    y = -0.1615
+    color = "t >= 7 && t < 20 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "draw = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1331
+    color = "t >= 7 && t < 20 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"ease_in_out((t - 7) / 13)\""
+    size = 0.021
+    x = -0.7507
+    y = -0.1331
+    color = "t >= 7 && t < 20 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "# A rose of seven petals inside it."
+    size = 0.021
+    x = -0.8389
+    y = -0.0764
+    color = "t >= 17 && t < 28 ? #FFFFFF : alpha(#8A7FB0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "[[scene.draw.draw.draw.draw]]"
+    size = 0.021
+    x = -0.8389
+    y = -0.0481
+    color = "t >= 17 && t < 28 ? #FFFFFF : alpha(#56D4F5, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "kind = "
+    size = 0.021
+    x = -0.8389
+    y = -0.0197
+    color = "t >= 17 && t < 28 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"lines\""
+    size = 0.021
+    x = -0.7507
+    y = -0.0197
+    color = "t >= 17 && t < 28 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "samples = "
+    size = 0.021
+    x = -0.8389
+    y = 0.0086
+    color = "t >= 17 && t < 28 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "1800"
+    size = 0.021
+    x = -0.7129
+    y = 0.0086
+    color = "t >= 17 && t < 28 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "px = "
+    size = 0.021
+    x = -0.8389
+    y = 0.037
+    color = "t >= 17 && t < 28 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"0.3 + 0.17 * cos(7 / 3 * s * tau * 3) * cos(s * tau * 3)\""
+    size = 0.021
+    x = -0.7759
+    y = 0.037
+    color = "t >= 17 && t < 28 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "py = "
+    size = 0.021
+    x = -0.8389
+    y = 0.0653
+    color = "t >= 17 && t < 28 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"0.02 + 0.17 * cos(7 / 3 * s * tau * 3) * sin(s * tau * 3)\""
+    size = 0.021
+    x = -0.7759
+    y = 0.0653
+    color = "t >= 17 && t < 28 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "width = "
+    size = 0.021
+    x = -0.8389
+    y = 0.0937
+    color = "t >= 17 && t < 28 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "0.002"
+    size = 0.021
+    x = -0.7381
+    y = 0.0937
+    color = "t >= 17 && t < 28 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "color = "
+    size = 0.021
+    x = -0.8389
+    y = 0.122
+    color = "t >= 17 && t < 28 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"#F25FD0\""
+    size = 0.021
+    x = -0.7381
+    y = 0.122
+    color = "t >= 17 && t < 28 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "draw = "
+    size = 0.021
+    x = -0.8389
+    y = 0.1504
+    color = "t >= 17 && t < 28 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"ease_in_out((t - 17) / 11)\""
+    size = 0.021
+    x = -0.7507
+    y = 0.1504
+    color = "t >= 17 && t < 28 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+# and the figure, drawn over its code.
+[[scene.draw]]
+kind = "group"
+visible = "t < 34.5"
+glow = "1.4 * gl"
+glow_radius = 0.006
+
+  # A wheel of 3 rolling inside a ring of 5, its pen at 5.
+      [[scene.draw.draw]]
+      kind = "lines"
+      samples = 2400
+      px = "0.3 + 0.062 * (2 * cos(s * tau * 3) + 5 * cos(s * tau * 2))"
+      py = "0.02 + 0.062 * (2 * sin(s * tau * 3) - 5 * sin(s * tau * 2))"
+      width = 0.0022
+      color = "#FFC86B"
+      draw = "ease_in_out((t - 7) / 13)"
+
+  # A rose of seven petals inside it.
+      [[scene.draw.draw]]
+      kind = "lines"
+      samples = 1800
+      px = "0.3 + 0.17 * cos(7 / 3 * s * tau * 3) * cos(s * tau * 3)"
+      py = "0.02 + 0.17 * cos(7 / 3 * s * tau * 3) * sin(s * tau * 3)"
+      width = 0.002
+      color = "#F25FD0"
+      draw = "ease_in_out((t - 17) / 11)"
+
+# The curl's front, rising toward us: the page itself, which its figure is drawn on next.
+[[scene.draw]]
+kind = "lines"
+count = 8
+visible = "t >= 34.5 && t < 39.5 && min(dm, rr * 1.5708) > 0 + 0.0005"
+let = ["qa = 0", "qb = min(dm, rr * 1.5708)", "q0 = mix(qa, qb, i / n)", "q1 = min(qb, mix(qa, qb, (i + 1) / n) + 0.003)", "c0 = fold - q0", "ax0 = (-0.8889 - -0.9119 * c0) / -0.4104", "bx0 = (0.8889 - -0.9119 * c0) / -0.4104", "ay0 = (-0.5 - -0.4104 * c0) / 0.9119", "by0 = (0.5 - -0.4104 * c0) / 0.9119", "lo0 = max(min(ax0, bx0), min(ay0, by0))", "hi0 = max(lo0, min(max(ax0, bx0), max(ay0, by0)))", "a0 = min(q0 / rr, bend)", "r0 = max(0, q0 - bend * rr)", "m0 = fold - rr * sin(a0) - r0 * cos(bend)", "k0 = min(3, 1 + near * (rr * (1 - cos(a0)) + r0 * sin(bend)))", "c1 = fold - q1", "ax1 = (-0.8889 - -0.9119 * c1) / -0.4104", "bx1 = (0.8889 - -0.9119 * c1) / -0.4104", "ay1 = (-0.5 - -0.4104 * c1) / 0.9119", "by1 = (0.5 - -0.4104 * c1) / 0.9119", "lo1 = max(min(ax1, bx1), min(ay1, by1))", "hi1 = max(lo1, min(max(ax1, bx1), max(ay1, by1)))", "a1 = min(q1 / rr, bend)", "r1 = max(0, q1 - bend * rr)", "m1 = fold - rr * sin(a1) - r1 * cos(bend)", "k1 = min(3, 1 + near * (rr * (1 - cos(a1)) + r1 * sin(bend)))", "am = (a0 + a1) / 2"]
+samples = 4
+closed = true
+px = "pick(j, (-0.9119 * m0 + -0.4104 * lo0) * k0, (-0.9119 * m0 + -0.4104 * hi0) * k0, (-0.9119 * m1 + -0.4104 * hi1) * k1, (-0.9119 * m1 + -0.4104 * lo1) * k1)"
+py = "pick(j, (-0.4104 * m0 + 0.9119 * lo0) * k0, (-0.4104 * m0 + 0.9119 * hi0) * k0, (-0.4104 * m1 + 0.9119 * hi1) * k1, (-0.4104 * m1 + 0.9119 * lo1) * k1)"
+width = 0
+fill = "mix(#080B16, #222A4A, 0.7 * sin(am))"
+
+# The shadow the curl casts on what it uncovers.
+[[scene.draw]]
+kind = "lines"
+visible = "t >= 34.5 && t < 39.5"
+samples = 2
+px = "-0.9119 * (fold - rr - 0.03) + -0.4104 * (s * 6 - 3)"
+py = "-0.4104 * (fold - rr - 0.03) + 0.9119 * (s * 6 - 3)"
+width = 0.06
+color = "alpha(#000000, 0.35 * min(1, dm * 8))"
+
+# The page, carried by the turn: flat beyond the fold, round the curl and on toward us before it.
+[[scene.draw]]
+kind = "group"
+visible = "t >= 34.5 && t < 39.5"
+
+  [[scene.draw.draw]]
+  kind = "rect"
+  count = 160
+  w = "(0.002 + 0.002 * hash(i * 9.1)) * wk"
+  h = "(0.002 + 0.002 * hash(i * 9.1)) * wk"
+  color = "alpha(#FFFFFF, sky * (0.25 + 0.55 * noise(t * 0.25 + i * 3.3)))"
+  let = ["wx0 = (hash(i * 1.37) * 2 - 1) * 0.88", "wy0 = (hash(i * 4.11) * 2 - 1) * 0.5", "wu = -0.9119 * wx0 + -0.4104 * wy0", "wv = -0.4104 * wx0 + 0.9119 * wy0", "wq = max(0, fold - wu)", "wa = min(wq / rr, bend)", "wr = max(0, wq - bend * rr)", "wm = wu + wq - rr * sin(wa) - wr * cos(bend)", "wz = rr * (1 - cos(wa)) + wr * sin(bend)", "wk = min(3, 1 + near * wz)"]
+  x = "(-0.9119 * wm + -0.4104 * wv) * wk"
+  y = "(-0.4104 * wm + 0.9119 * wv) * wk"
+
+  [[scene.draw.draw]]
+  kind = "lines"
+  samples = 48
+  width = 0.0016
+  color = "alpha(#F2A65A, sky * 0.55)"
+  sample_let = ["wx0 = -0.8889 + 1.7778 * s", "wy0 = 0.13", "wu = -0.9119 * wx0 + -0.4104 * wy0", "wv = -0.4104 * wx0 + 0.9119 * wy0", "wq = max(0, fold - wu)", "wa = min(wq / rr, bend)", "wr = max(0, wq - bend * rr)", "wm = wu + wq - rr * sin(wa) - wr * cos(bend)", "wz = rr * (1 - cos(wa)) + wr * sin(bend)", "wk = min(3, 1 + near * wz)"]
+  px = "(-0.9119 * wm + -0.4104 * wv) * wk"
+  py = "(-0.4104 * wm + 0.9119 * wv) * wk"
+glow = "1.5 * gl"
+glow_radius = 0.012
+
+  # The figure, carried along with its page.
+  [[scene.draw.draw]]
+  kind = "group"
+  glow = "1.4 * gl"
+  glow_radius = 0.006
+
+        [[scene.draw.draw.draw]]
+    kind = "lines"
+    samples = 2400
+    width = 0.0022
+    color = "#FFC86B"
+    draw = "ease_in_out((t - 7) / 13)"
+    sample_let = ["wx0 = 0.3 + 0.062 * (2 * cos(s * tau * 3) + 5 * cos(s * tau * 2))", "wy0 = 0.02 + 0.062 * (2 * sin(s * tau * 3) - 5 * sin(s * tau * 2))", "wu = -0.9119 * wx0 + -0.4104 * wy0", "wv = -0.4104 * wx0 + 0.9119 * wy0", "wq = max(0, fold - wu)", "wa = min(wq / rr, bend)", "wr = max(0, wq - bend * rr)", "wm = wu + wq - rr * sin(wa) - wr * cos(bend)", "wz = rr * (1 - cos(wa)) + wr * sin(bend)", "wk = min(3, 1 + near * wz)"]
+    px = "(-0.9119 * wm + -0.4104 * wv) * wk"
+    py = "(-0.4104 * wm + 0.9119 * wv) * wk"
+
+        [[scene.draw.draw.draw]]
+    kind = "lines"
+    samples = 1800
+    width = 0.002
+    color = "#F25FD0"
+    draw = "ease_in_out((t - 17) / 11)"
+    sample_let = ["wx0 = 0.3 + 0.17 * cos(7 / 3 * s * tau * 3) * cos(s * tau * 3)", "wy0 = 0.02 + 0.17 * cos(7 / 3 * s * tau * 3) * sin(s * tau * 3)", "wu = -0.9119 * wx0 + -0.4104 * wy0", "wv = -0.4104 * wx0 + 0.9119 * wy0", "wq = max(0, fold - wu)", "wa = min(wq / rr, bend)", "wr = max(0, wq - bend * rr)", "wm = wu + wq - rr * sin(wa) - wr * cos(bend)", "wz = rr * (1 - cos(wa)) + wr * sin(bend)", "wk = min(3, 1 + near * wz)"]
+    px = "(-0.9119 * wm + -0.4104 * wv) * wk"
+    py = "(-0.4104 * wm + 0.9119 * wv) * wk"
+
+# The lifted page's shadow, falling on the page beyond the fold.
+[[scene.draw]]
+kind = "lines"
+count = 3
+visible = "t >= 34.5 && t < 39.5"
+samples = 2
+px = "-0.9119 * (fold + 0.012 + i * 0.022) + -0.4104 * (s * 6 - 3)"
+py = "-0.4104 * (fold + 0.012 + i * 0.022) + 0.9119 * (s * 6 - 3)"
+width = "0.022 + i * 0.012"
+color = "alpha(#000000, (0.34 - i * 0.1) * min(1, dm * 8))"
+
+# The curl past edge-on, where the page shows its back.
+[[scene.draw]]
+kind = "lines"
+count = 6
+visible = "t >= 34.5 && t < 39.5 && min(dm, rr * bend) > min(dm, rr * 1.5708) + 0.0005"
+let = ["qa = min(dm, rr * 1.5708)", "qb = min(dm, rr * bend)", "q0 = mix(qa, qb, i / n)", "q1 = min(qb, mix(qa, qb, (i + 1) / n) + 0.003)", "c0 = fold - q0", "ax0 = (-0.8889 - -0.9119 * c0) / -0.4104", "bx0 = (0.8889 - -0.9119 * c0) / -0.4104", "ay0 = (-0.5 - -0.4104 * c0) / 0.9119", "by0 = (0.5 - -0.4104 * c0) / 0.9119", "lo0 = max(min(ax0, bx0), min(ay0, by0))", "hi0 = max(lo0, min(max(ax0, bx0), max(ay0, by0)))", "a0 = min(q0 / rr, bend)", "r0 = max(0, q0 - bend * rr)", "m0 = fold - rr * sin(a0) - r0 * cos(bend)", "k0 = min(3, 1 + near * (rr * (1 - cos(a0)) + r0 * sin(bend)))", "c1 = fold - q1", "ax1 = (-0.8889 - -0.9119 * c1) / -0.4104", "bx1 = (0.8889 - -0.9119 * c1) / -0.4104", "ay1 = (-0.5 - -0.4104 * c1) / 0.9119", "by1 = (0.5 - -0.4104 * c1) / 0.9119", "lo1 = max(min(ax1, bx1), min(ay1, by1))", "hi1 = max(lo1, min(max(ax1, bx1), max(ay1, by1)))", "a1 = min(q1 / rr, bend)", "r1 = max(0, q1 - bend * rr)", "m1 = fold - rr * sin(a1) - r1 * cos(bend)", "k1 = min(3, 1 + near * (rr * (1 - cos(a1)) + r1 * sin(bend)))", "am = (a0 + a1) / 2"]
+samples = 4
+closed = true
+px = "pick(j, (-0.9119 * m0 + -0.4104 * lo0) * k0, (-0.9119 * m0 + -0.4104 * hi0) * k0, (-0.9119 * m1 + -0.4104 * hi1) * k1, (-0.9119 * m1 + -0.4104 * lo1) * k1)"
+py = "pick(j, (-0.4104 * m0 + 0.9119 * lo0) * k0, (-0.4104 * m0 + 0.9119 * hi0) * k0, (-0.4104 * m1 + 0.9119 * hi1) * k1, (-0.4104 * m1 + 0.9119 * lo1) * k1)"
+width = 0
+fill = "mix(#4E4668, #F1EBFA, 0.42 + 0.55 * cos(am - 0.75))"
+
+# The rest of the lifted page, its back to us, rising straight on toward us.
+[[scene.draw]]
+kind = "lines"
+count = 4
+visible = "t >= 34.5 && t < 39.5 && dm > min(dm, rr * bend) + 0.0005"
+let = ["qa = min(dm, rr * bend)", "qb = dm", "q0 = mix(qa, qb, i / n)", "q1 = min(qb, mix(qa, qb, (i + 1) / n) + 0.003)", "c0 = fold - q0", "ax0 = (-0.8889 - -0.9119 * c0) / -0.4104", "bx0 = (0.8889 - -0.9119 * c0) / -0.4104", "ay0 = (-0.5 - -0.4104 * c0) / 0.9119", "by0 = (0.5 - -0.4104 * c0) / 0.9119", "lo0 = max(min(ax0, bx0), min(ay0, by0))", "hi0 = max(lo0, min(max(ax0, bx0), max(ay0, by0)))", "a0 = min(q0 / rr, bend)", "r0 = max(0, q0 - bend * rr)", "m0 = fold - rr * sin(a0) - r0 * cos(bend)", "k0 = min(3, 1 + near * (rr * (1 - cos(a0)) + r0 * sin(bend)))", "c1 = fold - q1", "ax1 = (-0.8889 - -0.9119 * c1) / -0.4104", "bx1 = (0.8889 - -0.9119 * c1) / -0.4104", "ay1 = (-0.5 - -0.4104 * c1) / 0.9119", "by1 = (0.5 - -0.4104 * c1) / 0.9119", "lo1 = max(min(ax1, bx1), min(ay1, by1))", "hi1 = max(lo1, min(max(ax1, bx1), max(ay1, by1)))", "a1 = min(q1 / rr, bend)", "r1 = max(0, q1 - bend * rr)", "m1 = fold - rr * sin(a1) - r1 * cos(bend)", "k1 = min(3, 1 + near * (rr * (1 - cos(a1)) + r1 * sin(bend)))", "am = (a0 + a1) / 2"]
+samples = 4
+closed = true
+px = "pick(j, (-0.9119 * m0 + -0.4104 * lo0) * k0, (-0.9119 * m0 + -0.4104 * hi0) * k0, (-0.9119 * m1 + -0.4104 * hi1) * k1, (-0.9119 * m1 + -0.4104 * lo1) * k1)"
+py = "pick(j, (-0.4104 * m0 + 0.9119 * lo0) * k0, (-0.4104 * m0 + 0.9119 * hi0) * k0, (-0.4104 * m1 + 0.9119 * hi1) * k1, (-0.4104 * m1 + 0.9119 * lo1) * k1)"
+width = 0
+fill = "mix(#4E4668, #F1EBFA, 0.42 + 0.55 * cos(am - 0.75))"
+
+# The Hand of Omnipotence: it reaches in, takes the page's corner, and pulls the page up and away.
+[[scene.draw]]
+kind = "sprite"
+file = "hands.png"
+frame_size = [809, 643]
+anchor = [619, 572]
+smooth = true
+visible = "t >= 33 && t < 39.5"
+frame = "t < 34.25 ? 0 : 1"
+x = "(-0.9119 * cm + -0.4104 * ct) * ck + 0.45 * reach"
+y = "(-0.4104 * cm + 0.9119 * ct) * ck + 0.4 * reach"
+pixel = "0.0006 * min(1.8, ck)"
+
+[[scene]]
+name = "Page IV: The Knot"
+duration = 40
+fade = 0
+let = ["codeop = t < 5 ? 1 : mix(1, 0.3, smoothstep(5, 7, t)) * (1 - smoothstep(34.5, 35.1, t))", "sky = smoothstep(5, 9, t)", "fold = t < 34.5 ? -4 : t >= 39.5 ? 4 : interp(t, 34.5, -1.0358, 35.2, -0.92, 36.4, -0.5, 37.6, 0, 38.5, 0.55, 39.4, 1.2458)", "dm = max(0, fold - -1.0158)", "rr = interp(fold, -1.0358, 0.05, -0.7, 0.15)", "bend = interp(fold, -1.0358, 0.7, -0.8, 2, -0.6, 2.8, -0.4, 2.9, 0, 2.9, 0.3, 2.3, 0.6, 1.9, 1.2458, 1.7)", "near = interp(fold, 0, 0.4, 0.3, 1.2, 0.6, 1.7, 1.2458, 2)", "cq = dm", "ca = min(cq / rr, bend)", "cr = max(0, cq - bend * rr)", "cm = -1.0158 + cq - rr * sin(ca) - cr * cos(bend)", "cz = rr * (1 - cos(ca)) + cr * sin(bend)", "ck = min(3, 1 + near * cz)", "ct = 0.0912", "gl = 1 - smoothstep(34.1, 35.1, t)", "reach = t < 33 ? 1 : 1 - ease_out((t - 33) / 1.5)"]
+
+# Beneath the page: the next page's code, shown where the page has been pulled away. (Clipping this, rather than
+# covering it with the page, saves drawing a whole screen of page through a mask.)
+[[scene.draw]]
+kind = "group"
+visible = "t >= 34.5"
+rotate = -2.7187
+clip = ["-9", "-9", "fold", "9"]
+
+  [[scene.draw.draw]]
+  kind = "group"
+  rotate = 2.7187
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "# Page V: The Sunflower"
+    size = 0.021
+    x = -0.8389
+    y = -0.445
+    color = "#8A7FB0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "# Nine hundred seeds, each turned by the golden angle from the "
+    size = 0.021
+    x = -0.8389
+    y = -0.4167
+    color = "#8A7FB0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "last."
+    size = 0.021
+    x = -0.7885
+    y = -0.3883
+    color = "#8A7FB0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "[[scene.draw.draw.draw.draw]]"
+    size = 0.021
+    x = -0.8389
+    y = -0.3599
+    color = "#56D4F5"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "kind = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3316
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"rect\""
+    size = 0.021
+    x = -0.7507
+    y = -0.3316
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "count = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3033
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "900"
+    size = 0.021
+    x = -0.7381
+    y = -0.3033
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "x = "
+    size = 0.021
+    x = -0.8389
+    y = -0.2749
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"0.3 + 0.4 * sqrt(k) * cos(i * 2.39996)\""
+    size = 0.021
+    x = -0.7885
+    y = -0.2749
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "y = "
+    size = 0.021
+    x = -0.8389
+    y = -0.2465
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"0.02 + 0.4 * sqrt(k) * sin(i * 2.39996)\""
+    size = 0.021
+    x = -0.7885
+    y = -0.2465
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "w = "
+    size = 0.021
+    x = -0.8389
+    y = -0.2182
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"0.0034 + 0.0055 * k\""
+    size = 0.021
+    x = -0.7885
+    y = -0.2182
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "h = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1898
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"0.0034 + 0.0055 * k\""
+    size = 0.021
+    x = -0.7885
+    y = -0.1898
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "rotate = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1615
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"i * 2.39996\""
+    size = 0.021
+    x = -0.7255
+    y = -0.1615
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "color = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1331
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"hsv(0.42 - 0.3 * k, 0.6, 1)\""
+    size = 0.021
+    x = -0.7381
+    y = -0.1331
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "visible = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1048
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"i < (t - 7) * 45\""
+    size = 0.021
+    x = -0.7129
+    y = -0.1048
+    color = "#7CF5A8"
+
+# The page as written, until the hand takes it: its sky,
+[[scene.draw]]
+kind = "group"
+visible = "t < 34.5"
+
+  [[scene.draw.draw]]
+  kind = "rect"
+  count = 160
+  x = "(hash(i * 1.37) * 2 - 1) * 0.88"
+  y = "(hash(i * 4.11) * 2 - 1) * 0.5"
+  w = "0.002 + 0.002 * hash(i * 9.1)"
+  h = "0.002 + 0.002 * hash(i * 9.1)"
+  color = "alpha(#FFFFFF, sky * (0.25 + 0.55 * noise(t * 0.25 + i * 3.3)))"
+
+  [[scene.draw.draw]]
+  kind = "lines"
+  samples = 48
+  px = "-0.8889 + 1.7778 * s"
+  py = "0.13"
+  width = 0.0016
+  color = "alpha(#F2A65A, sky * 0.55)"
+glow = "1.5 * gl"
+glow_radius = 0.012
+
+# its code, which fades as the hand takes the page (text isn't carried round the curl, so it's gone before the fold
+# comes near it),
+[[scene.draw]]
+kind = "group"
+visible = "t < 35.1"
+y = "0"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "# Page IV: The Knot"
+    size = 0.021
+    x = -0.8389
+    y = -0.445
+    color = "alpha(#8A7FB0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "# A torus knot, three times around and seven through, turning "
+    size = 0.021
+    x = -0.8389
+    y = -0.4167
+    color = "t >= 7 && t < 26 ? #FFFFFF : alpha(#8A7FB0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "as it's drawn."
+    size = 0.021
+    x = -0.7885
+    y = -0.3883
+    color = "t >= 7 && t < 26 ? #FFFFFF : alpha(#8A7FB0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "[[scene.draw.draw.draw.draw]]"
+    size = 0.021
+    x = -0.8389
+    y = -0.3599
+    color = "t >= 7 && t < 26 ? #FFFFFF : alpha(#56D4F5, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "kind = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3316
+    color = "t >= 7 && t < 26 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"lines\""
+    size = 0.021
+    x = -0.7507
+    y = -0.3316
+    color = "t >= 7 && t < 26 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "samples = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3033
+    color = "t >= 7 && t < 26 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "2000"
+    size = 0.021
+    x = -0.7129
+    y = -0.3033
+    color = "t >= 7 && t < 26 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "let = "
+    size = 0.021
+    x = -0.8389
+    y = -0.2749
+    color = "t >= 7 && t < 26 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "[\"spin = t * 0.22\"]"
+    size = 0.021
+    x = -0.7633
+    y = -0.2749
+    color = "t >= 7 && t < 26 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "px = "
+    size = 0.021
+    x = -0.8389
+    y = -0.2465
+    color = "t >= 7 && t < 26 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"0.3 + 0.12 * ((2 + cos(7 * s * tau)) * cos(3 * s * tau) * "
+    size = 0.021
+    x = -0.7759
+    y = -0.2465
+    color = "t >= 7 && t < 26 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "cos(spin) + sin(7 * s * tau) * sin(spin))\""
+    size = 0.021
+    x = -0.7885
+    y = -0.2182
+    color = "t >= 7 && t < 26 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "py = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1898
+    color = "t >= 7 && t < 26 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"0.02 + 0.12 * (2 + cos(7 * s * tau)) * sin(3 * s * tau)\""
+    size = 0.021
+    x = -0.7759
+    y = -0.1898
+    color = "t >= 7 && t < 26 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "width = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1615
+    color = "t >= 7 && t < 26 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "0.0026"
+    size = 0.021
+    x = -0.7381
+    y = -0.1615
+    color = "t >= 7 && t < 26 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "color = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1331
+    color = "t >= 7 && t < 26 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"mix(#F25FD0, #56D4F5, 0.5 + 0.5 * sin(t * 0.4))\""
+    size = 0.021
+    x = -0.7381
+    y = -0.1331
+    color = "t >= 7 && t < 26 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "draw = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1048
+    color = "t >= 7 && t < 26 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"ease_in_out((t - 7) / 19)\""
+    size = 0.021
+    x = -0.7507
+    y = -0.1048
+    color = "t >= 7 && t < 26 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+# and the figure, drawn over its code.
+[[scene.draw]]
+kind = "group"
+visible = "t < 34.5"
+glow = "1.4 * gl"
+glow_radius = 0.006
+
+  # A torus knot, three times around and seven through, turning as it's drawn.
+      [[scene.draw.draw]]
+      kind = "lines"
+      samples = 2000
+      let = ["spin = t * 0.22"]
+      px = "0.3 + 0.12 * ((2 + cos(7 * s * tau)) * cos(3 * s * tau) * cos(spin) + sin(7 * s * tau) * sin(spin))"
+      py = "0.02 + 0.12 * (2 + cos(7 * s * tau)) * sin(3 * s * tau)"
+      width = 0.0026
+      color = "mix(#F25FD0, #56D4F5, 0.5 + 0.5 * sin(t * 0.4))"
+      draw = "ease_in_out((t - 7) / 19)"
+
+# The curl's front, rising toward us: the page itself, which its figure is drawn on next.
+[[scene.draw]]
+kind = "lines"
+count = 8
+visible = "t >= 34.5 && t < 39.5 && min(dm, rr * 1.5708) > 0 + 0.0005"
+let = ["qa = 0", "qb = min(dm, rr * 1.5708)", "q0 = mix(qa, qb, i / n)", "q1 = min(qb, mix(qa, qb, (i + 1) / n) + 0.003)", "c0 = fold - q0", "ax0 = (-0.8889 - -0.9119 * c0) / -0.4104", "bx0 = (0.8889 - -0.9119 * c0) / -0.4104", "ay0 = (-0.5 - -0.4104 * c0) / 0.9119", "by0 = (0.5 - -0.4104 * c0) / 0.9119", "lo0 = max(min(ax0, bx0), min(ay0, by0))", "hi0 = max(lo0, min(max(ax0, bx0), max(ay0, by0)))", "a0 = min(q0 / rr, bend)", "r0 = max(0, q0 - bend * rr)", "m0 = fold - rr * sin(a0) - r0 * cos(bend)", "k0 = min(3, 1 + near * (rr * (1 - cos(a0)) + r0 * sin(bend)))", "c1 = fold - q1", "ax1 = (-0.8889 - -0.9119 * c1) / -0.4104", "bx1 = (0.8889 - -0.9119 * c1) / -0.4104", "ay1 = (-0.5 - -0.4104 * c1) / 0.9119", "by1 = (0.5 - -0.4104 * c1) / 0.9119", "lo1 = max(min(ax1, bx1), min(ay1, by1))", "hi1 = max(lo1, min(max(ax1, bx1), max(ay1, by1)))", "a1 = min(q1 / rr, bend)", "r1 = max(0, q1 - bend * rr)", "m1 = fold - rr * sin(a1) - r1 * cos(bend)", "k1 = min(3, 1 + near * (rr * (1 - cos(a1)) + r1 * sin(bend)))", "am = (a0 + a1) / 2"]
+samples = 4
+closed = true
+px = "pick(j, (-0.9119 * m0 + -0.4104 * lo0) * k0, (-0.9119 * m0 + -0.4104 * hi0) * k0, (-0.9119 * m1 + -0.4104 * hi1) * k1, (-0.9119 * m1 + -0.4104 * lo1) * k1)"
+py = "pick(j, (-0.4104 * m0 + 0.9119 * lo0) * k0, (-0.4104 * m0 + 0.9119 * hi0) * k0, (-0.4104 * m1 + 0.9119 * hi1) * k1, (-0.4104 * m1 + 0.9119 * lo1) * k1)"
+width = 0
+fill = "mix(#080B16, #222A4A, 0.7 * sin(am))"
+
+# The shadow the curl casts on what it uncovers.
+[[scene.draw]]
+kind = "lines"
+visible = "t >= 34.5 && t < 39.5"
+samples = 2
+px = "-0.9119 * (fold - rr - 0.03) + -0.4104 * (s * 6 - 3)"
+py = "-0.4104 * (fold - rr - 0.03) + 0.9119 * (s * 6 - 3)"
+width = 0.06
+color = "alpha(#000000, 0.35 * min(1, dm * 8))"
+
+# The page, carried by the turn: flat beyond the fold, round the curl and on toward us before it.
+[[scene.draw]]
+kind = "group"
+visible = "t >= 34.5 && t < 39.5"
+
+  [[scene.draw.draw]]
+  kind = "rect"
+  count = 160
+  w = "(0.002 + 0.002 * hash(i * 9.1)) * wk"
+  h = "(0.002 + 0.002 * hash(i * 9.1)) * wk"
+  color = "alpha(#FFFFFF, sky * (0.25 + 0.55 * noise(t * 0.25 + i * 3.3)))"
+  let = ["wx0 = (hash(i * 1.37) * 2 - 1) * 0.88", "wy0 = (hash(i * 4.11) * 2 - 1) * 0.5", "wu = -0.9119 * wx0 + -0.4104 * wy0", "wv = -0.4104 * wx0 + 0.9119 * wy0", "wq = max(0, fold - wu)", "wa = min(wq / rr, bend)", "wr = max(0, wq - bend * rr)", "wm = wu + wq - rr * sin(wa) - wr * cos(bend)", "wz = rr * (1 - cos(wa)) + wr * sin(bend)", "wk = min(3, 1 + near * wz)"]
+  x = "(-0.9119 * wm + -0.4104 * wv) * wk"
+  y = "(-0.4104 * wm + 0.9119 * wv) * wk"
+
+  [[scene.draw.draw]]
+  kind = "lines"
+  samples = 48
+  width = 0.0016
+  color = "alpha(#F2A65A, sky * 0.55)"
+  sample_let = ["wx0 = -0.8889 + 1.7778 * s", "wy0 = 0.13", "wu = -0.9119 * wx0 + -0.4104 * wy0", "wv = -0.4104 * wx0 + 0.9119 * wy0", "wq = max(0, fold - wu)", "wa = min(wq / rr, bend)", "wr = max(0, wq - bend * rr)", "wm = wu + wq - rr * sin(wa) - wr * cos(bend)", "wz = rr * (1 - cos(wa)) + wr * sin(bend)", "wk = min(3, 1 + near * wz)"]
+  px = "(-0.9119 * wm + -0.4104 * wv) * wk"
+  py = "(-0.4104 * wm + 0.9119 * wv) * wk"
+glow = "1.5 * gl"
+glow_radius = 0.012
+
+  # The figure, carried along with its page.
+  [[scene.draw.draw]]
+  kind = "group"
+  glow = "1.4 * gl"
+  glow_radius = 0.006
+
+        [[scene.draw.draw.draw]]
+    kind = "lines"
+    samples = 2000
+    let = ["spin = t * 0.22"]
+    width = 0.0026
+    color = "mix(#F25FD0, #56D4F5, 0.5 + 0.5 * sin(t * 0.4))"
+    draw = "ease_in_out((t - 7) / 19)"
+    sample_let = ["wx0 = 0.3 + 0.12 * ((2 + cos(7 * s * tau)) * cos(3 * s * tau) * cos(spin) + sin(7 * s * tau) * sin(spin))", "wy0 = 0.02 + 0.12 * (2 + cos(7 * s * tau)) * sin(3 * s * tau)", "wu = -0.9119 * wx0 + -0.4104 * wy0", "wv = -0.4104 * wx0 + 0.9119 * wy0", "wq = max(0, fold - wu)", "wa = min(wq / rr, bend)", "wr = max(0, wq - bend * rr)", "wm = wu + wq - rr * sin(wa) - wr * cos(bend)", "wz = rr * (1 - cos(wa)) + wr * sin(bend)", "wk = min(3, 1 + near * wz)"]
+    px = "(-0.9119 * wm + -0.4104 * wv) * wk"
+    py = "(-0.4104 * wm + 0.9119 * wv) * wk"
+
+# The lifted page's shadow, falling on the page beyond the fold.
+[[scene.draw]]
+kind = "lines"
+count = 3
+visible = "t >= 34.5 && t < 39.5"
+samples = 2
+px = "-0.9119 * (fold + 0.012 + i * 0.022) + -0.4104 * (s * 6 - 3)"
+py = "-0.4104 * (fold + 0.012 + i * 0.022) + 0.9119 * (s * 6 - 3)"
+width = "0.022 + i * 0.012"
+color = "alpha(#000000, (0.34 - i * 0.1) * min(1, dm * 8))"
+
+# The curl past edge-on, where the page shows its back.
+[[scene.draw]]
+kind = "lines"
+count = 6
+visible = "t >= 34.5 && t < 39.5 && min(dm, rr * bend) > min(dm, rr * 1.5708) + 0.0005"
+let = ["qa = min(dm, rr * 1.5708)", "qb = min(dm, rr * bend)", "q0 = mix(qa, qb, i / n)", "q1 = min(qb, mix(qa, qb, (i + 1) / n) + 0.003)", "c0 = fold - q0", "ax0 = (-0.8889 - -0.9119 * c0) / -0.4104", "bx0 = (0.8889 - -0.9119 * c0) / -0.4104", "ay0 = (-0.5 - -0.4104 * c0) / 0.9119", "by0 = (0.5 - -0.4104 * c0) / 0.9119", "lo0 = max(min(ax0, bx0), min(ay0, by0))", "hi0 = max(lo0, min(max(ax0, bx0), max(ay0, by0)))", "a0 = min(q0 / rr, bend)", "r0 = max(0, q0 - bend * rr)", "m0 = fold - rr * sin(a0) - r0 * cos(bend)", "k0 = min(3, 1 + near * (rr * (1 - cos(a0)) + r0 * sin(bend)))", "c1 = fold - q1", "ax1 = (-0.8889 - -0.9119 * c1) / -0.4104", "bx1 = (0.8889 - -0.9119 * c1) / -0.4104", "ay1 = (-0.5 - -0.4104 * c1) / 0.9119", "by1 = (0.5 - -0.4104 * c1) / 0.9119", "lo1 = max(min(ax1, bx1), min(ay1, by1))", "hi1 = max(lo1, min(max(ax1, bx1), max(ay1, by1)))", "a1 = min(q1 / rr, bend)", "r1 = max(0, q1 - bend * rr)", "m1 = fold - rr * sin(a1) - r1 * cos(bend)", "k1 = min(3, 1 + near * (rr * (1 - cos(a1)) + r1 * sin(bend)))", "am = (a0 + a1) / 2"]
+samples = 4
+closed = true
+px = "pick(j, (-0.9119 * m0 + -0.4104 * lo0) * k0, (-0.9119 * m0 + -0.4104 * hi0) * k0, (-0.9119 * m1 + -0.4104 * hi1) * k1, (-0.9119 * m1 + -0.4104 * lo1) * k1)"
+py = "pick(j, (-0.4104 * m0 + 0.9119 * lo0) * k0, (-0.4104 * m0 + 0.9119 * hi0) * k0, (-0.4104 * m1 + 0.9119 * hi1) * k1, (-0.4104 * m1 + 0.9119 * lo1) * k1)"
+width = 0
+fill = "mix(#4E4668, #F1EBFA, 0.42 + 0.55 * cos(am - 0.75))"
+
+# The rest of the lifted page, its back to us, rising straight on toward us.
+[[scene.draw]]
+kind = "lines"
+count = 4
+visible = "t >= 34.5 && t < 39.5 && dm > min(dm, rr * bend) + 0.0005"
+let = ["qa = min(dm, rr * bend)", "qb = dm", "q0 = mix(qa, qb, i / n)", "q1 = min(qb, mix(qa, qb, (i + 1) / n) + 0.003)", "c0 = fold - q0", "ax0 = (-0.8889 - -0.9119 * c0) / -0.4104", "bx0 = (0.8889 - -0.9119 * c0) / -0.4104", "ay0 = (-0.5 - -0.4104 * c0) / 0.9119", "by0 = (0.5 - -0.4104 * c0) / 0.9119", "lo0 = max(min(ax0, bx0), min(ay0, by0))", "hi0 = max(lo0, min(max(ax0, bx0), max(ay0, by0)))", "a0 = min(q0 / rr, bend)", "r0 = max(0, q0 - bend * rr)", "m0 = fold - rr * sin(a0) - r0 * cos(bend)", "k0 = min(3, 1 + near * (rr * (1 - cos(a0)) + r0 * sin(bend)))", "c1 = fold - q1", "ax1 = (-0.8889 - -0.9119 * c1) / -0.4104", "bx1 = (0.8889 - -0.9119 * c1) / -0.4104", "ay1 = (-0.5 - -0.4104 * c1) / 0.9119", "by1 = (0.5 - -0.4104 * c1) / 0.9119", "lo1 = max(min(ax1, bx1), min(ay1, by1))", "hi1 = max(lo1, min(max(ax1, bx1), max(ay1, by1)))", "a1 = min(q1 / rr, bend)", "r1 = max(0, q1 - bend * rr)", "m1 = fold - rr * sin(a1) - r1 * cos(bend)", "k1 = min(3, 1 + near * (rr * (1 - cos(a1)) + r1 * sin(bend)))", "am = (a0 + a1) / 2"]
+samples = 4
+closed = true
+px = "pick(j, (-0.9119 * m0 + -0.4104 * lo0) * k0, (-0.9119 * m0 + -0.4104 * hi0) * k0, (-0.9119 * m1 + -0.4104 * hi1) * k1, (-0.9119 * m1 + -0.4104 * lo1) * k1)"
+py = "pick(j, (-0.4104 * m0 + 0.9119 * lo0) * k0, (-0.4104 * m0 + 0.9119 * hi0) * k0, (-0.4104 * m1 + 0.9119 * hi1) * k1, (-0.4104 * m1 + 0.9119 * lo1) * k1)"
+width = 0
+fill = "mix(#4E4668, #F1EBFA, 0.42 + 0.55 * cos(am - 0.75))"
+
+# The Hand of Omnipotence: it reaches in, takes the page's corner, and pulls the page up and away.
+[[scene.draw]]
+kind = "sprite"
+file = "hands.png"
+frame_size = [809, 643]
+anchor = [619, 572]
+smooth = true
+visible = "t >= 33 && t < 39.5"
+frame = "t < 34.25 ? 0 : 1"
+x = "(-0.9119 * cm + -0.4104 * ct) * ck + 0.45 * reach"
+y = "(-0.4104 * cm + 0.9119 * ct) * ck + 0.4 * reach"
+pixel = "0.0006 * min(1.8, ck)"
+
+[[scene]]
+name = "Page V: The Sunflower"
+duration = 40
+fade = 0
+let = ["codeop = t < 5 ? 1 : mix(1, 0.3, smoothstep(5, 7, t)) * (1 - smoothstep(34.5, 35.1, t))", "sky = smoothstep(5, 9, t)", "fold = t < 34.5 ? -4 : t >= 39.5 ? 4 : interp(t, 34.5, -1.0358, 35.2, -0.92, 36.4, -0.5, 37.6, 0, 38.5, 0.55, 39.4, 1.2458)", "dm = max(0, fold - -1.0158)", "rr = interp(fold, -1.0358, 0.05, -0.7, 0.15)", "bend = interp(fold, -1.0358, 0.7, -0.8, 2, -0.6, 2.8, -0.4, 2.9, 0, 2.9, 0.3, 2.3, 0.6, 1.9, 1.2458, 1.7)", "near = interp(fold, 0, 0.4, 0.3, 1.2, 0.6, 1.7, 1.2458, 2)", "cq = dm", "ca = min(cq / rr, bend)", "cr = max(0, cq - bend * rr)", "cm = -1.0158 + cq - rr * sin(ca) - cr * cos(bend)", "cz = rr * (1 - cos(ca)) + cr * sin(bend)", "ck = min(3, 1 + near * cz)", "ct = 0.0912", "gl = 1 - smoothstep(34.1, 35.1, t)", "reach = t < 33 ? 1 : 1 - ease_out((t - 33) / 1.5)"]
+
+# Beneath the page: the next page's code, shown where the page has been pulled away. (Clipping this, rather than
+# covering it with the page, saves drawing a whole screen of page through a mask.)
+[[scene.draw]]
+kind = "group"
+visible = "t >= 34.5"
+rotate = -2.7187
+clip = ["-9", "-9", "fold", "9"]
+
+  [[scene.draw.draw]]
+  kind = "group"
+  rotate = 2.7187
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "# Page VI: The Revelation"
+    size = 0.021
+    x = -0.8389
+    y = -0.445
+    color = "#8A7FB0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "# Panes of folded light, unfolding one after another."
+    size = 0.021
+    x = -0.8389
+    y = -0.4167
+    color = "#8A7FB0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "[[scene.draw.draw.draw.draw]]"
+    size = 0.021
+    x = -0.8389
+    y = -0.3883
+    color = "#56D4F5"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "kind = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3599
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"lines\""
+    size = 0.021
+    x = -0.7507
+    y = -0.3599
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "count = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3316
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "9"
+    size = 0.021
+    x = -0.7381
+    y = -0.3316
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "samples = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3033
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "4"
+    size = 0.021
+    x = -0.7129
+    y = -0.3033
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "closed = "
+    size = 0.021
+    x = -0.8389
+    y = -0.2749
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "true"
+    size = 0.021
+    x = -0.7255
+    y = -0.2749
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "let = "
+    size = 0.021
+    x = -0.8389
+    y = -0.2465
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "[\"r = 0.09 + 0.1 * hash(i * 3.1)\", \"ang = hash(i * 7.7) * "
+    size = 0.021
+    x = -0.7633
+    y = -0.2465
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "tau + t * 0.04 * (hash(i) - 0.5)\", \"ox = 0.3 + 0.36 * "
+    size = 0.021
+    x = -0.7885
+    y = -0.2182
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "hash(i * 5.3)\", \"oy = -0.3 + 0.36 * hash(i * 2.9)\"]"
+    size = 0.021
+    x = -0.7885
+    y = -0.1898
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "px = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1615
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"ox + r * cos(ang + j * tau / 4 + 0.3 * sin(j * 2.1 + i))\""
+    size = 0.021
+    x = -0.7759
+    y = -0.1615
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "py = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1331
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"oy + r * 0.8 * sin(ang + j * tau / 4 + 0.3 * sin(j * 2.1 "
+    size = 0.021
+    x = -0.7759
+    y = -0.1331
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "+ i))\""
+    size = 0.021
+    x = -0.7885
+    y = -0.1048
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "width = "
+    size = 0.021
+    x = -0.8389
+    y = -0.0764
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "0.0014"
+    size = 0.021
+    x = -0.7381
+    y = -0.0764
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "color = "
+    size = 0.021
+    x = -0.8389
+    y = -0.0481
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"alpha(#C9A7FF, 0.8)\""
+    size = 0.021
+    x = -0.7381
+    y = -0.0481
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "fill = "
+    size = 0.021
+    x = -0.8389
+    y = -0.0197
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"alpha(#7B4BFF, 0.09)\""
+    size = 0.021
+    x = -0.7507
+    y = -0.0197
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "draw = "
+    size = 0.021
+    x = -0.8389
+    y = 0.0086
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"clamp((t - 7 - i * 1.2) / 1.4, 0, 1)\""
+    size = 0.021
+    x = -0.7507
+    y = 0.0086
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "# Three fronds rise from one root, each leaning its own way."
+    size = 0.021
+    x = -0.8389
+    y = 0.0653
+    color = "#8A7FB0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "[[scene.draw.draw.draw.draw]]"
+    size = 0.021
+    x = -0.8389
+    y = 0.0937
+    color = "#56D4F5"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "kind = "
+    size = 0.021
+    x = -0.8389
+    y = 0.122
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"lines\""
+    size = 0.021
+    x = -0.7507
+    y = 0.122
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "count = "
+    size = 0.021
+    x = -0.8389
+    y = 0.1504
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "3"
+    size = 0.021
+    x = -0.7381
+    y = 0.1504
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "let = "
+    size = 0.021
+    x = -0.8389
+    y = 0.1787
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "[\"bx = 0.18\", \"by = 0.47\", \"a = pick(i, -0.55, 0.05, "
+    size = 0.021
+    x = -0.7633
+    y = 0.1787
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "0.6)\", \"ln = pick(i, 0.62, 0.86, 0.66)\", \"c = pick(i, -0.4, "
+    size = 0.021
+    x = -0.7885
+    y = 0.2071
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "0.15, 0.45)\"]"
+    size = 0.021
+    x = -0.7885
+    y = 0.2354
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "samples = "
+    size = 0.021
+    x = -0.8389
+    y = 0.2638
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "120"
+    size = 0.021
+    x = -0.7129
+    y = 0.2638
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "px = "
+    size = 0.021
+    x = -0.8389
+    y = 0.2921
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"bx + ln * s * sin(a + c * s * 0.5)\""
+    size = 0.021
+    x = -0.7759
+    y = 0.2921
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "py = "
+    size = 0.021
+    x = -0.8389
+    y = 0.3205
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"by - ln * s * cos(a + c * s * 0.5)\""
+    size = 0.021
+    x = -0.7759
+    y = 0.3205
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "width = "
+    size = 0.021
+    x = -0.8389
+    y = 0.3488
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "0.0034"
+    size = 0.021
+    x = -0.7381
+    y = 0.3488
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "color = "
+    size = 0.021
+    x = -0.8389
+    y = 0.3772
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"#5EF2E0\""
+    size = 0.021
+    x = -0.7381
+    y = 0.3772
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "draw = "
+    size = 0.021
+    x = -0.8389
+    y = 0.4055
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"ease_in_out((t - 15) / 6)\""
+    size = 0.021
+    x = -0.7507
+    y = 0.4055
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "# Leaflets open along each frond, from its root to its tip."
+    size = 0.021
+    x = -0.8389
+    y = 0.4622
+    color = "#8A7FB0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "[[scene.draw.draw.draw.draw]]"
+    size = 0.021
+    x = -0.8389
+    y = 0.4906
+    color = "#56D4F5"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "kind = "
+    size = 0.021
+    x = -0.8389
+    y = 0.5189
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"lines\""
+    size = 0.021
+    x = -0.7507
+    y = 0.5189
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "count = "
+    size = 0.021
+    x = -0.8389
+    y = 0.5473
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "132"
+    size = 0.021
+    x = -0.7381
+    y = 0.5473
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "let = "
+    size = 0.021
+    x = -0.8389
+    y = 0.5756
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "[\"f = floor(i / 44)\", \"v = 0.06 + 0.92 * mod(i, 44) / "
+    size = 0.021
+    x = -0.7633
+    y = 0.5756
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "44\", \"side = mod(i, 2) * 2 - 1\", \"bx = 0.18\", \"by = 0.47\", "
+    size = 0.021
+    x = -0.7885
+    y = 0.6039
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"a = pick(f, -0.55, 0.05, 0.6)\", \"ln = pick(f, 0.62, 0.86, "
+    size = 0.021
+    x = -0.7885
+    y = 0.6323
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "0.66)\", \"c = pick(f, -0.4, 0.15, 0.45)\", \"sx = bx + ln * v "
+    size = 0.021
+    x = -0.7885
+    y = 0.6607
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "* sin(a + c * v * 0.5)\", \"sy = by - ln * v * cos(a + c * v "
+    size = 0.021
+    x = -0.7885
+    y = 0.689
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "* 0.5)\", \"th = a + c * v\", \"len = 0.15 * ln * sin(pi * "
+    size = 0.021
+    x = -0.7885
+    y = 0.7174
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "(0.08 + 0.88 * v)) * (1 - 0.45 * v)\"]"
+    size = 0.021
+    x = -0.7885
+    y = 0.7457
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "samples = "
+    size = 0.021
+    x = -0.8389
+    y = 0.7741
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "14"
+    size = 0.021
+    x = -0.7129
+    y = 0.7741
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "px = "
+    size = 0.021
+    x = -0.8389
+    y = 0.8024
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"sx + len * s * sin(th + side * (1.15 - 0.7 * s))\""
+    size = 0.021
+    x = -0.7759
+    y = 0.8024
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "py = "
+    size = 0.021
+    x = -0.8389
+    y = 0.8308
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"sy - len * s * cos(th + side * (1.15 - 0.7 * s))\""
+    size = 0.021
+    x = -0.7759
+    y = 0.8308
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "width = "
+    size = 0.021
+    x = -0.8389
+    y = 0.8591
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "0.0021"
+    size = 0.021
+    x = -0.7381
+    y = 0.8591
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "color = "
+    size = 0.021
+    x = -0.8389
+    y = 0.8875
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"mix(#2FB7B0, #A8F7FF, v)\""
+    size = 0.021
+    x = -0.7381
+    y = 0.8875
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "draw = "
+    size = 0.021
+    x = -0.8389
+    y = 0.9158
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"clamp((t - 17 - v * 6) / 1.4, 0, 1)\""
+    size = 0.021
+    x = -0.7507
+    y = 0.9158
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "# Each leaflet feathers into seven smaller ones as it grows."
+    size = 0.021
+    x = -0.8389
+    y = 0.9725
+    color = "#8A7FB0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "[[scene.draw.draw.draw.draw]]"
+    size = 0.021
+    x = -0.8389
+    y = 1.0009
+    color = "#56D4F5"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "kind = "
+    size = 0.021
+    x = -0.8389
+    y = 1.0292
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"lines\""
+    size = 0.021
+    x = -0.7507
+    y = 1.0292
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "count = "
+    size = 0.021
+    x = -0.8389
+    y = 1.0576
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "924"
+    size = 0.021
+    x = -0.7381
+    y = 1.0576
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "let = "
+    size = 0.021
+    x = -0.8389
+    y = 1.0859
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "[\"leaf = floor(i / 7)\", \"w = (mod(i, 7) + 1) / 8\", \"f = "
+    size = 0.021
+    x = -0.7633
+    y = 1.0859
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "floor(leaf / 44)\", \"v = 0.06 + 0.92 * mod(leaf, 44) / 44\", "
+    size = 0.021
+    x = -0.7885
+    y = 1.1143
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"side = mod(leaf, 2) * 2 - 1\", \"sub = mod(i, 2) * 2 - 1\", "
+    size = 0.021
+    x = -0.7885
+    y = 1.1426
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"bx = 0.18\", \"by = 0.47\", \"a = pick(f, -0.55, 0.05, 0.6)\", "
+    size = 0.021
+    x = -0.7885
+    y = 1.171
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"ln = pick(f, 0.62, 0.86, 0.66)\", \"c = pick(f, -0.4, 0.15, "
+    size = 0.021
+    x = -0.7885
+    y = 1.1993
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "0.45)\", \"sx = bx + ln * v * sin(a + c * v * 0.5)\", \"sy = by "
+    size = 0.021
+    x = -0.7885
+    y = 1.2277
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "- ln * v * cos(a + c * v * 0.5)\", \"th = a + c * v\", \"len = "
+    size = 0.021
+    x = -0.7885
+    y = 1.256
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "0.15 * ln * sin(pi * (0.08 + 0.88 * v)) * (1 - 0.45 * v)\", "
+    size = 0.021
+    x = -0.7885
+    y = 1.2844
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"phi = th + side * (1.15 - 0.7 * w)\", \"lx = sx + len * w * "
+    size = 0.021
+    x = -0.7885
+    y = 1.3127
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "sin(phi)\", \"ly = sy - len * w * cos(phi)\", \"grow = 17 + v * "
+    size = 0.021
+    x = -0.7885
+    y = 1.3411
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "6 + 1.4 * w\"]"
+    size = 0.021
+    x = -0.7885
+    y = 1.3694
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "samples = "
+    size = 0.021
+    x = -0.8389
+    y = 1.3978
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "5"
+    size = 0.021
+    x = -0.7129
+    y = 1.3978
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "px = "
+    size = 0.021
+    x = -0.8389
+    y = 1.4261
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"lx + len * 0.3 * (1 - w) * s * sin(phi + sub * 0.95)\""
+    size = 0.021
+    x = -0.7759
+    y = 1.4261
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "py = "
+    size = 0.021
+    x = -0.8389
+    y = 1.4545
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"ly - len * 0.3 * (1 - w) * s * cos(phi + sub * 0.95)\""
+    size = 0.021
+    x = -0.7759
+    y = 1.4545
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "width = "
+    size = 0.021
+    x = -0.8389
+    y = 1.4828
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "0.0012"
+    size = 0.021
+    x = -0.7381
+    y = 1.4828
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "color = "
+    size = 0.021
+    x = -0.8389
+    y = 1.5112
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"alpha(mix(#2FB7B0, #A8F7FF, v), 0.85)\""
+    size = 0.021
+    x = -0.7381
+    y = 1.5112
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "draw = "
+    size = 0.021
+    x = -0.8389
+    y = 1.5395
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"clamp((t - grow) / 0.9, 0, 1)\""
+    size = 0.021
+    x = -0.7507
+    y = 1.5395
+    color = "#7CF5A8"
+
+# The page as written, until the hand takes it: its sky,
+[[scene.draw]]
+kind = "group"
+visible = "t < 34.5"
+
+  [[scene.draw.draw]]
+  kind = "rect"
+  count = 160
+  x = "(hash(i * 1.37) * 2 - 1) * 0.88"
+  y = "(hash(i * 4.11) * 2 - 1) * 0.5"
+  w = "0.002 + 0.002 * hash(i * 9.1)"
+  h = "0.002 + 0.002 * hash(i * 9.1)"
+  color = "alpha(#FFFFFF, sky * (0.25 + 0.55 * noise(t * 0.25 + i * 3.3)))"
+
+  [[scene.draw.draw]]
+  kind = "lines"
+  samples = 48
+  px = "-0.8889 + 1.7778 * s"
+  py = "0.13"
+  width = 0.0016
+  color = "alpha(#F2A65A, sky * 0.55)"
+glow = "1.5 * gl"
+glow_radius = 0.012
+
+# its code, which fades as the hand takes the page (text isn't carried round the curl, so it's gone before the fold
+# comes near it),
+[[scene.draw]]
+kind = "group"
+visible = "t < 35.1"
+y = "0"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "# Page V: The Sunflower"
+    size = 0.021
+    x = -0.8389
+    y = -0.445
+    color = "alpha(#8A7FB0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "# Nine hundred seeds, each turned by the golden angle from the "
+    size = 0.021
+    x = -0.8389
+    y = -0.4167
+    color = "t >= 7 && t < 27 ? #FFFFFF : alpha(#8A7FB0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "last."
+    size = 0.021
+    x = -0.7885
+    y = -0.3883
+    color = "t >= 7 && t < 27 ? #FFFFFF : alpha(#8A7FB0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "[[scene.draw.draw.draw.draw]]"
+    size = 0.021
+    x = -0.8389
+    y = -0.3599
+    color = "t >= 7 && t < 27 ? #FFFFFF : alpha(#56D4F5, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "kind = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3316
+    color = "t >= 7 && t < 27 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"rect\""
+    size = 0.021
+    x = -0.7507
+    y = -0.3316
+    color = "t >= 7 && t < 27 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "count = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3033
+    color = "t >= 7 && t < 27 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "900"
+    size = 0.021
+    x = -0.7381
+    y = -0.3033
+    color = "t >= 7 && t < 27 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "x = "
+    size = 0.021
+    x = -0.8389
+    y = -0.2749
+    color = "t >= 7 && t < 27 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"0.3 + 0.4 * sqrt(k) * cos(i * 2.39996)\""
+    size = 0.021
+    x = -0.7885
+    y = -0.2749
+    color = "t >= 7 && t < 27 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "y = "
+    size = 0.021
+    x = -0.8389
+    y = -0.2465
+    color = "t >= 7 && t < 27 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"0.02 + 0.4 * sqrt(k) * sin(i * 2.39996)\""
+    size = 0.021
+    x = -0.7885
+    y = -0.2465
+    color = "t >= 7 && t < 27 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "w = "
+    size = 0.021
+    x = -0.8389
+    y = -0.2182
+    color = "t >= 7 && t < 27 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"0.0034 + 0.0055 * k\""
+    size = 0.021
+    x = -0.7885
+    y = -0.2182
+    color = "t >= 7 && t < 27 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "h = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1898
+    color = "t >= 7 && t < 27 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"0.0034 + 0.0055 * k\""
+    size = 0.021
+    x = -0.7885
+    y = -0.1898
+    color = "t >= 7 && t < 27 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "rotate = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1615
+    color = "t >= 7 && t < 27 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"i * 2.39996\""
+    size = 0.021
+    x = -0.7255
+    y = -0.1615
+    color = "t >= 7 && t < 27 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "color = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1331
+    color = "t >= 7 && t < 27 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"hsv(0.42 - 0.3 * k, 0.6, 1)\""
+    size = 0.021
+    x = -0.7381
+    y = -0.1331
+    color = "t >= 7 && t < 27 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "visible = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1048
+    color = "t >= 7 && t < 27 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"i < (t - 7) * 45\""
+    size = 0.021
+    x = -0.7129
+    y = -0.1048
+    color = "t >= 7 && t < 27 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+# and the figure, drawn over its code.
+[[scene.draw]]
+kind = "group"
+visible = "t < 34.5"
+glow = "1.4 * gl"
+glow_radius = 0.006
+
+  # Nine hundred seeds, each turned by the golden angle from the last.
+      [[scene.draw.draw]]
+      kind = "rect"
+      count = 900
+      x = "0.3 + 0.4 * sqrt(k) * cos(i * 2.39996)"
+      y = "0.02 + 0.4 * sqrt(k) * sin(i * 2.39996)"
+      w = "0.0034 + 0.0055 * k"
+      h = "0.0034 + 0.0055 * k"
+      rotate = "i * 2.39996"
+      color = "hsv(0.42 - 0.3 * k, 0.6, 1)"
+      visible = "i < (t - 7) * 45"
+
+# The curl's front, rising toward us: the page itself, which its figure is drawn on next.
+[[scene.draw]]
+kind = "lines"
+count = 8
+visible = "t >= 34.5 && t < 39.5 && min(dm, rr * 1.5708) > 0 + 0.0005"
+let = ["qa = 0", "qb = min(dm, rr * 1.5708)", "q0 = mix(qa, qb, i / n)", "q1 = min(qb, mix(qa, qb, (i + 1) / n) + 0.003)", "c0 = fold - q0", "ax0 = (-0.8889 - -0.9119 * c0) / -0.4104", "bx0 = (0.8889 - -0.9119 * c0) / -0.4104", "ay0 = (-0.5 - -0.4104 * c0) / 0.9119", "by0 = (0.5 - -0.4104 * c0) / 0.9119", "lo0 = max(min(ax0, bx0), min(ay0, by0))", "hi0 = max(lo0, min(max(ax0, bx0), max(ay0, by0)))", "a0 = min(q0 / rr, bend)", "r0 = max(0, q0 - bend * rr)", "m0 = fold - rr * sin(a0) - r0 * cos(bend)", "k0 = min(3, 1 + near * (rr * (1 - cos(a0)) + r0 * sin(bend)))", "c1 = fold - q1", "ax1 = (-0.8889 - -0.9119 * c1) / -0.4104", "bx1 = (0.8889 - -0.9119 * c1) / -0.4104", "ay1 = (-0.5 - -0.4104 * c1) / 0.9119", "by1 = (0.5 - -0.4104 * c1) / 0.9119", "lo1 = max(min(ax1, bx1), min(ay1, by1))", "hi1 = max(lo1, min(max(ax1, bx1), max(ay1, by1)))", "a1 = min(q1 / rr, bend)", "r1 = max(0, q1 - bend * rr)", "m1 = fold - rr * sin(a1) - r1 * cos(bend)", "k1 = min(3, 1 + near * (rr * (1 - cos(a1)) + r1 * sin(bend)))", "am = (a0 + a1) / 2"]
+samples = 4
+closed = true
+px = "pick(j, (-0.9119 * m0 + -0.4104 * lo0) * k0, (-0.9119 * m0 + -0.4104 * hi0) * k0, (-0.9119 * m1 + -0.4104 * hi1) * k1, (-0.9119 * m1 + -0.4104 * lo1) * k1)"
+py = "pick(j, (-0.4104 * m0 + 0.9119 * lo0) * k0, (-0.4104 * m0 + 0.9119 * hi0) * k0, (-0.4104 * m1 + 0.9119 * hi1) * k1, (-0.4104 * m1 + 0.9119 * lo1) * k1)"
+width = 0
+fill = "mix(#080B16, #222A4A, 0.7 * sin(am))"
+
+# The shadow the curl casts on what it uncovers.
+[[scene.draw]]
+kind = "lines"
+visible = "t >= 34.5 && t < 39.5"
+samples = 2
+px = "-0.9119 * (fold - rr - 0.03) + -0.4104 * (s * 6 - 3)"
+py = "-0.4104 * (fold - rr - 0.03) + 0.9119 * (s * 6 - 3)"
+width = 0.06
+color = "alpha(#000000, 0.35 * min(1, dm * 8))"
+
+# The page, carried by the turn: flat beyond the fold, round the curl and on toward us before it.
+[[scene.draw]]
+kind = "group"
+visible = "t >= 34.5 && t < 39.5"
+
+  [[scene.draw.draw]]
+  kind = "rect"
+  count = 160
+  w = "(0.002 + 0.002 * hash(i * 9.1)) * wk"
+  h = "(0.002 + 0.002 * hash(i * 9.1)) * wk"
+  color = "alpha(#FFFFFF, sky * (0.25 + 0.55 * noise(t * 0.25 + i * 3.3)))"
+  let = ["wx0 = (hash(i * 1.37) * 2 - 1) * 0.88", "wy0 = (hash(i * 4.11) * 2 - 1) * 0.5", "wu = -0.9119 * wx0 + -0.4104 * wy0", "wv = -0.4104 * wx0 + 0.9119 * wy0", "wq = max(0, fold - wu)", "wa = min(wq / rr, bend)", "wr = max(0, wq - bend * rr)", "wm = wu + wq - rr * sin(wa) - wr * cos(bend)", "wz = rr * (1 - cos(wa)) + wr * sin(bend)", "wk = min(3, 1 + near * wz)"]
+  x = "(-0.9119 * wm + -0.4104 * wv) * wk"
+  y = "(-0.4104 * wm + 0.9119 * wv) * wk"
+
+  [[scene.draw.draw]]
+  kind = "lines"
+  samples = 48
+  width = 0.0016
+  color = "alpha(#F2A65A, sky * 0.55)"
+  sample_let = ["wx0 = -0.8889 + 1.7778 * s", "wy0 = 0.13", "wu = -0.9119 * wx0 + -0.4104 * wy0", "wv = -0.4104 * wx0 + 0.9119 * wy0", "wq = max(0, fold - wu)", "wa = min(wq / rr, bend)", "wr = max(0, wq - bend * rr)", "wm = wu + wq - rr * sin(wa) - wr * cos(bend)", "wz = rr * (1 - cos(wa)) + wr * sin(bend)", "wk = min(3, 1 + near * wz)"]
+  px = "(-0.9119 * wm + -0.4104 * wv) * wk"
+  py = "(-0.4104 * wm + 0.9119 * wv) * wk"
+glow = "1.5 * gl"
+glow_radius = 0.012
+
+  # The figure, carried along with its page.
+  [[scene.draw.draw]]
+  kind = "group"
+  glow = "1.4 * gl"
+  glow_radius = 0.006
+
+        [[scene.draw.draw.draw]]
+    kind = "rect"
+    count = 900
+    w = "(0.0034 + 0.0055 * k) * wk"
+    h = "(0.0034 + 0.0055 * k) * wk"
+    rotate = "i * 2.39996"
+    color = "hsv(0.42 - 0.3 * k, 0.6, 1)"
+    visible = "i < (t - 7) * 45"
+    let = ["wx0 = 0.3 + 0.4 * sqrt(k) * cos(i * 2.39996)", "wy0 = 0.02 + 0.4 * sqrt(k) * sin(i * 2.39996)", "wu = -0.9119 * wx0 + -0.4104 * wy0", "wv = -0.4104 * wx0 + 0.9119 * wy0", "wq = max(0, fold - wu)", "wa = min(wq / rr, bend)", "wr = max(0, wq - bend * rr)", "wm = wu + wq - rr * sin(wa) - wr * cos(bend)", "wz = rr * (1 - cos(wa)) + wr * sin(bend)", "wk = min(3, 1 + near * wz)"]
+    x = "(-0.9119 * wm + -0.4104 * wv) * wk"
+    y = "(-0.4104 * wm + 0.9119 * wv) * wk"
+
+# The lifted page's shadow, falling on the page beyond the fold.
+[[scene.draw]]
+kind = "lines"
+count = 3
+visible = "t >= 34.5 && t < 39.5"
+samples = 2
+px = "-0.9119 * (fold + 0.012 + i * 0.022) + -0.4104 * (s * 6 - 3)"
+py = "-0.4104 * (fold + 0.012 + i * 0.022) + 0.9119 * (s * 6 - 3)"
+width = "0.022 + i * 0.012"
+color = "alpha(#000000, (0.34 - i * 0.1) * min(1, dm * 8))"
+
+# The curl past edge-on, where the page shows its back.
+[[scene.draw]]
+kind = "lines"
+count = 6
+visible = "t >= 34.5 && t < 39.5 && min(dm, rr * bend) > min(dm, rr * 1.5708) + 0.0005"
+let = ["qa = min(dm, rr * 1.5708)", "qb = min(dm, rr * bend)", "q0 = mix(qa, qb, i / n)", "q1 = min(qb, mix(qa, qb, (i + 1) / n) + 0.003)", "c0 = fold - q0", "ax0 = (-0.8889 - -0.9119 * c0) / -0.4104", "bx0 = (0.8889 - -0.9119 * c0) / -0.4104", "ay0 = (-0.5 - -0.4104 * c0) / 0.9119", "by0 = (0.5 - -0.4104 * c0) / 0.9119", "lo0 = max(min(ax0, bx0), min(ay0, by0))", "hi0 = max(lo0, min(max(ax0, bx0), max(ay0, by0)))", "a0 = min(q0 / rr, bend)", "r0 = max(0, q0 - bend * rr)", "m0 = fold - rr * sin(a0) - r0 * cos(bend)", "k0 = min(3, 1 + near * (rr * (1 - cos(a0)) + r0 * sin(bend)))", "c1 = fold - q1", "ax1 = (-0.8889 - -0.9119 * c1) / -0.4104", "bx1 = (0.8889 - -0.9119 * c1) / -0.4104", "ay1 = (-0.5 - -0.4104 * c1) / 0.9119", "by1 = (0.5 - -0.4104 * c1) / 0.9119", "lo1 = max(min(ax1, bx1), min(ay1, by1))", "hi1 = max(lo1, min(max(ax1, bx1), max(ay1, by1)))", "a1 = min(q1 / rr, bend)", "r1 = max(0, q1 - bend * rr)", "m1 = fold - rr * sin(a1) - r1 * cos(bend)", "k1 = min(3, 1 + near * (rr * (1 - cos(a1)) + r1 * sin(bend)))", "am = (a0 + a1) / 2"]
+samples = 4
+closed = true
+px = "pick(j, (-0.9119 * m0 + -0.4104 * lo0) * k0, (-0.9119 * m0 + -0.4104 * hi0) * k0, (-0.9119 * m1 + -0.4104 * hi1) * k1, (-0.9119 * m1 + -0.4104 * lo1) * k1)"
+py = "pick(j, (-0.4104 * m0 + 0.9119 * lo0) * k0, (-0.4104 * m0 + 0.9119 * hi0) * k0, (-0.4104 * m1 + 0.9119 * hi1) * k1, (-0.4104 * m1 + 0.9119 * lo1) * k1)"
+width = 0
+fill = "mix(#4E4668, #F1EBFA, 0.42 + 0.55 * cos(am - 0.75))"
+
+# The rest of the lifted page, its back to us, rising straight on toward us.
+[[scene.draw]]
+kind = "lines"
+count = 4
+visible = "t >= 34.5 && t < 39.5 && dm > min(dm, rr * bend) + 0.0005"
+let = ["qa = min(dm, rr * bend)", "qb = dm", "q0 = mix(qa, qb, i / n)", "q1 = min(qb, mix(qa, qb, (i + 1) / n) + 0.003)", "c0 = fold - q0", "ax0 = (-0.8889 - -0.9119 * c0) / -0.4104", "bx0 = (0.8889 - -0.9119 * c0) / -0.4104", "ay0 = (-0.5 - -0.4104 * c0) / 0.9119", "by0 = (0.5 - -0.4104 * c0) / 0.9119", "lo0 = max(min(ax0, bx0), min(ay0, by0))", "hi0 = max(lo0, min(max(ax0, bx0), max(ay0, by0)))", "a0 = min(q0 / rr, bend)", "r0 = max(0, q0 - bend * rr)", "m0 = fold - rr * sin(a0) - r0 * cos(bend)", "k0 = min(3, 1 + near * (rr * (1 - cos(a0)) + r0 * sin(bend)))", "c1 = fold - q1", "ax1 = (-0.8889 - -0.9119 * c1) / -0.4104", "bx1 = (0.8889 - -0.9119 * c1) / -0.4104", "ay1 = (-0.5 - -0.4104 * c1) / 0.9119", "by1 = (0.5 - -0.4104 * c1) / 0.9119", "lo1 = max(min(ax1, bx1), min(ay1, by1))", "hi1 = max(lo1, min(max(ax1, bx1), max(ay1, by1)))", "a1 = min(q1 / rr, bend)", "r1 = max(0, q1 - bend * rr)", "m1 = fold - rr * sin(a1) - r1 * cos(bend)", "k1 = min(3, 1 + near * (rr * (1 - cos(a1)) + r1 * sin(bend)))", "am = (a0 + a1) / 2"]
+samples = 4
+closed = true
+px = "pick(j, (-0.9119 * m0 + -0.4104 * lo0) * k0, (-0.9119 * m0 + -0.4104 * hi0) * k0, (-0.9119 * m1 + -0.4104 * hi1) * k1, (-0.9119 * m1 + -0.4104 * lo1) * k1)"
+py = "pick(j, (-0.4104 * m0 + 0.9119 * lo0) * k0, (-0.4104 * m0 + 0.9119 * hi0) * k0, (-0.4104 * m1 + 0.9119 * hi1) * k1, (-0.4104 * m1 + 0.9119 * lo1) * k1)"
+width = 0
+fill = "mix(#4E4668, #F1EBFA, 0.42 + 0.55 * cos(am - 0.75))"
+
+# The Hand of Omnipotence: it reaches in, takes the page's corner, and pulls the page up and away.
+[[scene.draw]]
+kind = "sprite"
+file = "hands.png"
+frame_size = [809, 643]
+anchor = [619, 572]
+smooth = true
+visible = "t >= 33 && t < 39.5"
+frame = "t < 34.25 ? 0 : 1"
+x = "(-0.9119 * cm + -0.4104 * ct) * ck + 0.45 * reach"
+y = "(-0.4104 * cm + 0.9119 * ct) * ck + 0.4 * reach"
+pixel = "0.0006 * min(1.8, ck)"
+
+[[scene]]
+name = "Page VI: The Revelation"
+duration = 40
+fade = 0
+let = ["codeop = t < 5 ? 1 : mix(1, 0.3, smoothstep(5, 7, t)) * (1 - smoothstep(34.5, 35.1, t))", "sky = smoothstep(5, 9, t)", "fold = t < 34.5 ? -4 : t >= 39.5 ? 4 : interp(t, 34.5, -1.0358, 35.2, -0.92, 36.4, -0.5, 37.6, 0, 38.5, 0.55, 39.4, 1.2458)", "dm = max(0, fold - -1.0158)", "rr = interp(fold, -1.0358, 0.05, -0.7, 0.15)", "bend = interp(fold, -1.0358, 0.7, -0.8, 2, -0.6, 2.8, -0.4, 2.9, 0, 2.9, 0.3, 2.3, 0.6, 1.9, 1.2458, 1.7)", "near = interp(fold, 0, 0.4, 0.3, 1.2, 0.6, 1.7, 1.2458, 2)", "cq = dm", "ca = min(cq / rr, bend)", "cr = max(0, cq - bend * rr)", "cm = -1.0158 + cq - rr * sin(ca) - cr * cos(bend)", "cz = rr * (1 - cos(ca)) + cr * sin(bend)", "ck = min(3, 1 + near * cz)", "ct = 0.0912", "gl = 1 - smoothstep(34.1, 35.1, t)", "reach = t < 33 ? 1 : 1 - ease_out((t - 33) / 1.5)"]
+
+# Beneath the page: the next page's code, shown where the page has been pulled away. (Clipping this, rather than
+# covering it with the page, saves drawing a whole screen of page through a mask.)
+[[scene.draw]]
+kind = "group"
+visible = "t >= 34.5"
+rotate = -2.7187
+clip = ["-9", "-9", "fold", "9"]
+
+  [[scene.draw.draw]]
+  kind = "group"
+  rotate = 2.7187
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "# Page I: The Fern"
+    size = 0.021
+    x = -0.8389
+    y = -0.445
+    color = "#8A7FB0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "# Three fronds rise from one root, each leaning its own way."
+    size = 0.021
+    x = -0.8389
+    y = -0.4167
+    color = "#8A7FB0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "[[scene.draw.draw.draw.draw]]"
+    size = 0.021
+    x = -0.8389
+    y = -0.3883
+    color = "#56D4F5"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "kind = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3599
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"lines\""
+    size = 0.021
+    x = -0.7507
+    y = -0.3599
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "count = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3316
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "3"
+    size = 0.021
+    x = -0.7381
+    y = -0.3316
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "let = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3033
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "[\"bx = 0.3\", \"by = 0.46\", \"a = pick(i, -0.55, 0.05, "
+    size = 0.021
+    x = -0.7633
+    y = -0.3033
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "0.6)\", \"ln = pick(i, 0.62, 0.86, 0.66)\", \"c = pick(i, -0.4, "
+    size = 0.021
+    x = -0.7885
+    y = -0.2749
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "0.15, 0.45)\"]"
+    size = 0.021
+    x = -0.7885
+    y = -0.2465
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "samples = "
+    size = 0.021
+    x = -0.8389
+    y = -0.2182
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "120"
+    size = 0.021
+    x = -0.7129
+    y = -0.2182
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "px = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1898
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"bx + ln * s * sin(a + c * s * 0.5)\""
+    size = 0.021
+    x = -0.7759
+    y = -0.1898
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "py = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1615
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"by - ln * s * cos(a + c * s * 0.5)\""
+    size = 0.021
+    x = -0.7759
+    y = -0.1615
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "width = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1331
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "0.0034"
+    size = 0.021
+    x = -0.7381
+    y = -0.1331
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "color = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1048
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"#5EF2E0\""
+    size = 0.021
+    x = -0.7381
+    y = -0.1048
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "draw = "
+    size = 0.021
+    x = -0.8389
+    y = -0.0764
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"ease_in_out((t - 7) / 6)\""
+    size = 0.021
+    x = -0.7507
+    y = -0.0764
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "# Leaflets open along each frond, from its root to its tip."
+    size = 0.021
+    x = -0.8389
+    y = -0.0197
+    color = "#8A7FB0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "[[scene.draw.draw.draw.draw]]"
+    size = 0.021
+    x = -0.8389
+    y = 0.0086
+    color = "#56D4F5"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "kind = "
+    size = 0.021
+    x = -0.8389
+    y = 0.037
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"lines\""
+    size = 0.021
+    x = -0.7507
+    y = 0.037
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "count = "
+    size = 0.021
+    x = -0.8389
+    y = 0.0653
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "132"
+    size = 0.021
+    x = -0.7381
+    y = 0.0653
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "let = "
+    size = 0.021
+    x = -0.8389
+    y = 0.0937
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "[\"f = floor(i / 44)\", \"v = 0.06 + 0.92 * mod(i, 44) / "
+    size = 0.021
+    x = -0.7633
+    y = 0.0937
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "44\", \"side = mod(i, 2) * 2 - 1\", \"bx = 0.3\", \"by = 0.46\", "
+    size = 0.021
+    x = -0.7885
+    y = 0.122
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"a = pick(f, -0.55, 0.05, 0.6)\", \"ln = pick(f, 0.62, 0.86, "
+    size = 0.021
+    x = -0.7885
+    y = 0.1504
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "0.66)\", \"c = pick(f, -0.4, 0.15, 0.45)\", \"sx = bx + ln * v "
+    size = 0.021
+    x = -0.7885
+    y = 0.1787
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "* sin(a + c * v * 0.5)\", \"sy = by - ln * v * cos(a + c * v "
+    size = 0.021
+    x = -0.7885
+    y = 0.2071
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "* 0.5)\", \"th = a + c * v\", \"len = 0.15 * ln * sin(pi * "
+    size = 0.021
+    x = -0.7885
+    y = 0.2354
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "(0.08 + 0.88 * v)) * (1 - 0.45 * v)\"]"
+    size = 0.021
+    x = -0.7885
+    y = 0.2638
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "samples = "
+    size = 0.021
+    x = -0.8389
+    y = 0.2921
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "14"
+    size = 0.021
+    x = -0.7129
+    y = 0.2921
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "px = "
+    size = 0.021
+    x = -0.8389
+    y = 0.3205
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"sx + len * s * sin(th + side * (1.15 - 0.7 * s))\""
+    size = 0.021
+    x = -0.7759
+    y = 0.3205
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "py = "
+    size = 0.021
+    x = -0.8389
+    y = 0.3488
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"sy - len * s * cos(th + side * (1.15 - 0.7 * s))\""
+    size = 0.021
+    x = -0.7759
+    y = 0.3488
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "width = "
+    size = 0.021
+    x = -0.8389
+    y = 0.3772
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "0.0021"
+    size = 0.021
+    x = -0.7381
+    y = 0.3772
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "color = "
+    size = 0.021
+    x = -0.8389
+    y = 0.4055
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"mix(#2FB7B0, #A8F7FF, v)\""
+    size = 0.021
+    x = -0.7381
+    y = 0.4055
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "draw = "
+    size = 0.021
+    x = -0.8389
+    y = 0.4339
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"clamp((t - 9 - v * 12) / 1.4, 0, 1)\""
+    size = 0.021
+    x = -0.7507
+    y = 0.4339
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "# Each leaflet feathers into seven smaller ones as it grows."
+    size = 0.021
+    x = -0.8389
+    y = 0.4906
+    color = "#8A7FB0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "[[scene.draw.draw.draw.draw]]"
+    size = 0.021
+    x = -0.8389
+    y = 0.5189
+    color = "#56D4F5"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "kind = "
+    size = 0.021
+    x = -0.8389
+    y = 0.5473
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"lines\""
+    size = 0.021
+    x = -0.7507
+    y = 0.5473
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "count = "
+    size = 0.021
+    x = -0.8389
+    y = 0.5756
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "924"
+    size = 0.021
+    x = -0.7381
+    y = 0.5756
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "let = "
+    size = 0.021
+    x = -0.8389
+    y = 0.6039
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "[\"leaf = floor(i / 7)\", \"w = (mod(i, 7) + 1) / 8\", \"f = "
+    size = 0.021
+    x = -0.7633
+    y = 0.6039
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "floor(leaf / 44)\", \"v = 0.06 + 0.92 * mod(leaf, 44) / 44\", "
+    size = 0.021
+    x = -0.7885
+    y = 0.6323
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"side = mod(leaf, 2) * 2 - 1\", \"sub = mod(i, 2) * 2 - 1\", "
+    size = 0.021
+    x = -0.7885
+    y = 0.6607
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"bx = 0.3\", \"by = 0.46\", \"a = pick(f, -0.55, 0.05, 0.6)\", "
+    size = 0.021
+    x = -0.7885
+    y = 0.689
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"ln = pick(f, 0.62, 0.86, 0.66)\", \"c = pick(f, -0.4, 0.15, "
+    size = 0.021
+    x = -0.7885
+    y = 0.7174
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "0.45)\", \"sx = bx + ln * v * sin(a + c * v * 0.5)\", \"sy = by "
+    size = 0.021
+    x = -0.7885
+    y = 0.7457
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "- ln * v * cos(a + c * v * 0.5)\", \"th = a + c * v\", \"len = "
+    size = 0.021
+    x = -0.7885
+    y = 0.7741
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "0.15 * ln * sin(pi * (0.08 + 0.88 * v)) * (1 - 0.45 * v)\", "
+    size = 0.021
+    x = -0.7885
+    y = 0.8024
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"phi = th + side * (1.15 - 0.7 * w)\", \"lx = sx + len * w * "
+    size = 0.021
+    x = -0.7885
+    y = 0.8308
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "sin(phi)\", \"ly = sy - len * w * cos(phi)\", \"grow = 9 + v * "
+    size = 0.021
+    x = -0.7885
+    y = 0.8591
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "12 + 1.4 * w\"]"
+    size = 0.021
+    x = -0.7885
+    y = 0.8875
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "samples = "
+    size = 0.021
+    x = -0.8389
+    y = 0.9158
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "5"
+    size = 0.021
+    x = -0.7129
+    y = 0.9158
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "px = "
+    size = 0.021
+    x = -0.8389
+    y = 0.9442
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"lx + len * 0.3 * (1 - w) * s * sin(phi + sub * 0.95)\""
+    size = 0.021
+    x = -0.7759
+    y = 0.9442
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "py = "
+    size = 0.021
+    x = -0.8389
+    y = 0.9725
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"ly - len * 0.3 * (1 - w) * s * cos(phi + sub * 0.95)\""
+    size = 0.021
+    x = -0.7759
+    y = 0.9725
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "width = "
+    size = 0.021
+    x = -0.8389
+    y = 1.0009
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "0.0012"
+    size = 0.021
+    x = -0.7381
+    y = 1.0009
+    color = "#FFC86B"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "color = "
+    size = 0.021
+    x = -0.8389
+    y = 1.0292
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"alpha(mix(#2FB7B0, #A8F7FF, v), 0.85)\""
+    size = 0.021
+    x = -0.7381
+    y = 1.0292
+    color = "#7CF5A8"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "draw = "
+    size = 0.021
+    x = -0.8389
+    y = 1.0576
+    color = "#F25FD0"
+
+    [[scene.draw.draw.draw]]
+    kind = "text"
+    text = "\"clamp((t - grow) / 0.9, 0, 1)\""
+    size = 0.021
+    x = -0.7507
+    y = 1.0576
+    color = "#7CF5A8"
+
+# The page as written, until the hand takes it: its sky,
+[[scene.draw]]
+kind = "group"
+visible = "t < 34.5"
+
+  [[scene.draw.draw]]
+  kind = "rect"
+  count = 160
+  x = "(hash(i * 1.37) * 2 - 1) * 0.88"
+  y = "(hash(i * 4.11) * 2 - 1) * 0.5"
+  w = "0.002 + 0.002 * hash(i * 9.1)"
+  h = "0.002 + 0.002 * hash(i * 9.1)"
+  color = "alpha(#FFFFFF, sky * (0.25 + 0.55 * noise(t * 0.25 + i * 3.3)))"
+
+  [[scene.draw.draw]]
+  kind = "lines"
+  samples = 48
+  px = "-0.8889 + 1.7778 * s"
+  py = "0.13"
+  width = 0.0016
+  color = "alpha(#F2A65A, sky * 0.55)"
+glow = "1.5 * gl"
+glow_radius = 0.012
+
+# its code, which fades as the hand takes the page (text isn't carried round the curl, so it's gone before the fold
+# comes near it),
+[[scene.draw]]
+kind = "group"
+visible = "t < 35.1"
+y = "-1.134 * smoothstep(7, 27, t)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "# Page VI: The Revelation"
+    size = 0.021
+    x = -0.8389
+    y = -0.445
+    color = "alpha(#8A7FB0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "# Panes of folded light, unfolding one after another."
+    size = 0.021
+    x = -0.8389
+    y = -0.4167
+    color = "t >= 7 && t < 19 ? #FFFFFF : alpha(#8A7FB0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "[[scene.draw.draw.draw.draw]]"
+    size = 0.021
+    x = -0.8389
+    y = -0.3883
+    color = "t >= 7 && t < 19 ? #FFFFFF : alpha(#56D4F5, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "kind = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3599
+    color = "t >= 7 && t < 19 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"lines\""
+    size = 0.021
+    x = -0.7507
+    y = -0.3599
+    color = "t >= 7 && t < 19 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "count = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3316
+    color = "t >= 7 && t < 19 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "9"
+    size = 0.021
+    x = -0.7381
+    y = -0.3316
+    color = "t >= 7 && t < 19 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "samples = "
+    size = 0.021
+    x = -0.8389
+    y = -0.3033
+    color = "t >= 7 && t < 19 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "4"
+    size = 0.021
+    x = -0.7129
+    y = -0.3033
+    color = "t >= 7 && t < 19 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "closed = "
+    size = 0.021
+    x = -0.8389
+    y = -0.2749
+    color = "t >= 7 && t < 19 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "true"
+    size = 0.021
+    x = -0.7255
+    y = -0.2749
+    color = "t >= 7 && t < 19 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "let = "
+    size = 0.021
+    x = -0.8389
+    y = -0.2465
+    color = "t >= 7 && t < 19 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "[\"r = 0.09 + 0.1 * hash(i * 3.1)\", \"ang = hash(i * 7.7) * "
+    size = 0.021
+    x = -0.7633
+    y = -0.2465
+    color = "t >= 7 && t < 19 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "tau + t * 0.04 * (hash(i) - 0.5)\", \"ox = 0.3 + 0.36 * "
+    size = 0.021
+    x = -0.7885
+    y = -0.2182
+    color = "t >= 7 && t < 19 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "hash(i * 5.3)\", \"oy = -0.3 + 0.36 * hash(i * 2.9)\"]"
+    size = 0.021
+    x = -0.7885
+    y = -0.1898
+    color = "t >= 7 && t < 19 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "px = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1615
+    color = "t >= 7 && t < 19 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"ox + r * cos(ang + j * tau / 4 + 0.3 * sin(j * 2.1 + i))\""
+    size = 0.021
+    x = -0.7759
+    y = -0.1615
+    color = "t >= 7 && t < 19 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "py = "
+    size = 0.021
+    x = -0.8389
+    y = -0.1331
+    color = "t >= 7 && t < 19 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"oy + r * 0.8 * sin(ang + j * tau / 4 + 0.3 * sin(j * 2.1 "
+    size = 0.021
+    x = -0.7759
+    y = -0.1331
+    color = "t >= 7 && t < 19 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "+ i))\""
+    size = 0.021
+    x = -0.7885
+    y = -0.1048
+    color = "t >= 7 && t < 19 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "width = "
+    size = 0.021
+    x = -0.8389
+    y = -0.0764
+    color = "t >= 7 && t < 19 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "0.0014"
+    size = 0.021
+    x = -0.7381
+    y = -0.0764
+    color = "t >= 7 && t < 19 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "color = "
+    size = 0.021
+    x = -0.8389
+    y = -0.0481
+    color = "t >= 7 && t < 19 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"alpha(#C9A7FF, 0.8)\""
+    size = 0.021
+    x = -0.7381
+    y = -0.0481
+    color = "t >= 7 && t < 19 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "fill = "
+    size = 0.021
+    x = -0.8389
+    y = -0.0197
+    color = "t >= 7 && t < 19 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"alpha(#7B4BFF, 0.09)\""
+    size = 0.021
+    x = -0.7507
+    y = -0.0197
+    color = "t >= 7 && t < 19 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "draw = "
+    size = 0.021
+    x = -0.8389
+    y = 0.0086
+    color = "t >= 7 && t < 19 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"clamp((t - 7 - i * 1.2) / 1.4, 0, 1)\""
+    size = 0.021
+    x = -0.7507
+    y = 0.0086
+    color = "t >= 7 && t < 19 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "# Three fronds rise from one root, each leaning its own way."
+    size = 0.021
+    x = -0.8389
+    y = 0.0653
+    color = "t >= 15 && t < 21 ? #FFFFFF : alpha(#8A7FB0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "[[scene.draw.draw.draw.draw]]"
+    size = 0.021
+    x = -0.8389
+    y = 0.0937
+    color = "t >= 15 && t < 21 ? #FFFFFF : alpha(#56D4F5, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "kind = "
+    size = 0.021
+    x = -0.8389
+    y = 0.122
+    color = "t >= 15 && t < 21 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"lines\""
+    size = 0.021
+    x = -0.7507
+    y = 0.122
+    color = "t >= 15 && t < 21 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "count = "
+    size = 0.021
+    x = -0.8389
+    y = 0.1504
+    color = "t >= 15 && t < 21 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "3"
+    size = 0.021
+    x = -0.7381
+    y = 0.1504
+    color = "t >= 15 && t < 21 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "let = "
+    size = 0.021
+    x = -0.8389
+    y = 0.1787
+    color = "t >= 15 && t < 21 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "[\"bx = 0.18\", \"by = 0.47\", \"a = pick(i, -0.55, 0.05, "
+    size = 0.021
+    x = -0.7633
+    y = 0.1787
+    color = "t >= 15 && t < 21 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "0.6)\", \"ln = pick(i, 0.62, 0.86, 0.66)\", \"c = pick(i, -0.4, "
+    size = 0.021
+    x = -0.7885
+    y = 0.2071
+    color = "t >= 15 && t < 21 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "0.15, 0.45)\"]"
+    size = 0.021
+    x = -0.7885
+    y = 0.2354
+    color = "t >= 15 && t < 21 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "samples = "
+    size = 0.021
+    x = -0.8389
+    y = 0.2638
+    color = "t >= 15 && t < 21 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "120"
+    size = 0.021
+    x = -0.7129
+    y = 0.2638
+    color = "t >= 15 && t < 21 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "px = "
+    size = 0.021
+    x = -0.8389
+    y = 0.2921
+    color = "t >= 15 && t < 21 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"bx + ln * s * sin(a + c * s * 0.5)\""
+    size = 0.021
+    x = -0.7759
+    y = 0.2921
+    color = "t >= 15 && t < 21 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "py = "
+    size = 0.021
+    x = -0.8389
+    y = 0.3205
+    color = "t >= 15 && t < 21 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"by - ln * s * cos(a + c * s * 0.5)\""
+    size = 0.021
+    x = -0.7759
+    y = 0.3205
+    color = "t >= 15 && t < 21 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "width = "
+    size = 0.021
+    x = -0.8389
+    y = 0.3488
+    color = "t >= 15 && t < 21 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "0.0034"
+    size = 0.021
+    x = -0.7381
+    y = 0.3488
+    color = "t >= 15 && t < 21 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "color = "
+    size = 0.021
+    x = -0.8389
+    y = 0.3772
+    color = "t >= 15 && t < 21 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"#5EF2E0\""
+    size = 0.021
+    x = -0.7381
+    y = 0.3772
+    color = "t >= 15 && t < 21 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "draw = "
+    size = 0.021
+    x = -0.8389
+    y = 0.4055
+    color = "t >= 15 && t < 21 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"ease_in_out((t - 15) / 6)\""
+    size = 0.021
+    x = -0.7507
+    y = 0.4055
+    color = "t >= 15 && t < 21 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "# Leaflets open along each frond, from its root to its tip."
+    size = 0.021
+    x = -0.8389
+    y = 0.4622
+    color = "t >= 17 && t < 29 ? #FFFFFF : alpha(#8A7FB0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "[[scene.draw.draw.draw.draw]]"
+    size = 0.021
+    x = -0.8389
+    y = 0.4906
+    color = "t >= 17 && t < 29 ? #FFFFFF : alpha(#56D4F5, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "kind = "
+    size = 0.021
+    x = -0.8389
+    y = 0.5189
+    color = "t >= 17 && t < 29 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"lines\""
+    size = 0.021
+    x = -0.7507
+    y = 0.5189
+    color = "t >= 17 && t < 29 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "count = "
+    size = 0.021
+    x = -0.8389
+    y = 0.5473
+    color = "t >= 17 && t < 29 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "132"
+    size = 0.021
+    x = -0.7381
+    y = 0.5473
+    color = "t >= 17 && t < 29 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "let = "
+    size = 0.021
+    x = -0.8389
+    y = 0.5756
+    color = "t >= 17 && t < 29 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "[\"f = floor(i / 44)\", \"v = 0.06 + 0.92 * mod(i, 44) / "
+    size = 0.021
+    x = -0.7633
+    y = 0.5756
+    color = "t >= 17 && t < 29 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "44\", \"side = mod(i, 2) * 2 - 1\", \"bx = 0.18\", \"by = 0.47\", "
+    size = 0.021
+    x = -0.7885
+    y = 0.6039
+    color = "t >= 17 && t < 29 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"a = pick(f, -0.55, 0.05, 0.6)\", \"ln = pick(f, 0.62, 0.86, "
+    size = 0.021
+    x = -0.7885
+    y = 0.6323
+    color = "t >= 17 && t < 29 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "0.66)\", \"c = pick(f, -0.4, 0.15, 0.45)\", \"sx = bx + ln * v "
+    size = 0.021
+    x = -0.7885
+    y = 0.6607
+    color = "t >= 17 && t < 29 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "* sin(a + c * v * 0.5)\", \"sy = by - ln * v * cos(a + c * v "
+    size = 0.021
+    x = -0.7885
+    y = 0.689
+    color = "t >= 17 && t < 29 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "* 0.5)\", \"th = a + c * v\", \"len = 0.15 * ln * sin(pi * "
+    size = 0.021
+    x = -0.7885
+    y = 0.7174
+    color = "t >= 17 && t < 29 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "(0.08 + 0.88 * v)) * (1 - 0.45 * v)\"]"
+    size = 0.021
+    x = -0.7885
+    y = 0.7457
+    color = "t >= 17 && t < 29 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "samples = "
+    size = 0.021
+    x = -0.8389
+    y = 0.7741
+    color = "t >= 17 && t < 29 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "14"
+    size = 0.021
+    x = -0.7129
+    y = 0.7741
+    color = "t >= 17 && t < 29 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "px = "
+    size = 0.021
+    x = -0.8389
+    y = 0.8024
+    color = "t >= 17 && t < 29 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"sx + len * s * sin(th + side * (1.15 - 0.7 * s))\""
+    size = 0.021
+    x = -0.7759
+    y = 0.8024
+    color = "t >= 17 && t < 29 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "py = "
+    size = 0.021
+    x = -0.8389
+    y = 0.8308
+    color = "t >= 17 && t < 29 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"sy - len * s * cos(th + side * (1.15 - 0.7 * s))\""
+    size = 0.021
+    x = -0.7759
+    y = 0.8308
+    color = "t >= 17 && t < 29 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "width = "
+    size = 0.021
+    x = -0.8389
+    y = 0.8591
+    color = "t >= 17 && t < 29 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "0.0021"
+    size = 0.021
+    x = -0.7381
+    y = 0.8591
+    color = "t >= 17 && t < 29 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "color = "
+    size = 0.021
+    x = -0.8389
+    y = 0.8875
+    color = "t >= 17 && t < 29 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"mix(#2FB7B0, #A8F7FF, v)\""
+    size = 0.021
+    x = -0.7381
+    y = 0.8875
+    color = "t >= 17 && t < 29 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "draw = "
+    size = 0.021
+    x = -0.8389
+    y = 0.9158
+    color = "t >= 17 && t < 29 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"clamp((t - 17 - v * 6) / 1.4, 0, 1)\""
+    size = 0.021
+    x = -0.7507
+    y = 0.9158
+    color = "t >= 17 && t < 29 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "# Each leaflet feathers into seven smaller ones as it grows."
+    size = 0.021
+    x = -0.8389
+    y = 0.9725
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#8A7FB0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "[[scene.draw.draw.draw.draw]]"
+    size = 0.021
+    x = -0.8389
+    y = 1.0009
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#56D4F5, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "kind = "
+    size = 0.021
+    x = -0.8389
+    y = 1.0292
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"lines\""
+    size = 0.021
+    x = -0.7507
+    y = 1.0292
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "count = "
+    size = 0.021
+    x = -0.8389
+    y = 1.0576
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "924"
+    size = 0.021
+    x = -0.7381
+    y = 1.0576
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "let = "
+    size = 0.021
+    x = -0.8389
+    y = 1.0859
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "[\"leaf = floor(i / 7)\", \"w = (mod(i, 7) + 1) / 8\", \"f = "
+    size = 0.021
+    x = -0.7633
+    y = 1.0859
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "floor(leaf / 44)\", \"v = 0.06 + 0.92 * mod(leaf, 44) / 44\", "
+    size = 0.021
+    x = -0.7885
+    y = 1.1143
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"side = mod(leaf, 2) * 2 - 1\", \"sub = mod(i, 2) * 2 - 1\", "
+    size = 0.021
+    x = -0.7885
+    y = 1.1426
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"bx = 0.18\", \"by = 0.47\", \"a = pick(f, -0.55, 0.05, 0.6)\", "
+    size = 0.021
+    x = -0.7885
+    y = 1.171
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"ln = pick(f, 0.62, 0.86, 0.66)\", \"c = pick(f, -0.4, 0.15, "
+    size = 0.021
+    x = -0.7885
+    y = 1.1993
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "0.45)\", \"sx = bx + ln * v * sin(a + c * v * 0.5)\", \"sy = by "
+    size = 0.021
+    x = -0.7885
+    y = 1.2277
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "- ln * v * cos(a + c * v * 0.5)\", \"th = a + c * v\", \"len = "
+    size = 0.021
+    x = -0.7885
+    y = 1.256
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "0.15 * ln * sin(pi * (0.08 + 0.88 * v)) * (1 - 0.45 * v)\", "
+    size = 0.021
+    x = -0.7885
+    y = 1.2844
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"phi = th + side * (1.15 - 0.7 * w)\", \"lx = sx + len * w * "
+    size = 0.021
+    x = -0.7885
+    y = 1.3127
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "sin(phi)\", \"ly = sy - len * w * cos(phi)\", \"grow = 17 + v * "
+    size = 0.021
+    x = -0.7885
+    y = 1.3411
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "6 + 1.4 * w\"]"
+    size = 0.021
+    x = -0.7885
+    y = 1.3694
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "samples = "
+    size = 0.021
+    x = -0.8389
+    y = 1.3978
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "5"
+    size = 0.021
+    x = -0.7129
+    y = 1.3978
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "px = "
+    size = 0.021
+    x = -0.8389
+    y = 1.4261
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"lx + len * 0.3 * (1 - w) * s * sin(phi + sub * 0.95)\""
+    size = 0.021
+    x = -0.7759
+    y = 1.4261
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "py = "
+    size = 0.021
+    x = -0.8389
+    y = 1.4545
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"ly - len * 0.3 * (1 - w) * s * cos(phi + sub * 0.95)\""
+    size = 0.021
+    x = -0.7759
+    y = 1.4545
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "width = "
+    size = 0.021
+    x = -0.8389
+    y = 1.4828
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "0.0012"
+    size = 0.021
+    x = -0.7381
+    y = 1.4828
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#FFC86B, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "color = "
+    size = 0.021
+    x = -0.8389
+    y = 1.5112
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"alpha(mix(#2FB7B0, #A8F7FF, v), 0.85)\""
+    size = 0.021
+    x = -0.7381
+    y = 1.5112
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "draw = "
+    size = 0.021
+    x = -0.8389
+    y = 1.5395
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#F25FD0, codeop)"
+
+    [[scene.draw.draw]]
+    kind = "text"
+    text = "\"clamp((t - grow) / 0.9, 0, 1)\""
+    size = 0.021
+    x = -0.7507
+    y = 1.5395
+    color = "t >= 18 && t < 30 ? #FFFFFF : alpha(#7CF5A8, codeop)"
+
+# and the figure, drawn over its code.
+[[scene.draw]]
+kind = "group"
+visible = "t < 34.5"
+glow = "1.4 * gl"
+glow_radius = 0.006
+
+  # Panes of folded light, unfolding one after another.
+      [[scene.draw.draw]]
+      kind = "lines"
+      count = 9
+      samples = 4
+      closed = true
+      let = ["r = 0.09 + 0.1 * hash(i * 3.1)", "ang = hash(i * 7.7) * tau + t * 0.04 * (hash(i) - 0.5)", "ox = 0.3 + 0.36 * hash(i * 5.3)", "oy = -0.3 + 0.36 * hash(i * 2.9)"]
+      px = "ox + r * cos(ang + j * tau / 4 + 0.3 * sin(j * 2.1 + i))"
+      py = "oy + r * 0.8 * sin(ang + j * tau / 4 + 0.3 * sin(j * 2.1 + i))"
+      width = 0.0014
+      color = "alpha(#C9A7FF, 0.8)"
+      fill = "alpha(#7B4BFF, 0.09)"
+      draw = "clamp((t - 7 - i * 1.2) / 1.4, 0, 1)"
+
+  # Three fronds rise from one root, each leaning its own way.
+      [[scene.draw.draw]]
+      kind = "lines"
+      count = 3
+      let = ["bx = 0.18", "by = 0.47", "a = pick(i, -0.55, 0.05, 0.6)", "ln = pick(i, 0.62, 0.86, 0.66)", "c = pick(i, -0.4, 0.15, 0.45)"]
+      samples = 120
+      px = "bx + ln * s * sin(a + c * s * 0.5)"
+      py = "by - ln * s * cos(a + c * s * 0.5)"
+      width = 0.0034
+      color = "#5EF2E0"
+      draw = "ease_in_out((t - 15) / 6)"
+
+  # Leaflets open along each frond, from its root to its tip.
+      [[scene.draw.draw]]
+      kind = "lines"
+      count = 132
+      let = ["f = floor(i / 44)", "v = 0.06 + 0.92 * mod(i, 44) / 44", "side = mod(i, 2) * 2 - 1", "bx = 0.18", "by = 0.47", "a = pick(f, -0.55, 0.05, 0.6)", "ln = pick(f, 0.62, 0.86, 0.66)", "c = pick(f, -0.4, 0.15, 0.45)", "sx = bx + ln * v * sin(a + c * v * 0.5)", "sy = by - ln * v * cos(a + c * v * 0.5)", "th = a + c * v", "len = 0.15 * ln * sin(pi * (0.08 + 0.88 * v)) * (1 - 0.45 * v)"]
+      samples = 14
+      px = "sx + len * s * sin(th + side * (1.15 - 0.7 * s))"
+      py = "sy - len * s * cos(th + side * (1.15 - 0.7 * s))"
+      width = 0.0021
+      color = "mix(#2FB7B0, #A8F7FF, v)"
+      draw = "clamp((t - 17 - v * 6) / 1.4, 0, 1)"
+
+  # Each leaflet feathers into seven smaller ones as it grows.
+      [[scene.draw.draw]]
+      kind = "lines"
+      count = 924
+      let = ["leaf = floor(i / 7)", "w = (mod(i, 7) + 1) / 8", "f = floor(leaf / 44)", "v = 0.06 + 0.92 * mod(leaf, 44) / 44", "side = mod(leaf, 2) * 2 - 1", "sub = mod(i, 2) * 2 - 1", "bx = 0.18", "by = 0.47", "a = pick(f, -0.55, 0.05, 0.6)", "ln = pick(f, 0.62, 0.86, 0.66)", "c = pick(f, -0.4, 0.15, 0.45)", "sx = bx + ln * v * sin(a + c * v * 0.5)", "sy = by - ln * v * cos(a + c * v * 0.5)", "th = a + c * v", "len = 0.15 * ln * sin(pi * (0.08 + 0.88 * v)) * (1 - 0.45 * v)", "phi = th + side * (1.15 - 0.7 * w)", "lx = sx + len * w * sin(phi)", "ly = sy - len * w * cos(phi)", "grow = 17 + v * 6 + 1.4 * w"]
+      samples = 5
+      px = "lx + len * 0.3 * (1 - w) * s * sin(phi + sub * 0.95)"
+      py = "ly - len * 0.3 * (1 - w) * s * cos(phi + sub * 0.95)"
+      width = 0.0012
+      color = "alpha(mix(#2FB7B0, #A8F7FF, v), 0.85)"
+      draw = "clamp((t - grow) / 0.9, 0, 1)"
+
+# The curl's front, rising toward us: the page itself, which its figure is drawn on next.
+[[scene.draw]]
+kind = "lines"
+count = 8
+visible = "t >= 34.5 && t < 39.5 && min(dm, rr * 1.5708) > 0 + 0.0005"
+let = ["qa = 0", "qb = min(dm, rr * 1.5708)", "q0 = mix(qa, qb, i / n)", "q1 = min(qb, mix(qa, qb, (i + 1) / n) + 0.003)", "c0 = fold - q0", "ax0 = (-0.8889 - -0.9119 * c0) / -0.4104", "bx0 = (0.8889 - -0.9119 * c0) / -0.4104", "ay0 = (-0.5 - -0.4104 * c0) / 0.9119", "by0 = (0.5 - -0.4104 * c0) / 0.9119", "lo0 = max(min(ax0, bx0), min(ay0, by0))", "hi0 = max(lo0, min(max(ax0, bx0), max(ay0, by0)))", "a0 = min(q0 / rr, bend)", "r0 = max(0, q0 - bend * rr)", "m0 = fold - rr * sin(a0) - r0 * cos(bend)", "k0 = min(3, 1 + near * (rr * (1 - cos(a0)) + r0 * sin(bend)))", "c1 = fold - q1", "ax1 = (-0.8889 - -0.9119 * c1) / -0.4104", "bx1 = (0.8889 - -0.9119 * c1) / -0.4104", "ay1 = (-0.5 - -0.4104 * c1) / 0.9119", "by1 = (0.5 - -0.4104 * c1) / 0.9119", "lo1 = max(min(ax1, bx1), min(ay1, by1))", "hi1 = max(lo1, min(max(ax1, bx1), max(ay1, by1)))", "a1 = min(q1 / rr, bend)", "r1 = max(0, q1 - bend * rr)", "m1 = fold - rr * sin(a1) - r1 * cos(bend)", "k1 = min(3, 1 + near * (rr * (1 - cos(a1)) + r1 * sin(bend)))", "am = (a0 + a1) / 2"]
+samples = 4
+closed = true
+px = "pick(j, (-0.9119 * m0 + -0.4104 * lo0) * k0, (-0.9119 * m0 + -0.4104 * hi0) * k0, (-0.9119 * m1 + -0.4104 * hi1) * k1, (-0.9119 * m1 + -0.4104 * lo1) * k1)"
+py = "pick(j, (-0.4104 * m0 + 0.9119 * lo0) * k0, (-0.4104 * m0 + 0.9119 * hi0) * k0, (-0.4104 * m1 + 0.9119 * hi1) * k1, (-0.4104 * m1 + 0.9119 * lo1) * k1)"
+width = 0
+fill = "mix(#080B16, #222A4A, 0.7 * sin(am))"
+
+# The shadow the curl casts on what it uncovers.
+[[scene.draw]]
+kind = "lines"
+visible = "t >= 34.5 && t < 39.5"
+samples = 2
+px = "-0.9119 * (fold - rr - 0.03) + -0.4104 * (s * 6 - 3)"
+py = "-0.4104 * (fold - rr - 0.03) + 0.9119 * (s * 6 - 3)"
+width = 0.06
+color = "alpha(#000000, 0.35 * min(1, dm * 8))"
+
+# The page, carried by the turn: flat beyond the fold, round the curl and on toward us before it.
+[[scene.draw]]
+kind = "group"
+visible = "t >= 34.5 && t < 39.5"
+
+  [[scene.draw.draw]]
+  kind = "rect"
+  count = 160
+  w = "(0.002 + 0.002 * hash(i * 9.1)) * wk"
+  h = "(0.002 + 0.002 * hash(i * 9.1)) * wk"
+  color = "alpha(#FFFFFF, sky * (0.25 + 0.55 * noise(t * 0.25 + i * 3.3)))"
+  let = ["wx0 = (hash(i * 1.37) * 2 - 1) * 0.88", "wy0 = (hash(i * 4.11) * 2 - 1) * 0.5", "wu = -0.9119 * wx0 + -0.4104 * wy0", "wv = -0.4104 * wx0 + 0.9119 * wy0", "wq = max(0, fold - wu)", "wa = min(wq / rr, bend)", "wr = max(0, wq - bend * rr)", "wm = wu + wq - rr * sin(wa) - wr * cos(bend)", "wz = rr * (1 - cos(wa)) + wr * sin(bend)", "wk = min(3, 1 + near * wz)"]
+  x = "(-0.9119 * wm + -0.4104 * wv) * wk"
+  y = "(-0.4104 * wm + 0.9119 * wv) * wk"
+
+  [[scene.draw.draw]]
+  kind = "lines"
+  samples = 48
+  width = 0.0016
+  color = "alpha(#F2A65A, sky * 0.55)"
+  sample_let = ["wx0 = -0.8889 + 1.7778 * s", "wy0 = 0.13", "wu = -0.9119 * wx0 + -0.4104 * wy0", "wv = -0.4104 * wx0 + 0.9119 * wy0", "wq = max(0, fold - wu)", "wa = min(wq / rr, bend)", "wr = max(0, wq - bend * rr)", "wm = wu + wq - rr * sin(wa) - wr * cos(bend)", "wz = rr * (1 - cos(wa)) + wr * sin(bend)", "wk = min(3, 1 + near * wz)"]
+  px = "(-0.9119 * wm + -0.4104 * wv) * wk"
+  py = "(-0.4104 * wm + 0.9119 * wv) * wk"
+glow = "1.5 * gl"
+glow_radius = 0.012
+
+  # The figure, carried along with its page.
+  [[scene.draw.draw]]
+  kind = "group"
+  glow = "1.4 * gl"
+  glow_radius = 0.006
+
+        [[scene.draw.draw.draw]]
+    kind = "lines"
+    count = 9
+    samples = 4
+    closed = true
+    let = ["r = 0.09 + 0.1 * hash(i * 3.1)", "ang = hash(i * 7.7) * tau + t * 0.04 * (hash(i) - 0.5)", "ox = 0.3 + 0.36 * hash(i * 5.3)", "oy = -0.3 + 0.36 * hash(i * 2.9)"]
+    width = 0.0014
+    color = "alpha(#C9A7FF, 0.8)"
+    fill = "alpha(#7B4BFF, 0.09)"
+    draw = "clamp((t - 7 - i * 1.2) / 1.4, 0, 1)"
+    sample_let = ["wx0 = ox + r * cos(ang + j * tau / 4 + 0.3 * sin(j * 2.1 + i))", "wy0 = oy + r * 0.8 * sin(ang + j * tau / 4 + 0.3 * sin(j * 2.1 + i))", "wu = -0.9119 * wx0 + -0.4104 * wy0", "wv = -0.4104 * wx0 + 0.9119 * wy0", "wq = max(0, fold - wu)", "wa = min(wq / rr, bend)", "wr = max(0, wq - bend * rr)", "wm = wu + wq - rr * sin(wa) - wr * cos(bend)", "wz = rr * (1 - cos(wa)) + wr * sin(bend)", "wk = min(3, 1 + near * wz)"]
+    px = "(-0.9119 * wm + -0.4104 * wv) * wk"
+    py = "(-0.4104 * wm + 0.9119 * wv) * wk"
+
+        [[scene.draw.draw.draw]]
+    kind = "lines"
+    count = 3
+    let = ["bx = 0.18", "by = 0.47", "a = pick(i, -0.55, 0.05, 0.6)", "ln = pick(i, 0.62, 0.86, 0.66)", "c = pick(i, -0.4, 0.15, 0.45)"]
+    samples = 120
+    width = 0.0034
+    color = "#5EF2E0"
+    draw = "ease_in_out((t - 15) / 6)"
+    sample_let = ["wx0 = bx + ln * s * sin(a + c * s * 0.5)", "wy0 = by - ln * s * cos(a + c * s * 0.5)", "wu = -0.9119 * wx0 + -0.4104 * wy0", "wv = -0.4104 * wx0 + 0.9119 * wy0", "wq = max(0, fold - wu)", "wa = min(wq / rr, bend)", "wr = max(0, wq - bend * rr)", "wm = wu + wq - rr * sin(wa) - wr * cos(bend)", "wz = rr * (1 - cos(wa)) + wr * sin(bend)", "wk = min(3, 1 + near * wz)"]
+    px = "(-0.9119 * wm + -0.4104 * wv) * wk"
+    py = "(-0.4104 * wm + 0.9119 * wv) * wk"
+
+        [[scene.draw.draw.draw]]
+    kind = "lines"
+    count = 132
+    let = ["f = floor(i / 44)", "v = 0.06 + 0.92 * mod(i, 44) / 44", "side = mod(i, 2) * 2 - 1", "bx = 0.18", "by = 0.47", "a = pick(f, -0.55, 0.05, 0.6)", "ln = pick(f, 0.62, 0.86, 0.66)", "c = pick(f, -0.4, 0.15, 0.45)", "sx = bx + ln * v * sin(a + c * v * 0.5)", "sy = by - ln * v * cos(a + c * v * 0.5)", "th = a + c * v", "len = 0.15 * ln * sin(pi * (0.08 + 0.88 * v)) * (1 - 0.45 * v)"]
+    samples = 14
+    width = 0.0021
+    color = "mix(#2FB7B0, #A8F7FF, v)"
+    draw = "clamp((t - 17 - v * 6) / 1.4, 0, 1)"
+    sample_let = ["wx0 = sx + len * s * sin(th + side * (1.15 - 0.7 * s))", "wy0 = sy - len * s * cos(th + side * (1.15 - 0.7 * s))", "wu = -0.9119 * wx0 + -0.4104 * wy0", "wv = -0.4104 * wx0 + 0.9119 * wy0", "wq = max(0, fold - wu)", "wa = min(wq / rr, bend)", "wr = max(0, wq - bend * rr)", "wm = wu + wq - rr * sin(wa) - wr * cos(bend)", "wz = rr * (1 - cos(wa)) + wr * sin(bend)", "wk = min(3, 1 + near * wz)"]
+    px = "(-0.9119 * wm + -0.4104 * wv) * wk"
+    py = "(-0.4104 * wm + 0.9119 * wv) * wk"
+    visible = "fold - (-0.9119 * sx + -0.4104 * sy) < rr * 1.5708 + 0.06"
+
+        [[scene.draw.draw.draw]]
+    kind = "lines"
+    count = 924
+    let = ["leaf = floor(i / 7)", "w = (mod(i, 7) + 1) / 8", "f = floor(leaf / 44)", "v = 0.06 + 0.92 * mod(leaf, 44) / 44", "side = mod(leaf, 2) * 2 - 1", "sub = mod(i, 2) * 2 - 1", "bx = 0.18", "by = 0.47", "a = pick(f, -0.55, 0.05, 0.6)", "ln = pick(f, 0.62, 0.86, 0.66)", "c = pick(f, -0.4, 0.15, 0.45)", "sx = bx + ln * v * sin(a + c * v * 0.5)", "sy = by - ln * v * cos(a + c * v * 0.5)", "th = a + c * v", "len = 0.15 * ln * sin(pi * (0.08 + 0.88 * v)) * (1 - 0.45 * v)", "phi = th + side * (1.15 - 0.7 * w)", "lx = sx + len * w * sin(phi)", "ly = sy - len * w * cos(phi)", "grow = 17 + v * 6 + 1.4 * w"]
+    samples = 5
+    width = 0.0012
+    color = "alpha(mix(#2FB7B0, #A8F7FF, v), 0.85)"
+    draw = "clamp((t - grow) / 0.9, 0, 1)"
+    sample_let = ["wx0 = lx + len * 0.3 * (1 - w) * s * sin(phi + sub * 0.95)", "wy0 = ly - len * 0.3 * (1 - w) * s * cos(phi + sub * 0.95)", "wu = -0.9119 * wx0 + -0.4104 * wy0", "wv = -0.4104 * wx0 + 0.9119 * wy0", "wq = max(0, fold - wu)", "wa = min(wq / rr, bend)", "wr = max(0, wq - bend * rr)", "wm = wu + wq - rr * sin(wa) - wr * cos(bend)", "wz = rr * (1 - cos(wa)) + wr * sin(bend)", "wk = min(3, 1 + near * wz)"]
+    px = "(-0.9119 * wm + -0.4104 * wv) * wk"
+    py = "(-0.4104 * wm + 0.9119 * wv) * wk"
+    visible = "fold - (-0.9119 * lx + -0.4104 * ly) < rr * 1.5708 + 0.06"
+
+# The lifted page's shadow, falling on the page beyond the fold.
+[[scene.draw]]
+kind = "lines"
+count = 3
+visible = "t >= 34.5 && t < 39.5"
+samples = 2
+px = "-0.9119 * (fold + 0.012 + i * 0.022) + -0.4104 * (s * 6 - 3)"
+py = "-0.4104 * (fold + 0.012 + i * 0.022) + 0.9119 * (s * 6 - 3)"
+width = "0.022 + i * 0.012"
+color = "alpha(#000000, (0.34 - i * 0.1) * min(1, dm * 8))"
+
+# The curl past edge-on, where the page shows its back.
+[[scene.draw]]
+kind = "lines"
+count = 6
+visible = "t >= 34.5 && t < 39.5 && min(dm, rr * bend) > min(dm, rr * 1.5708) + 0.0005"
+let = ["qa = min(dm, rr * 1.5708)", "qb = min(dm, rr * bend)", "q0 = mix(qa, qb, i / n)", "q1 = min(qb, mix(qa, qb, (i + 1) / n) + 0.003)", "c0 = fold - q0", "ax0 = (-0.8889 - -0.9119 * c0) / -0.4104", "bx0 = (0.8889 - -0.9119 * c0) / -0.4104", "ay0 = (-0.5 - -0.4104 * c0) / 0.9119", "by0 = (0.5 - -0.4104 * c0) / 0.9119", "lo0 = max(min(ax0, bx0), min(ay0, by0))", "hi0 = max(lo0, min(max(ax0, bx0), max(ay0, by0)))", "a0 = min(q0 / rr, bend)", "r0 = max(0, q0 - bend * rr)", "m0 = fold - rr * sin(a0) - r0 * cos(bend)", "k0 = min(3, 1 + near * (rr * (1 - cos(a0)) + r0 * sin(bend)))", "c1 = fold - q1", "ax1 = (-0.8889 - -0.9119 * c1) / -0.4104", "bx1 = (0.8889 - -0.9119 * c1) / -0.4104", "ay1 = (-0.5 - -0.4104 * c1) / 0.9119", "by1 = (0.5 - -0.4104 * c1) / 0.9119", "lo1 = max(min(ax1, bx1), min(ay1, by1))", "hi1 = max(lo1, min(max(ax1, bx1), max(ay1, by1)))", "a1 = min(q1 / rr, bend)", "r1 = max(0, q1 - bend * rr)", "m1 = fold - rr * sin(a1) - r1 * cos(bend)", "k1 = min(3, 1 + near * (rr * (1 - cos(a1)) + r1 * sin(bend)))", "am = (a0 + a1) / 2"]
+samples = 4
+closed = true
+px = "pick(j, (-0.9119 * m0 + -0.4104 * lo0) * k0, (-0.9119 * m0 + -0.4104 * hi0) * k0, (-0.9119 * m1 + -0.4104 * hi1) * k1, (-0.9119 * m1 + -0.4104 * lo1) * k1)"
+py = "pick(j, (-0.4104 * m0 + 0.9119 * lo0) * k0, (-0.4104 * m0 + 0.9119 * hi0) * k0, (-0.4104 * m1 + 0.9119 * hi1) * k1, (-0.4104 * m1 + 0.9119 * lo1) * k1)"
+width = 0
+fill = "mix(#4E4668, #F1EBFA, 0.42 + 0.55 * cos(am - 0.75))"
+
+# The rest of the lifted page, its back to us, rising straight on toward us.
+[[scene.draw]]
+kind = "lines"
+count = 4
+visible = "t >= 34.5 && t < 39.5 && dm > min(dm, rr * bend) + 0.0005"
+let = ["qa = min(dm, rr * bend)", "qb = dm", "q0 = mix(qa, qb, i / n)", "q1 = min(qb, mix(qa, qb, (i + 1) / n) + 0.003)", "c0 = fold - q0", "ax0 = (-0.8889 - -0.9119 * c0) / -0.4104", "bx0 = (0.8889 - -0.9119 * c0) / -0.4104", "ay0 = (-0.5 - -0.4104 * c0) / 0.9119", "by0 = (0.5 - -0.4104 * c0) / 0.9119", "lo0 = max(min(ax0, bx0), min(ay0, by0))", "hi0 = max(lo0, min(max(ax0, bx0), max(ay0, by0)))", "a0 = min(q0 / rr, bend)", "r0 = max(0, q0 - bend * rr)", "m0 = fold - rr * sin(a0) - r0 * cos(bend)", "k0 = min(3, 1 + near * (rr * (1 - cos(a0)) + r0 * sin(bend)))", "c1 = fold - q1", "ax1 = (-0.8889 - -0.9119 * c1) / -0.4104", "bx1 = (0.8889 - -0.9119 * c1) / -0.4104", "ay1 = (-0.5 - -0.4104 * c1) / 0.9119", "by1 = (0.5 - -0.4104 * c1) / 0.9119", "lo1 = max(min(ax1, bx1), min(ay1, by1))", "hi1 = max(lo1, min(max(ax1, bx1), max(ay1, by1)))", "a1 = min(q1 / rr, bend)", "r1 = max(0, q1 - bend * rr)", "m1 = fold - rr * sin(a1) - r1 * cos(bend)", "k1 = min(3, 1 + near * (rr * (1 - cos(a1)) + r1 * sin(bend)))", "am = (a0 + a1) / 2"]
+samples = 4
+closed = true
+px = "pick(j, (-0.9119 * m0 + -0.4104 * lo0) * k0, (-0.9119 * m0 + -0.4104 * hi0) * k0, (-0.9119 * m1 + -0.4104 * hi1) * k1, (-0.9119 * m1 + -0.4104 * lo1) * k1)"
+py = "pick(j, (-0.4104 * m0 + 0.9119 * lo0) * k0, (-0.4104 * m0 + 0.9119 * hi0) * k0, (-0.4104 * m1 + 0.9119 * hi1) * k1, (-0.4104 * m1 + 0.9119 * lo1) * k1)"
+width = 0
+fill = "mix(#4E4668, #F1EBFA, 0.42 + 0.55 * cos(am - 0.75))"
+
+# The Hand of Omnipotence: it reaches in, takes the page's corner, and pulls the page up and away.
+[[scene.draw]]
+kind = "sprite"
+file = "hands.png"
+frame_size = [809, 643]
+anchor = [619, 572]
+smooth = true
+visible = "t >= 33 && t < 39.5"
+frame = "t < 34.25 ? 0 : 1"
+x = "(-0.9119 * cm + -0.4104 * ct) * ck + 0.45 * reach"
+y = "(-0.4104 * cm + 0.9119 * ct) * ck + 0.4 * reach"
+pixel = "0.0006 * min(1.8, ck)"

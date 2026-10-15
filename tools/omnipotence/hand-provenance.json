@@ -1,0 +1,13 @@
+{
+ "file": "hand-sheet.png",
+ "sha256": "2e9557d0dab363e66ddc56e08d1fa7c7ae4fd2d6731755b6d1a360adcc5b3afc",
+ "generator": "Codex image generation, 2026-10-14",
+ "prompt": "hand-prompt.txt",
+ "reference": {
+  "description": "An image owned by the author, showing a hand; used only as the reference for style and color",
+  "file": "x-header-comp-hand-v11.png",
+  "sha256": "bbdd463b8e7f05c62663ba51cf212dc077322a30516368cfa0d5b891bac43dcc"
+ },
+ "used": "the reaching and pinching poses (the first two); hands.py cuts them out",
+ "license": "MIT, with the pack"
+}

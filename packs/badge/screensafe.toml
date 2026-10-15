@@ -1,0 +1,451 @@
+# Badge: ScreenSafe's shield or the Omarchy mark, or your own badge, bouncing, shattering, waving and in orbit. To show yours, put an image at ~/.config/omarchy/screensafe/badge.png. Written by tools/badge/build.py.
+format = 1
+name = "Badge"
+author = "ScreenSafe"
+license = "MIT"
+description = "ScreenSafe's shield or the Omarchy mark, or your own badge, bouncing, shattering, waving and in orbit. To show yours, put an image at ~/.config/omarchy/screensafe/badge.png."
+preview = 138
+fps = 30
+fade = 0
+
+[[setting]]
+name = "logo"
+label = "Picture"
+kind = "choice"
+choices = ["ScreenSafe", "Omarchy"]
+values = [0, 1]
+default = 0
+
+[[setting]]
+name = "pixelart"
+label = "Pixel art in theme colors"
+kind = "toggle"
+default = false
+
+[[scene]]
+name = "Bounce"
+duration = 32
+fade = 1.5
+
+# The badge, drifting from edge to edge and back.
+[[scene.draw]]
+kind = "sprite"
+file = "shield.png"
+source = "badge"
+smooth = true
+frame_size = [512, 512]
+anchor = [256, 256]
+x = "(tri(time / 23 + 0.2) - 0.5) * (aspect - 0.31248)"
+y = "(tri(time / 17 + 0.6) - 0.5) * 0.6528"
+pixel = "0.00068"
+visible = "logo == 0 && !pixelart"
+
+[[scene.draw]]
+kind = "sprite"
+file = "shield-pixel.png"
+source = "badge"
+smooth = false
+palette = "theme"
+frame_size = [64, 64]
+anchor = [32, 32]
+x = "(tri(time / 23 + 0.2) - 0.5) * (aspect - 0.31248)"
+y = "(tri(time / 17 + 0.6) - 0.5) * 0.6528"
+pixel = "0.00543"
+visible = "logo == 0 && pixelart"
+
+[[scene.draw]]
+kind = "sprite"
+file = "omarchy.png"
+source = "badge"
+smooth = true
+frame_size = [512, 512]
+anchor = [256, 256]
+x = "(tri(time / 23 + 0.2) - 0.5) * (aspect - 0.31248)"
+y = "(tri(time / 17 + 0.6) - 0.5) * 0.6528"
+pixel = "0.00068"
+visible = "logo == 1 && !pixelart"
+
+[[scene.draw]]
+kind = "sprite"
+file = "omarchy-pixel.png"
+source = "badge"
+smooth = false
+palette = "theme"
+frame_size = [64, 64]
+anchor = [32, 32]
+x = "(tri(time / 23 + 0.2) - 0.5) * (aspect - 0.31248)"
+y = "(tri(time / 17 + 0.6) - 0.5) * 0.6528"
+pixel = "0.00543"
+visible = "logo == 1 && pixelart"
+
+[[scene]]
+name = "Shatter"
+duration = 32
+fade = 1.5
+
+# Whole, bursting apart, drifting, and snapping back together.
+[[scene.draw]]
+kind = "sprite"
+file = "shield.png"
+source = "badge"
+smooth = true
+frame_size = [64, 64]
+anchor = [32, 32]
+count = 64
+frame = "i"
+let = ["col = mod(i, 8)", "row = floor(i / 8)", "hx = (col - 3.5) * 0.07", "hy = (row - 3.5) * 0.07", "burst = ease_out(clamp((t - 3) / 4, 0, 1))", "snap = clamp((t - 19) / 5, 0, 1)", "back = 1 + 2.70158 * (snap - 1) ^ 3 + 1.70158 * sqr(snap - 1)", "out = t < 19 ? burst : 1 - back", "spin = 0.8 * sin(pi * clamp((t - 3) / 21, 0, 1))", "ang = atan2(hy, hx) + out * (hash(i * 3.1) - 0.5) * 1.2 + spin", "dist = sqrt(sqr(hx) + sqr(hy)) * (1 + out * (0.6 + hash(i * 7.3) * 0.9))", "settle = 1 + 0.05 * max(0, 1 - abs(t - 24.2) * 2)"]
+x = "dist * cos(ang) * settle"
+y = "dist * sin(ang) * settle"
+pixel = "0.00113 * (1 - 0.3 * clamp(out, 0, 1) * hash(i * 5.7)) * settle"
+visible = "logo == 0 && !pixelart"
+
+[[scene.draw]]
+kind = "sprite"
+file = "shield-pixel.png"
+source = "badge"
+smooth = false
+palette = "theme"
+frame_size = [8, 8]
+anchor = [4, 4]
+count = 64
+frame = "i"
+let = ["col = mod(i, 8)", "row = floor(i / 8)", "hx = (col - 3.5) * 0.07", "hy = (row - 3.5) * 0.07", "burst = ease_out(clamp((t - 3) / 4, 0, 1))", "snap = clamp((t - 19) / 5, 0, 1)", "back = 1 + 2.70158 * (snap - 1) ^ 3 + 1.70158 * sqr(snap - 1)", "out = t < 19 ? burst : 1 - back", "spin = 0.8 * sin(pi * clamp((t - 3) / 21, 0, 1))", "ang = atan2(hy, hx) + out * (hash(i * 3.1) - 0.5) * 1.2 + spin", "dist = sqrt(sqr(hx) + sqr(hy)) * (1 + out * (0.6 + hash(i * 7.3) * 0.9))", "settle = 1 + 0.05 * max(0, 1 - abs(t - 24.2) * 2)"]
+x = "dist * cos(ang) * settle"
+y = "dist * sin(ang) * settle"
+pixel = "0.00901 * (1 - 0.3 * clamp(out, 0, 1) * hash(i * 5.7)) * settle"
+visible = "logo == 0 && pixelart"
+
+[[scene.draw]]
+kind = "sprite"
+file = "omarchy.png"
+source = "badge"
+smooth = true
+frame_size = [64, 64]
+anchor = [32, 32]
+count = 64
+frame = "i"
+let = ["col = mod(i, 8)", "row = floor(i / 8)", "hx = (col - 3.5) * 0.07", "hy = (row - 3.5) * 0.07", "burst = ease_out(clamp((t - 3) / 4, 0, 1))", "snap = clamp((t - 19) / 5, 0, 1)", "back = 1 + 2.70158 * (snap - 1) ^ 3 + 1.70158 * sqr(snap - 1)", "out = t < 19 ? burst : 1 - back", "spin = 0.8 * sin(pi * clamp((t - 3) / 21, 0, 1))", "ang = atan2(hy, hx) + out * (hash(i * 3.1) - 0.5) * 1.2 + spin", "dist = sqrt(sqr(hx) + sqr(hy)) * (1 + out * (0.6 + hash(i * 7.3) * 0.9))", "settle = 1 + 0.05 * max(0, 1 - abs(t - 24.2) * 2)"]
+x = "dist * cos(ang) * settle"
+y = "dist * sin(ang) * settle"
+pixel = "0.00113 * (1 - 0.3 * clamp(out, 0, 1) * hash(i * 5.7)) * settle"
+visible = "logo == 1 && !pixelart"
+
+[[scene.draw]]
+kind = "sprite"
+file = "omarchy-pixel.png"
+source = "badge"
+smooth = false
+palette = "theme"
+frame_size = [8, 8]
+anchor = [4, 4]
+count = 64
+frame = "i"
+let = ["col = mod(i, 8)", "row = floor(i / 8)", "hx = (col - 3.5) * 0.07", "hy = (row - 3.5) * 0.07", "burst = ease_out(clamp((t - 3) / 4, 0, 1))", "snap = clamp((t - 19) / 5, 0, 1)", "back = 1 + 2.70158 * (snap - 1) ^ 3 + 1.70158 * sqr(snap - 1)", "out = t < 19 ? burst : 1 - back", "spin = 0.8 * sin(pi * clamp((t - 3) / 21, 0, 1))", "ang = atan2(hy, hx) + out * (hash(i * 3.1) - 0.5) * 1.2 + spin", "dist = sqrt(sqr(hx) + sqr(hy)) * (1 + out * (0.6 + hash(i * 7.3) * 0.9))", "settle = 1 + 0.05 * max(0, 1 - abs(t - 24.2) * 2)"]
+x = "dist * cos(ang) * settle"
+y = "dist * sin(ang) * settle"
+pixel = "0.00901 * (1 - 0.3 * clamp(out, 0, 1) * hash(i * 5.7)) * settle"
+visible = "logo == 1 && pixelart"
+
+[[scene]]
+name = "Wave"
+duration = 32
+fade = 1.5
+
+# A wave through the badge, as through a flag.
+[[scene.draw]]
+kind = "sprite"
+file = "shield.png"
+source = "badge"
+smooth = true
+frame_size = [16, 512]
+anchor = [8, 256]
+count = 32
+frame = "i"
+let = ["calm = smoothstep(1, 4, t) * (1 - smoothstep(28, 31, t))"]
+x = "(i - 15.5) * 0.0175"
+y = "0.04 * sin(i * 0.1875 - t * 2.1) * calm"
+pixel = "0.00113"
+visible = "logo == 0 && !pixelart"
+
+[[scene.draw]]
+kind = "sprite"
+file = "shield-pixel.png"
+source = "badge"
+smooth = false
+palette = "theme"
+frame_size = [2, 64]
+anchor = [1, 32]
+count = 32
+frame = "i"
+let = ["calm = smoothstep(1, 4, t) * (1 - smoothstep(28, 31, t))"]
+x = "(i - 15.5) * 0.0175"
+y = "0.04 * sin(i * 0.1875 - t * 2.1) * calm"
+pixel = "0.00901"
+visible = "logo == 0 && pixelart"
+
+[[scene.draw]]
+kind = "sprite"
+file = "omarchy.png"
+source = "badge"
+smooth = true
+frame_size = [16, 512]
+anchor = [8, 256]
+count = 32
+frame = "i"
+let = ["calm = smoothstep(1, 4, t) * (1 - smoothstep(28, 31, t))"]
+x = "(i - 15.5) * 0.0175"
+y = "0.04 * sin(i * 0.1875 - t * 2.1) * calm"
+pixel = "0.00113"
+visible = "logo == 1 && !pixelart"
+
+[[scene.draw]]
+kind = "sprite"
+file = "omarchy-pixel.png"
+source = "badge"
+smooth = false
+palette = "theme"
+frame_size = [2, 64]
+anchor = [1, 32]
+count = 32
+frame = "i"
+let = ["calm = smoothstep(1, 4, t) * (1 - smoothstep(28, 31, t))"]
+x = "(i - 15.5) * 0.0175"
+y = "0.04 * sin(i * 0.1875 - t * 2.1) * calm"
+pixel = "0.00901"
+visible = "logo == 1 && pixelart"
+
+[[scene]]
+name = "Assemble"
+duration = 32
+fade = 1.5
+
+# Tiles flying in, one after another, then raining away.
+[[scene.draw]]
+kind = "sprite"
+file = "shield.png"
+source = "badge"
+smooth = true
+frame_size = [64, 64]
+anchor = [32, 32]
+count = 64
+frame = "i"
+let = ["col = mod(i, 8)", "row = floor(i / 8)", "hx = (col - 3.5) * 0.07", "hy = (row - 3.5) * 0.07", "arrive = ease_out(clamp((t - 1 - hash(i * 2.9) * 8) / 2.5, 0, 1))", "fall = ease_in(clamp((t - 22 - hash(i * 4.4) * 6) / 2.2, 0, 1))", "sx = (hash(i * 6.1) * 2 - 1) * aspect * 0.6", "sy = (hash(i * 8.3) * 2 - 1) * 0.6"]
+x = "mix(sx, hx, arrive)"
+y = "mix(sy, hy, arrive) + fall * 1.2"
+visible = "(logo == 0 && !pixelart) && (arrive > 0 && fall < 1)"
+pixel = "0.00113"
+
+[[scene.draw]]
+kind = "sprite"
+file = "shield-pixel.png"
+source = "badge"
+smooth = false
+palette = "theme"
+frame_size = [8, 8]
+anchor = [4, 4]
+count = 64
+frame = "i"
+let = ["col = mod(i, 8)", "row = floor(i / 8)", "hx = (col - 3.5) * 0.07", "hy = (row - 3.5) * 0.07", "arrive = ease_out(clamp((t - 1 - hash(i * 2.9) * 8) / 2.5, 0, 1))", "fall = ease_in(clamp((t - 22 - hash(i * 4.4) * 6) / 2.2, 0, 1))", "sx = (hash(i * 6.1) * 2 - 1) * aspect * 0.6", "sy = (hash(i * 8.3) * 2 - 1) * 0.6"]
+x = "mix(sx, hx, arrive)"
+y = "mix(sy, hy, arrive) + fall * 1.2"
+visible = "(logo == 0 && pixelart) && (arrive > 0 && fall < 1)"
+pixel = "0.00901"
+
+[[scene.draw]]
+kind = "sprite"
+file = "omarchy.png"
+source = "badge"
+smooth = true
+frame_size = [64, 64]
+anchor = [32, 32]
+count = 64
+frame = "i"
+let = ["col = mod(i, 8)", "row = floor(i / 8)", "hx = (col - 3.5) * 0.07", "hy = (row - 3.5) * 0.07", "arrive = ease_out(clamp((t - 1 - hash(i * 2.9) * 8) / 2.5, 0, 1))", "fall = ease_in(clamp((t - 22 - hash(i * 4.4) * 6) / 2.2, 0, 1))", "sx = (hash(i * 6.1) * 2 - 1) * aspect * 0.6", "sy = (hash(i * 8.3) * 2 - 1) * 0.6"]
+x = "mix(sx, hx, arrive)"
+y = "mix(sy, hy, arrive) + fall * 1.2"
+visible = "(logo == 1 && !pixelart) && (arrive > 0 && fall < 1)"
+pixel = "0.00113"
+
+[[scene.draw]]
+kind = "sprite"
+file = "omarchy-pixel.png"
+source = "badge"
+smooth = false
+palette = "theme"
+frame_size = [8, 8]
+anchor = [4, 4]
+count = 64
+frame = "i"
+let = ["col = mod(i, 8)", "row = floor(i / 8)", "hx = (col - 3.5) * 0.07", "hy = (row - 3.5) * 0.07", "arrive = ease_out(clamp((t - 1 - hash(i * 2.9) * 8) / 2.5, 0, 1))", "fall = ease_in(clamp((t - 22 - hash(i * 4.4) * 6) / 2.2, 0, 1))", "sx = (hash(i * 6.1) * 2 - 1) * aspect * 0.6", "sy = (hash(i * 8.3) * 2 - 1) * 0.6"]
+x = "mix(sx, hx, arrive)"
+y = "mix(sy, hy, arrive) + fall * 1.2"
+visible = "(logo == 1 && pixelart) && (arrive > 0 && fall < 1)"
+pixel = "0.00901"
+
+[[scene]]
+name = "Orbit"
+duration = 32
+fade = 1.5
+
+# Six small copies in orbit about a large one.
+[[scene.draw]]
+kind = "sprite"
+file = "shield.png"
+source = "badge"
+smooth = true
+frame_size = [512, 512]
+anchor = [256, 256]
+count = 6
+let = ["a = i / n * tau + t * 0.35"]
+visible = "(logo == 0 && !pixelart) && (sin(a) < 0)"
+x = "0.62 * cos(a)"
+y = "0.3 * sin(a)"
+pixel = "0.00024 * (0.85 + 0.15 * sin(a))"
+
+[[scene.draw]]
+kind = "sprite"
+file = "shield.png"
+source = "badge"
+smooth = true
+frame_size = [512, 512]
+anchor = [256, 256]
+pixel = "0.00082"
+y = "0.02 * sin(t * 0.7)"
+visible = "logo == 0 && !pixelart"
+
+[[scene.draw]]
+kind = "sprite"
+file = "shield.png"
+source = "badge"
+smooth = true
+frame_size = [512, 512]
+anchor = [256, 256]
+count = 6
+let = ["a = i / n * tau + t * 0.35"]
+visible = "(logo == 0 && !pixelart) && (sin(a) >= 0)"
+x = "0.62 * cos(a)"
+y = "0.3 * sin(a)"
+pixel = "0.00024 * (0.85 + 0.15 * sin(a))"
+
+[[scene.draw]]
+kind = "sprite"
+file = "shield-pixel.png"
+source = "badge"
+smooth = false
+palette = "theme"
+frame_size = [64, 64]
+anchor = [32, 32]
+count = 6
+let = ["a = i / n * tau + t * 0.35"]
+visible = "(logo == 0 && pixelart) && (sin(a) < 0)"
+x = "0.62 * cos(a)"
+y = "0.3 * sin(a)"
+pixel = "0.00193 * (0.85 + 0.15 * sin(a))"
+
+[[scene.draw]]
+kind = "sprite"
+file = "shield-pixel.png"
+source = "badge"
+smooth = false
+palette = "theme"
+frame_size = [64, 64]
+anchor = [32, 32]
+pixel = "0.00656"
+y = "0.02 * sin(t * 0.7)"
+visible = "logo == 0 && pixelart"
+
+[[scene.draw]]
+kind = "sprite"
+file = "shield-pixel.png"
+source = "badge"
+smooth = false
+palette = "theme"
+frame_size = [64, 64]
+anchor = [32, 32]
+count = 6
+let = ["a = i / n * tau + t * 0.35"]
+visible = "(logo == 0 && pixelart) && (sin(a) >= 0)"
+x = "0.62 * cos(a)"
+y = "0.3 * sin(a)"
+pixel = "0.00193 * (0.85 + 0.15 * sin(a))"
+
+[[scene.draw]]
+kind = "sprite"
+file = "omarchy.png"
+source = "badge"
+smooth = true
+frame_size = [512, 512]
+anchor = [256, 256]
+count = 6
+let = ["a = i / n * tau + t * 0.35"]
+visible = "(logo == 1 && !pixelart) && (sin(a) < 0)"
+x = "0.62 * cos(a)"
+y = "0.3 * sin(a)"
+pixel = "0.00024 * (0.85 + 0.15 * sin(a))"
+
+[[scene.draw]]
+kind = "sprite"
+file = "omarchy.png"
+source = "badge"
+smooth = true
+frame_size = [512, 512]
+anchor = [256, 256]
+pixel = "0.00082"
+y = "0.02 * sin(t * 0.7)"
+visible = "logo == 1 && !pixelart"
+
+[[scene.draw]]
+kind = "sprite"
+file = "omarchy.png"
+source = "badge"
+smooth = true
+frame_size = [512, 512]
+anchor = [256, 256]
+count = 6
+let = ["a = i / n * tau + t * 0.35"]
+visible = "(logo == 1 && !pixelart) && (sin(a) >= 0)"
+x = "0.62 * cos(a)"
+y = "0.3 * sin(a)"
+pixel = "0.00024 * (0.85 + 0.15 * sin(a))"
+
+[[scene.draw]]
+kind = "sprite"
+file = "omarchy-pixel.png"
+source = "badge"
+smooth = false
+palette = "theme"
+frame_size = [64, 64]
+anchor = [32, 32]
+count = 6
+let = ["a = i / n * tau + t * 0.35"]
+visible = "(logo == 1 && pixelart) && (sin(a) < 0)"
+x = "0.62 * cos(a)"
+y = "0.3 * sin(a)"
+pixel = "0.00193 * (0.85 + 0.15 * sin(a))"
+
+[[scene.draw]]
+kind = "sprite"
+file = "omarchy-pixel.png"
+source = "badge"
+smooth = false
+palette = "theme"
+frame_size = [64, 64]
+anchor = [32, 32]
+pixel = "0.00656"
+y = "0.02 * sin(t * 0.7)"
+visible = "logo == 1 && pixelart"
+
+[[scene.draw]]
+kind = "sprite"
+file = "omarchy-pixel.png"
+source = "badge"
+smooth = false
+palette = "theme"
+frame_size = [64, 64]
+anchor = [32, 32]
+count = 6
+let = ["a = i / n * tau + t * 0.35"]
+visible = "(logo == 1 && pixelart) && (sin(a) >= 0)"
+x = "0.62 * cos(a)"
+y = "0.3 * sin(a)"
+pixel = "0.00193 * (0.85 + 0.15 * sin(a))"

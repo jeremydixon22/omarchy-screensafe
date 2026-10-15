@@ -1,0 +1,32 @@
+# Omarchy's own screensaver art, the text you edit under Style > Screensaver, drawn by ScreenSafe: sharp at any
+# size, scaled to fit the screen, in the theme's colors, with a different reveal each time round.
+format = 1
+name = "Omarchy"
+author = "ScreenSafe"
+license = "MIT"
+description = "Your screensaver art from Style > Screensaver, revealed a different way each time, in the theme's colors."
+stage = "screen"
+fps = 30
+background = "background"
+
+# What can be changed in the panel: how long the art stays once revealed.
+[[setting]]
+name = "staying"
+label = "Art stays"
+kind = "choice"
+choices = ["Briefly", "A while", "Long"]
+values = [4, 9, 20]
+default = 9
+
+[[scene]]
+name = "Logo"
+duration = 5
+hold = "staying"
+fade = 0.8
+
+[[scene.draw]]
+kind = "ascii"
+source = "branding"
+effect = "random"
+fit = 0.62
+colors = ["accent", "foreground"]

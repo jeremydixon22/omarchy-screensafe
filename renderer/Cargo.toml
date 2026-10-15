@@ -1,0 +1,28 @@
+[package]
+name = "screensafe"
+version = "0.4.7"
+edition = "2021"
+rust-version = "1.97"
+license = "MIT"
+description = "Renders ScreenSafe screensaver packs on Wayland"
+publish = false
+
+[dependencies]
+fontdue = { version = "0.9", default-features = false, features = ["std"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
+landlock = "0.4"
+rustix = { version = "1", features = ["fs", "mm", "process", "time", "event"] }
+tiny-skia = { version = "0.11", default-features = false, features = ["std", "simd"] }
+ttf-parser = { version = "0.25", default-features = false, features = ["opentype-layout", "no-std-float"] }
+toml = { version = "0.9", default-features = false, features = ["parse", "serde", "std"] }
+wayland-client = "0.31"
+wayland-protocols = { version = "0.32", features = ["client", "staging"] }
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true
+debug = false

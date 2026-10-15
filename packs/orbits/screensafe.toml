@@ -1,0 +1,87 @@
+# Line art made from expressions: the Omarchy box turning in its orbits, and a slowly changing Lissajous figure.
+format = 1
+name = "Orbits"
+author = "ScreenSafe"
+license = "MIT"
+description = "The Omarchy box turning in its orbits, then a Lissajous figure that slowly changes, in the theme's colors."
+fps = 30
+fade = 1.2
+background = "background"
+
+# What can be changed in the panel: how quickly the box turns.
+[[setting]]
+name = "spin"
+label = "Spin"
+kind = "choice"
+choices = ["Slow", "Normal", "Fast"]
+values = [0.25, 0.45, 0.8]
+default = 0.45
+
+[[scene]]
+name = "Orbits"
+duration = 30
+let = ["appear = ease_out(clamp(t / 2.5, 0, 1))"]
+
+# The Omarchy box: a cube with Omarchy's mark, as line art, on two neighboring sides.
+[[scene.draw]]
+kind = "mesh"
+vertices = [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1], [-0.78, -0.78, -1], [-0.78, 0.78, -1], [0.052, 0.78, -1], [0.052, 0.572, -1], [0.572, 0.572, -1], [0.572, -0.572, -1], [0.364, -0.572, -1], [0.364, -0.468, -1], [0.468, -0.468, -1], [0.468, 0.468, -1], [-0.468, 0.468, -1], [-0.468, -0.468, -1], [0.052, -0.468, -1], [0.052, -0.676, -1], [0.676, -0.676, -1], [0.676, 0.676, -1], [0.156, 0.676, -1], [0.156, 0.78, -1], [0.78, 0.78, -1], [0.78, -0.78, -1], [-0.676, 0.052, -1], [-0.572, 0.052, -1], [-0.572, 0.572, -1], [-0.052, 0.572, -1], [-0.052, 0.676, -1], [-0.676, 0.676, -1], [-0.676, -0.052, -1], [-0.676, -0.676, -1], [-0.052, -0.676, -1], [-0.052, -0.572, -1], [-0.572, -0.572, -1], [-0.572, -0.052, -1], [1, -0.78, -0.78], [1, 0.78, -0.78], [1, 0.78, 0.052], [1, 0.572, 0.052], [1, 0.572, 0.572], [1, -0.572, 0.572], [1, -0.572, 0.364], [1, -0.468, 0.364], [1, -0.468, 0.468], [1, 0.468, 0.468], [1, 0.468, -0.468], [1, -0.468, -0.468], [1, -0.468, 0.052], [1, -0.676, 0.052], [1, -0.676, 0.676], [1, 0.676, 0.676], [1, 0.676, 0.156], [1, 0.78, 0.156], [1, 0.78, 0.78], [1, -0.78, 0.78], [1, 0.052, -0.676], [1, 0.052, -0.572], [1, 0.572, -0.572], [1, 0.572, -0.052], [1, 0.676, -0.052], [1, 0.676, -0.676], [1, -0.052, -0.676], [1, -0.676, -0.676], [1, -0.676, -0.052], [1, -0.572, -0.052], [1, -0.572, -0.572], [1, -0.052, -0.572]]
+edges = [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7], [8, 9], [9, 10], [10, 11], [11, 12], [12, 13], [13, 14], [14, 15], [15, 16], [16, 17], [17, 18], [18, 19], [19, 20], [20, 21], [21, 22], [22, 23], [23, 24], [24, 25], [25, 26], [26, 27], [27, 8], [28, 29], [29, 30], [30, 31], [31, 32], [32, 33], [33, 28], [34, 35], [35, 36], [36, 37], [37, 38], [38, 39], [39, 34], [40, 41], [41, 42], [42, 43], [43, 44], [44, 45], [45, 46], [46, 47], [47, 48], [48, 49], [49, 50], [50, 51], [51, 52], [52, 53], [53, 54], [54, 55], [55, 56], [56, 57], [57, 58], [58, 59], [59, 40], [60, 61], [61, 62], [62, 63], [63, 64], [64, 65], [65, 60], [66, 67], [67, 68], [68, 69], [69, 70], [70, 71], [71, 66]]
+size = 0.13
+distance = 5
+ry = "t * spin"
+rx = "0.5 + 0.12 * sin(t * 0.21)"
+rz = "-t * spin * 0.6"
+width = 0.0022
+draw = "appear"
+edge_color = "e < 12 ? accent : mix(accent, bright_foreground, 0.35)"
+
+# Three tilted orbits, each with a body traveling round it.
+[[scene.draw]]
+kind = "group"
+count = 3
+let = ["radius = 0.27 + 0.085 * i", "speed = 0.35 - 0.08 * i", "lag = i * 0.6"]
+rotate = "-0.35 + i * 0.55 + t * 0.012"
+
+  [[scene.draw.draw]]
+  kind = "lines"
+  samples = 180
+  closed = true
+  px = "radius * cos(s * tau)"
+  py = "radius * 0.28 * sin(s * tau)"
+  width = 0.0016
+  color = "pick(i, cyan, magenta, yellow)"
+  opacity = 0.75
+  draw = "clamp((t - 0.8 - lag) / 2, 0, 1)"
+
+  [[scene.draw.draw]]
+  kind = "lines"
+  samples = 24
+  closed = true
+  x = "radius * cos(t * speed * tau + i * 2.1)"
+  y = "radius * 0.28 * sin(t * speed * tau + i * 2.1)"
+  px = "0.009 * cos(s * tau)"
+  py = "0.009 * sin(s * tau)"
+  width = 0.002
+  fill = "pick(i, cyan, magenta, yellow)"
+  color = "pick(i, cyan, magenta, yellow)"
+  visible = "t > 2.8 + lag"
+
+[[scene]]
+name = "Lissajous"
+duration = 30
+fps = 24
+let = ["phase = t * 0.18"]
+
+# The figure, with a fainter copy trailing a moment behind it.
+[[scene.draw]]
+kind = "lines"
+count = 2
+samples = 600
+closed = true
+let = ["lag = i * 0.5"]
+px = "0.62 * sin(3 * s * tau + phase - lag * 0.18)"
+py = "0.38 * sin(4 * s * tau + 0.6 * sin((t - lag) * 0.11))"
+width = "0.0024 - i * 0.0004"
+color = "mix(accent, magenta, 0.5 + 0.5 * sin(t * 0.17))"
+opacity = "(1 - k * 0.7) * clamp(t / 3, 0, 1)"

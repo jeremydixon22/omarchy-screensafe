@@ -1,0 +1,71 @@
+# Columns of digits fall down the screen at their own speeds, each led by a bright digit and trailing dimmer ones
+# that keep changing, in the theme's colors.
+format = 1
+name = "Cascade"
+author = "ScreenSafe"
+license = "MIT"
+description = "Columns of ever-changing digits fall down the screen, each led by a bright one, in the theme's colors."
+stage = "screen"
+fps = 30
+fade = 0
+background = "background"
+
+[params]
+# Digit size.
+size = 0.026
+
+# What can be changed in the panel: how fast the columns fall, and how long their trails are.
+[[setting]]
+name = "pace"
+label = "Speed"
+kind = "choice"
+choices = ["Slow", "Normal", "Fast"]
+values = [0.6, 1, 1.6]
+default = 1
+
+[[setting]]
+name = "trail"
+label = "Trail"
+kind = "choice"
+choices = ["Short", "Long"]
+values = [10, 18]
+default = 18
+
+
+[[scene]]
+name = "Falling"
+duration = 600
+fade = 0
+let = ["cell = size * 1.15", "opening = smoothstep(0, 2, time)"]
+
+[[scene.draw]]
+kind = "group"
+count = 60
+opacity = "opening"
+let = [
+  "column = i",
+  "x0 = (k - 0.5) * (aspect - size)",
+  # Each column falls at its own speed, starting at its own point, and pauses off screen between falls.
+  "speed = (0.12 + 0.2 * rand(column * 1.31 + 0.2)) * pace",
+  "span = 1.1 + trail * cell + 0.6 * rand(column * 2.71 + 0.4)",
+  "head = -0.55 + fract(time * speed / span + rand(column * 3.17 + 0.6)) * span",
+]
+
+  [[scene.draw.draw]]
+  kind = "text"
+  count = 18
+  let = [
+    "y0 = head - i * cell",
+    # Digits change now and then, the leader most often.
+    "tick = floor(time * (i == 0 ? 7 : 1.5) + hash(column * 5.3 + i * 1.7) * 9)",
+    "digit = floor(hash(column * 13.1 + i * 7.7 + tick * 0.618) * 10)",
+  ]
+  visible = "i < trail && y0 > -0.55 && y0 < 0.55"
+  text = "{digit}"
+  x = "x0"
+  y = "y0"
+  size = "size"
+  align = "center"
+  valign = "middle"
+  color = "i == 0 ? bright_foreground : mix(accent, green, k)"
+  opacity = "i == 0 ? 1 : 0.85 * pow(1 - clamp(i / (trail - 1), 0, 1), 1.4)"

@@ -1,0 +1,73 @@
+# Stars drift about the screen, bouncing off its edges, and any two that pass near each other are joined by a line
+# that fades as they part, in the theme's colors.
+format = 1
+name = "Constellations"
+author = "ScreenSafe"
+license = "MIT"
+description = "Stars drift about the screen, joined by faint lines whenever two pass close, like constellations forming and fading."
+stage = "screen"
+fps = 30
+fade = 0
+background = "background"
+
+# What can be changed in the panel: how far apart two stars can be and still be joined, and how quickly they drift.
+[[setting]]
+name = "near"
+label = "Links"
+kind = "choice"
+choices = ["Short", "Medium", "Long"]
+values = [0.16, 0.22, 0.3]
+default = 0.22
+
+[[setting]]
+name = "pace"
+label = "Drift"
+kind = "choice"
+choices = ["Slow", "Normal", "Lively"]
+values = [0.6, 1, 1.8]
+default = 1
+
+
+[[scene]]
+name = "Drift"
+duration = 600
+fade = 0
+let = ["opening = smoothstep(0, 2, time)", "w = aspect - 0.04", "drift = time * pace"]
+
+# Every pair of the 45 stars: pair i joins star a to star b, with b < a.
+[[scene.draw]]
+kind = "lines"
+count = 990
+samples = 2
+let = [
+  "a = floor((1 + sqrt(1 + 8 * i)) / 2)",
+  "b = i - a * (a - 1) / 2",
+  "ax = (tri(drift * (0.006 + 0.012 * rand(a * 3.1)) + rand(a * 5.3)) - 0.5) * w",
+  "ay = (tri(drift * (0.008 + 0.014 * rand(a * 7.7)) + rand(a * 9.9)) - 0.5) * 0.96",
+  "bx = (tri(drift * (0.006 + 0.012 * rand(b * 3.1)) + rand(b * 5.3)) - 0.5) * w",
+  "by = (tri(drift * (0.008 + 0.014 * rand(b * 7.7)) + rand(b * 9.9)) - 0.5) * 0.96",
+  "d = sqrt(sqr(ax - bx) + sqr(ay - by))",
+]
+visible = "d < near"
+px = "mix(ax, bx, s)"
+py = "mix(ay, by, s)"
+width = 0.0012
+color = "mix(accent, foreground, 0.3)"
+opacity = "opening * 0.75 * pow(1 - d / near, 1.5)"
+
+# The stars.
+[[scene.draw]]
+kind = "lines"
+count = 45
+samples = 12
+closed = true
+let = [
+  "x0 = (tri(drift * (0.006 + 0.012 * rand(i * 3.1)) + rand(i * 5.3)) - 0.5) * w",
+  "y0 = (tri(drift * (0.008 + 0.014 * rand(i * 7.7)) + rand(i * 9.9)) - 0.5) * 0.96",
+  "r = 0.0025 + 0.003 * hash(i * 1.7)",
+]
+px = "x0 + cos(s * tau) * r"
+py = "y0 + sin(s * tau) * r"
+width = 0
+fill = "i % 7 == 0 ? accent : foreground"
+opacity = "opening * (0.6 + 0.4 * hash(i * 2.9))"

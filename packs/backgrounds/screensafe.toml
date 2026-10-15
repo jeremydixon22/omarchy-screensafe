@@ -1,0 +1,38 @@
+# The theme's own backgrounds, one each time round, drifting slowly across the screen.
+format = 1
+name = "Theme backgrounds"
+author = "ScreenSafe"
+license = "MIT"
+description = "Your theme's backgrounds, one after another, drifting slowly across the screen."
+stage = "screen"
+fps = 24
+fade = 1.5
+background = "black"
+
+# What can be changed in the panel: how long each background shows, and whether it drifts.
+[[setting]]
+name = "each"
+label = "Each background"
+kind = "choice"
+choices = ["10 s", "20 s", "45 s"]
+values = [10, 20, 45]
+default = 20
+
+[[setting]]
+name = "drifting"
+label = "Drift"
+kind = "toggle"
+default = true
+
+[[scene]]
+name = "Drift"
+duration = "each"
+
+[[scene.draw]]
+kind = "image"
+source = "theme-backgrounds"
+index = "cycle"
+# A steady zoom lets ScreenSafe show a copy resampled once, rather than filter every pixel every frame.
+zoom = "drifting ? 1.1 : 1"
+pan_x = "drifting ? (mod(cycle, 2) * 2 - 1) * (0.8 - 1.6 * u) : 0"
+pan_y = "drifting ? 0.3 * sin(u * pi + cycle) : 0"

@@ -1,0 +1,57 @@
+# Flying through a field of stars: each star keeps its own place in the sky and comes towards you, streaking as it
+# passes, in the theme's colors. Worked out from the time alone, so the flight never repeats a frame or jumps.
+format = 1
+name = "Starfield"
+author = "ScreenSafe"
+license = "MIT"
+description = "Flying through a field of stars that streak past as they come close, in the theme's colors."
+stage = "screen"
+fps = 30
+# One endless scene: no fade as it goes round.
+fade = 0
+background = "background"
+
+# What can be changed in the panel: how fast the flight goes, and how many stars pass.
+[[setting]]
+name = "speed"
+label = "Speed"
+kind = "choice"
+choices = ["Cruise", "Steady", "Warp"]
+values = [0.06, 0.11, 0.2]
+default = 0.11
+
+[[setting]]
+name = "stars"
+label = "Stars"
+kind = "choice"
+choices = ["Sparse", "Normal", "Dense"]
+values = [220, 420, 700]
+default = 420
+
+
+[[scene]]
+name = "Flight"
+duration = 600
+fade = 0
+let = ["flown = time * speed + 0.9 * sin(time * 0.045)"]
+
+[[scene.draw]]
+kind = "lines"
+count = 700
+visible = "i < stars"
+samples = 2
+let = [
+  # Where the star sits across the sky, and how far away it starts.
+  "sx = (hash(i * 1.618 + 0.3) * 2 - 1) * aspect",
+  "sy = hash(i * 2.414 + 0.7) * 2 - 1",
+  "depth = 1 - fract(flown + hash(i * 3.141 + 0.1))",
+  "near = 1 - depth",
+  "z = 0.035 + depth",
+  # The streak reaches back to where the star was a moment ago.
+  "tail = 0.003 + 0.011 * near * near * near",
+]
+px = "sx * 0.06 / (z + tail * (1 - s))"
+py = "sy * 0.06 / (z + tail * (1 - s))"
+width = "0.0008 + 0.0032 * near * near"
+color = "pick(i, foreground, foreground, bright_foreground, foreground, accent, cyan)"
+opacity = "smoothstep(0, 0.35, near) * (0.35 + 0.65 * near)"

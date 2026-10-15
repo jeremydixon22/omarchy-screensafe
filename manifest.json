@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.jeremydixon22.screensafe",
+  "name": "ScreenSafe",
+  "version": "0.4.7",
+  "author": "Jeremy Dixon",
+  "license": "MIT",
+  "description": "Screensavers made of data, not code: ASCII art, line art and images, drawn sharp on every screen.",
+  "kinds": [
+    "service",
+    "bar-widget"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "ScreenSafe",
+    "description": "Choose the screensaver and when it starts, switch it on for idle, or preview it.",
+    "category": "Appearance",
+    "aliases": [
+      "screensaver",
+      "idle",
+      "screensafe"
+    ],
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "onIdle": false,
+      "pack": "auto",
+      "idleSeconds": 0,
+      "favorites": []
+    },
+    "schema": [
+      {
+        "key": "onIdle",
+        "type": "boolean",
+        "label": "Enable",
+        "description": "Show ScreenSafe instead of Omarchy's screensaver when you're idle.",
+        "defaultValue": false
+      },
+      {
+        "key": "idleSeconds",
+        "type": "integer",
+        "label": "Starts after (seconds)",
+        "min": 0,
+        "max": 86400,
+        "step": 60,
+        "defaultValue": 0,
+        "description": "Seconds idle before ScreenSafe shows, from 10; 0 follows Omarchy's screensaver time."
+      }
+    ]
+  }
+}

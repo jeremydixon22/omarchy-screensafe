@@ -1,0 +1,188 @@
+# Thoughts drift through a fading web of memories. Each reaches toward an idea, a faint light that wanders out of
+# reach, and lets go just before it gets there. The backgrounds are stills from the video "the city remembers
+# nothing" by signal // directive, released here under the MIT license with permission: each is the median of four
+# seconds of the video, which keeps its nebula and the traces its arcs leave and drops the arcs themselves.
+format = 1
+name = "Trying To Remember"
+author = "ScreenSafe"
+license = "MIT"
+description = "Aimless thoughts wander through a fog of half-remembered ones, each reaching for an idea that glows just out of reach, and letting go before it's found."
+stage = "screen"
+fps = 30
+fade = 0
+background = "#0b0a26"
+
+[params]
+# Seconds each background shows, and each thought's life from first spark to the next.
+still = 24
+period = 9
+# Seconds a thought takes to reach as far as it gets.
+grow = 3.2
+
+[colors]
+core = "#f0f6ff"
+body = "#86acff"
+branch = "#a283ff"
+idea = "#e2d6ff"
+
+[[scene]]
+name = "Trying to remember"
+duration = 144
+fade = 0
+let = [
+  "seg = mod(time / still, 6)",
+  # The idea drifts slowly about the middle of the screen.
+  "cx = (noise(time * 0.021 + 3.7) - 0.5) * 0.7 * aspect",
+  "cy = (noise(time * 0.017 + 9.1) - 0.5) * 0.45",
+  "opening = smoothstep(0, 2.5, time)",
+]
+
+[[scene.draw]]
+kind = "image"
+file = "memory-1.webp"
+zoom = 1.12
+pan_x = "sin(time * 0.011 + 0)"
+pan_y = "cos(time * 0.009 + 0)"
+opacity = "seg < 1 || seg >= 5.8 ? 1 : 0"
+
+[[scene.draw]]
+kind = "image"
+file = "memory-2.webp"
+zoom = 1.12
+pan_x = "sin(time * 0.011 + 1.7)"
+pan_y = "cos(time * 0.009 + 2.3)"
+opacity = "seg >= 0.8 && seg < 2 ? smoothstep(0.8, 1, seg) : 0"
+
+[[scene.draw]]
+kind = "image"
+file = "memory-3.webp"
+zoom = 1.12
+pan_x = "sin(time * 0.011 + 3.4)"
+pan_y = "cos(time * 0.009 + 4.6)"
+opacity = "seg >= 1.8 && seg < 3 ? smoothstep(1.8, 2, seg) : 0"
+
+[[scene.draw]]
+kind = "image"
+file = "memory-4.webp"
+zoom = 1.12
+pan_x = "sin(time * 0.011 + 5.1)"
+pan_y = "cos(time * 0.009 + 6.9)"
+opacity = "seg >= 2.8 && seg < 4 ? smoothstep(2.8, 3, seg) : 0"
+
+[[scene.draw]]
+kind = "image"
+file = "memory-5.webp"
+zoom = 1.12
+pan_x = "sin(time * 0.011 + 6.8)"
+pan_y = "cos(time * 0.009 + 9.2)"
+opacity = "seg >= 3.8 && seg < 5 ? smoothstep(3.8, 4, seg) : 0"
+
+[[scene.draw]]
+kind = "image"
+file = "memory-6.webp"
+zoom = 1.12
+pan_x = "sin(time * 0.011 + 8.5)"
+pan_y = "cos(time * 0.009 + 11.5)"
+opacity = "seg >= 4.8 ? smoothstep(4.8, 5, seg) * (1 - smoothstep(5.8, 6, seg)) : 0"
+
+# The idea: a faint light, slowly breathing.
+[[scene.draw]]
+kind = "group"
+x = "cx"
+y = "cy"
+opacity = "opening * (0.55 + 0.2 * sin(time * 0.8))"
+glow = 2.2
+glow_radius = 0.02
+
+  # A soft halo, of discs laid one over another.
+  [[scene.draw.draw]]
+  kind = "lines"
+  count = 6
+  samples = 40
+  closed = true
+  px = "cos(s * tau) * mix(0.05, 0.014, k)"
+  py = "sin(s * tau) * mix(0.05, 0.014, k)"
+  width = 0
+  fill = "alpha(idea, 0.045)"
+
+  [[scene.draw.draw]]
+  kind = "lines"
+  samples = 24
+  closed = true
+  px = "cos(s * tau) * 0.009"
+  py = "sin(s * tau) * 0.009"
+  width = 0
+  fill = "idea"
+
+# The thoughts, lit by one glow together, each reaching from somewhere about the idea's old place towards where
+# it is now.
+[[scene.draw]]
+kind = "group"
+glow = 2
+glow_radius = 0.01
+
+  [[scene.draw.draw]]
+  kind = "group"
+  count = 5
+  let = [
+    "th = i",
+    "ph = (time + th * period / n) / period",
+    "c = floor(ph)",
+    "tt = fract(ph) * period",
+    "birth = c * period - th * period / n",
+    "seed = th * 7.31 + c * 1.618",
+    "bx = (noise(birth * 0.021 + 3.7) - 0.5) * 0.7 * aspect",
+    "by = (noise(birth * 0.017 + 9.1) - 0.5) * 0.45",
+    "a = rand(seed) * tau",
+    "r = 0.38 + 0.25 * rand(seed + 0.5)",
+    "sx = bx + cos(a) * r * 1.3",
+    "sy = by + sin(a) * r * 0.8",
+    # It stops a little short of the idea.
+    "gap = 0.05 + 0.04 * rand(seed + 0.7)",
+    "dx = cx - sx",
+    "dy = cy - sy",
+    "dist = max(sqrt(dx * dx + dy * dy), 0.1)",
+    "ux = dx / dist",
+    "uy = dy / dist",
+    "len = dist - gap",
+    "reach = ease_out(clamp(tt / grow, 0, 1))",
+  ]
+  opacity = "opening * smoothstep(0, 0.5, tt) * (1 - smoothstep(grow + 1.2, grow + 3.8, tt))"
+
+    [[scene.draw.draw.draw]]
+    kind = "lines"
+    samples = 140
+    draw = "reach"
+    px = "sx + ux * len * s - uy * ((noise(s * 2.2 + seed * 3.3) - 0.5) * len * 0.7 * sin(pi * s) + (noise(s * 11 + seed * 2.3) - 0.5) * 0.05 * sin(pi * s) + (noise(s * 38 + seed * 5.1 + time * 0.35) - 0.5) * 0.022 * sqrt(sin(pi * s)) + (hash(floor(s * 90) + seed * 11) - 0.5) * 0.0025 * sin(pi * s))"
+    py = "sy + uy * len * s + ux * ((noise(s * 2.2 + seed * 3.3) - 0.5) * len * 0.7 * sin(pi * s) + (noise(s * 11 + seed * 2.3) - 0.5) * 0.05 * sin(pi * s) + (noise(s * 38 + seed * 5.1 + time * 0.35) - 0.5) * 0.022 * sqrt(sin(pi * s)) + (hash(floor(s * 90) + seed * 11) - 0.5) * 0.0025 * sin(pi * s))"
+    width = 0.005
+    color = "alpha(body, 0.8)"
+
+    [[scene.draw.draw.draw]]
+    kind = "lines"
+    samples = 140
+    draw = "reach"
+    px = "sx + ux * len * s - uy * ((noise(s * 2.2 + seed * 3.3) - 0.5) * len * 0.7 * sin(pi * s) + (noise(s * 11 + seed * 2.3) - 0.5) * 0.05 * sin(pi * s) + (noise(s * 38 + seed * 5.1 + time * 0.35) - 0.5) * 0.022 * sqrt(sin(pi * s)) + (hash(floor(s * 90) + seed * 11) - 0.5) * 0.0025 * sin(pi * s))"
+    py = "sy + uy * len * s + ux * ((noise(s * 2.2 + seed * 3.3) - 0.5) * len * 0.7 * sin(pi * s) + (noise(s * 11 + seed * 2.3) - 0.5) * 0.05 * sin(pi * s) + (noise(s * 38 + seed * 5.1 + time * 0.35) - 0.5) * 0.022 * sqrt(sin(pi * s)) + (hash(floor(s * 90) + seed * 11) - 0.5) * 0.0025 * sin(pi * s))"
+    width = 0.0017
+    color = "core"
+
+    # Side branches, sprouting once the thought has passed them.
+    [[scene.draw.draw.draw]]
+    kind = "lines"
+    count = 3
+    samples = 36
+    let = [
+      "bseed = seed + i * 0.37 + 2",
+      "s0 = 0.25 + 0.55 * rand(bseed)",
+      "ax = sx + ux * len * s0 - uy * ((noise(s0 * 2.2 + seed * 3.3) - 0.5) * len * 0.7 * sin(pi * s0) + (noise(s0 * 11 + seed * 2.3) - 0.5) * 0.05 * sin(pi * s0) + (noise(s0 * 38 + seed * 5.1 + time * 0.35) - 0.5) * 0.022 * sqrt(sin(pi * s0)) + (hash(floor(s0 * 90) + seed * 11) - 0.5) * 0.0025 * sin(pi * s0))",
+      "ay = sy + uy * len * s0 + ux * ((noise(s0 * 2.2 + seed * 3.3) - 0.5) * len * 0.7 * sin(pi * s0) + (noise(s0 * 11 + seed * 2.3) - 0.5) * 0.05 * sin(pi * s0) + (noise(s0 * 38 + seed * 5.1 + time * 0.35) - 0.5) * 0.022 * sqrt(sin(pi * s0)) + (hash(floor(s0 * 90) + seed * 11) - 0.5) * 0.0025 * sin(pi * s0))",
+      "turn = (rand(bseed + 0.2) < 0.5 ? -1 : 1) * (0.5 + 0.6 * rand(bseed + 0.4))",
+      "ang = atan2(uy, ux) + turn",
+      "blen = 0.05 + 0.11 * rand(bseed + 0.6)",
+    ]
+    draw = "ease_out(clamp((reach - s0) * 3, 0, 1))"
+    px = "ax + cos(ang) * blen * s - sin(ang) * ((noise(s * 3 + bseed * 2.7) - 0.5) * blen * 0.8 * sin(pi * s * 0.5) + (noise(s * 16 + bseed * 4.3 + time * 0.35) - 0.5) * 0.014 * sqrt(s) + (hash(floor(s * 30) + bseed * 13) - 0.5) * 0.004 * s)"
+    py = "ay + sin(ang) * blen * s + cos(ang) * ((noise(s * 3 + bseed * 2.7) - 0.5) * blen * 0.8 * sin(pi * s * 0.5) + (noise(s * 16 + bseed * 4.3 + time * 0.35) - 0.5) * 0.014 * sqrt(s) + (hash(floor(s * 30) + bseed * 13) - 0.5) * 0.004 * s)"
+    width = 0.002
+    color = "alpha(branch, 0.8)"

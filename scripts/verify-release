@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# Rebuilds the renderer from this checkout with scripts/build-release and checks that both results are byte for byte
+# the committed bin/screensafe-x86_64 and bin/screensafe-aarch64. Needs rustup, which fetches the toolchain pinned in
+# renderer/rust-toolchain.toml.
+#
+#   scripts/verify-release
+set -euo pipefail
+
+root=$(cd "$(dirname "$0")/.." && pwd)
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+
+CARGO_TARGET_DIR="$work/target" "$root/scripts/build-release" "$work/bin" >/dev/null
+status=0
+for arch in x86_64 aarch64; do
+  expected=$(sha256sum < "$root/bin/screensafe-$arch")
+  rebuilt=$(sha256sum < "$work/bin/screensafe-$arch")
+  if [[ $expected == "$rebuilt" ]]; then
+    echo "bin/screensafe-$arch matches its source: sha256 ${rebuilt%% *}"
+  else
+    echo "bin/screensafe-$arch does not match its source: committed ${expected%% *}, rebuilt ${rebuilt%% *}" >&2
+    status=1
+  fi
+done
+exit $status

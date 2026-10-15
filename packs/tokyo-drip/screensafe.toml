@@ -1,0 +1,953 @@
+# Tokyo Drip: a rainy Tokyo side street at night, in the theme's colors. Written by tools/tokyo-drip/build.py.
+format = 1
+name = "Tokyo Drip"
+author = "ScreenSafe"
+license = "MIT"
+description = "A rainy Tokyo side street at night: neon signs, lanterns and an LED screen, as rain drips onto the wet street, in your theme's colors."
+preview = 30
+fps = 30
+fade = 0
+
+[fonts]
+sign = "fonts/sign.otf"
+
+# What can be changed in the panel: how hard it rains (with none, the signs stop dripping, though the street stays
+# wet), and what the big screen advertises between its pictures: nothing, ScreenSafe, or Omarchy.
+[[setting]]
+name = "rain"
+label = "Rain"
+kind = "choice"
+choices = ["None", "Light", "Heavy"]
+values = [0, 0.4, 1]
+default = 1
+
+[[setting]]
+name = "screen"
+label = "Big screen"
+kind = "choice"
+choices = ["Patterns", "ScreenSafe", "Omarchy"]
+values = [0, 1, 2]
+default = 1
+
+[[scene]]
+name = "The street"
+duration = 600
+# It's always night here. A dark theme's own colors make it; a light theme's are darkened to dusk, keeping their tint,
+# and its light color takes the place of a dark theme's for the rain and the like, so the neon still glows.
+let = ["night = light ? mix(background, black, 0.8) : background",
+       "sky = light ? mix(darker_background, black, 0.86) : darker_background",
+       "ink = light ? background : foreground"]
+background = "light ? mix(darker_background, black, 0.86) : darker_background"
+
+# The night sky, lit from below by the city.
+[[scene.draw]]
+kind = "rect"
+count = 2
+y = "-0.1 - i * 0.07"
+w = "0.5 - i * 0.15"
+h = 0.14
+color = "alpha(mix(mix(magenta, blue, 0.4), night, 0.5), 0.09 - i * 0.03)"
+
+[[scene.draw]]
+kind = "lines"
+points = [[-0.21, -0.015], [-0.15, -0.015], [-0.15, -0.315], [-0.21, -0.315]]
+closed = true
+width = 0
+fill = "mix(sky, night, 0.6)"
+
+[[scene.draw]]
+kind = "lines"
+points = [[-0.12, -0.015], [-0.07, -0.015], [-0.07, -0.4], [-0.12, -0.4]]
+closed = true
+width = 0
+fill = "mix(sky, night, 0.6)"
+
+[[scene.draw]]
+kind = "lines"
+points = [[0.0475, -0.015], [0.1125, -0.015], [0.1125, -0.36], [0.0475, -0.36]]
+closed = true
+width = 0
+fill = "mix(sky, night, 0.6)"
+
+[[scene.draw]]
+kind = "lines"
+points = [[0.1375, -0.015], [0.1925, -0.015], [0.1925, -0.28], [0.1375, -0.28]]
+closed = true
+width = 0
+fill = "mix(sky, night, 0.6)"
+
+# Their windows.
+[[scene.draw]]
+kind = "rect"
+count = 160
+let = ["tw = pick(floor(i / 40), -3.6, -1.9, 1.6, 3.3)", "ww = pick(floor(i / 40), 1.2, 1, 1.3, 1.1)", "tt = pick(floor(i / 40), -5.5, -7.2, -6.4, -4.8)", "col = mod(i, 5)", "row = floor(mod(i, 40) / 5)"]
+x = "(tw - ww * 0.38 + col * ww * 0.19) * 0.05"
+y = "-0.04 + (tt + 0.4 + row * 0.55) * 0.05"
+w = "0.005"
+h = "0.008"
+visible = "hash(i * 3.3) > 0.45"
+color = "alpha(pick(mod(i, 3), mix(blue, ink, 0.5), mix(magenta, ink, 0.5), mix(yellow, ink, 0.5)), 0.35 + 0.2 * noise(time * 0.05 + i))"
+
+# Aircraft warning lights.
+[[scene.draw]]
+kind = "rect"
+count = 4
+x = "pick(i, -3.6, -1.9, 1.6, 3.3) * 0.05"
+y = "-0.04 + (pick(i, -5.5, -7.2, -6.4, -4.8) - 0.1) * 0.05"
+w = 0.006
+h = 0.006
+color = "alpha(red, 0.25 + 0.75 * max(0, sin(time * 1.6 + i * 1.3)) ^ 6)"
+
+# The building across the end of the street.
+[[scene.draw]]
+kind = "lines"
+points = [[-0.13778, 0.00444], [0.13778, 0.00444], [0.13778, -0.36], [-0.13778, -0.36]]
+closed = true
+width = 0
+fill = "mix(sky, night, 0.4)"
+
+# Its screen: a grid of LEDs, playing its program round and round.
+[[scene.draw]]
+kind = "lines"
+points = [[-0.12278, -0.31832], [0.12278, -0.31832], [0.12278, -0.17412], [-0.12278, -0.17412]]
+closed = true
+width = 0
+fill = "black"
+
+[[scene.draw]]
+kind = "group"
+glow = 1.2
+glow_radius = 0.008
+let = ["slot = mod(time, screen == 1 ? 88 : screen == 2 ? 56 : 36)", "pic = screen == 2 && slot >= 40 && slot < 48 ? 4 : min(3, floor(slot / 12))", "blend = slot < 36 ? smoothstep(0.85, 1, fract(slot / 12)) : 0", "cx = 0", "cy = -0.24622"]
+
+[[scene.draw.draw]]
+kind = "rect"
+count = 576
+let = ["c = mod(i, 32)", "r = floor(i / 32)", "cu = c / 31", "cv = r / 17", "wave = 0.5 + 0.5 * sin(cu * 9 - time * 2.2 + sin(cv * 4 + time) * 1.5)", "level = step(1 - cv, 0.15 + 0.8 * noise(c * 0.37 + time * 1.8) ^ 1.5)", "ring = 0.5 + 0.5 * cos(sqrt(sqr((cu - 0.5) * 1.8) + sqr(cv - 0.5)) * 22 - time * 3)", "mc = c - 9", "mr = r - 2", "mrow = pick(clamp(mr, 0, 12), 8191, 4161, 6093, 5125, 5125, 5125, 7173, 5125, 5125, 5125, 6141, 4161, 8159)", "inside = mc >= 0 && mc < 13 && mr >= 0 && mr < 13", "mark = inside ? mod(floor(mrow / 2 ^ (12 - mc)), 2) * step((mc + mr) / 24, (slot - 40) / 2.5) * (0.8 + 0.2 * sin(time * 3)) : 0", "a = pick(pic, wave, level, ring, 0, mark)", "b = pick(pic + 1, wave, level, ring, 0, mark)", "lit = mix(a, b, blend)"]
+x = "-0.11194 + c * 0.00722"
+y = "-0.30751 + r * 0.00721"
+w = "0.0052"
+h = "0.00519"
+color = "alpha(pick(pic, mix(bright_cyan, bright_magenta, cu), mix(blue, red, 1 - cv), mix(accent, bright_yellow, cv), accent, mix(accent, white, 0.15)), 0.08 + 0.92 * lit)"
+
+# ScreenSafe's name,
+[[scene.draw.draw]]
+kind = "text"
+font = "sign"
+text = "ScreenSafe"
+size = "0.03355"
+align = "center"
+valign = "middle"
+x = "cx"
+y = "cy"
+visible = "screen == 1 && slot >= 36 && slot < 40"
+color = "alpha(mix(accent, white, 0.3), smoothstep(36, 36.6, slot) * (1 - smoothstep(39.4, 40, slot)))"
+
+# Omarchy's name,
+[[scene.draw.draw]]
+kind = "text"
+font = "sign"
+text = "Omarchy"
+size = "0.04793"
+align = "center"
+valign = "middle"
+x = "cx"
+y = "cy"
+visible = "screen == 2 && slot >= 36 && slot < 40"
+color = "alpha(mix(accent, white, 0.3), smoothstep(36, 36.6, slot) * (1 - smoothstep(39.4, 40, slot)))"
+
+# and its name, scrolling past.
+[[scene.draw.draw]]
+kind = "group"
+visible = "screen == 2 && slot >= 48 && slot < 56"
+clip = ["-0.11556", "-0.31111", "0.11556", "-0.18133"]
+
+[[scene.draw.draw.draw]]
+kind = "text"
+font = "sign"
+text = "OMARCHY  OMARCHY"
+size = "0.07138"
+valign = "middle"
+x = "0.11556 - (slot - 48) / 8 * 0.93918"
+y = "cy"
+color = "mix(accent, white, 0.2)"
+
+# its shield,
+[[scene.draw.draw]]
+kind = "group"
+visible = "screen == 1 && slot >= 40 && slot < 44"
+opacity = "smoothstep(40, 40.6, slot) * (1 - smoothstep(43.4, 44, slot))"
+
+[[scene.draw.draw.draw]]
+kind = "lines"
+points = [[-0.04429, -0.29481], [-0.02214, -0.28165], [0, -0.29684], [0.02214, -0.28165], [0.04429, -0.29481], [0.04429, -0.25027], [0.04398, -0.24463], [0.04306, -0.23919], [0.04152, -0.23395], [0.03937, -0.2289], [0.0366, -0.22405], [0.03321, -0.2194], [0.02922, -0.21494], [0.0246, -0.21068], [0.01938, -0.20662], [0.01353, -0.20275], [0.00707, -0.19908], [0, -0.19561], [-0.00707, -0.19908], [-0.01353, -0.20275], [-0.01938, -0.20662], [-0.0246, -0.21068], [-0.02922, -0.21494], [-0.03321, -0.2194], [-0.0366, -0.22405], [-0.03937, -0.2289], [-0.04152, -0.23395], [-0.04306, -0.23919], [-0.04398, -0.24463], [-0.04429, -0.25027]]
+closed = true
+width = 0
+fill = "accent"
+
+[[scene.draw.draw.draw]]
+kind = "lines"
+points = [[-0.04429, -0.29481], [-0.02214, -0.28165], [0, -0.29684], [0, -0.19561], [-0.00707, -0.19908], [-0.01353, -0.20275], [-0.01938, -0.20662], [-0.0246, -0.21068], [-0.02922, -0.21494], [-0.03321, -0.2194], [-0.0366, -0.22405], [-0.03937, -0.2289], [-0.04152, -0.23395], [-0.04306, -0.23919], [-0.04398, -0.24463], [-0.04429, -0.25027]]
+closed = true
+width = 0
+fill = "mix(accent, white, 0.2)"
+
+[[scene.draw.draw.draw]]
+kind = "text"
+font = "sign"
+text = "§"
+size = "0.05203"
+align = "center"
+valign = "middle"
+x = "-0.01264"
+y = "-0.25796"
+color = "black"
+
+# and a few seconds of each of its screensavers: Badge, Orbits, Starfield, Echoes, Cascade, Harmonograph, Constellations, Trying To Remember, Distro Wars, Omnipotence, Fibonacci.
+[[scene.draw.draw]]
+kind = "sprite"
+file = "previews.png"
+frame_size = [192, 108]
+anchor = [96, 54]
+smooth = true
+x = "cx"
+y = "cy"
+pixel = "0.0012"
+let = ["shown = (slot - 44) / 4"]
+frame = "floor(shown)"
+visible = "screen == 1 && slot >= 44"
+opacity = "smoothstep(0, 0.12, fract(shown)) * (1 - smoothstep(0.88, 1, fract(shown)))"
+
+# The LEDs' grid, over the pictures.
+[[scene.draw.draw]]
+kind = "lines"
+count = 50
+samples = 2
+width = "0.00216"
+visible = "screen == 1 && slot >= 44 || screen == 2 && slot >= 48"
+px = "i < 32 ? -0.11556 + i * 0.00722 : -0.11556 + s * 0.23111"
+py = "i < 32 ? -0.31111 + s * 0.12978 : -0.31111 + (i - 32) * 0.00721"
+color = "alpha(black, 0.35)"
+
+# The buildings on the left,
+[[scene.draw]]
+kind = "lines"
+points = [[-1, 0.39478], [-0.46, 0.16], [-0.46, -1.08], [-1, -2.30087]]
+closed = true
+width = 0
+fill = "mix(night, black, 0.25)"
+
+[[scene.draw]]
+kind = "lines"
+points = [[-0.46, -0.8], [-0.7, -0.8], [-0.7, -1.08], [-0.46, -1.08]]
+closed = true
+width = 0
+fill = "mix(night, black, 0.45)"
+
+[[scene.draw]]
+kind = "lines"
+points = [[-0.46, 0.16], [-0.30667, 0.09333], [-0.30667, -0.54667], [-0.46, -0.8]]
+closed = true
+width = 0
+fill = "mix(night, black, 0.33)"
+
+[[scene.draw]]
+kind = "lines"
+points = [[-0.30667, 0.09333], [-0.2, 0.04696], [-0.2, -0.45739], [-0.30667, -0.68]]
+closed = true
+width = 0
+fill = "mix(night, black, 0.28)"
+
+[[scene.draw]]
+kind = "lines"
+points = [[-0.2, -0.33565], [-0.30435, -0.33565], [-0.30435, -0.45739], [-0.2, -0.45739]]
+closed = true
+width = 0
+fill = "mix(night, black, 0.48)"
+
+[[scene.draw]]
+kind = "lines"
+points = [[-0.2, 0.04696], [-0.14839, 0.02452], [-0.14839, -0.25935], [-0.2, -0.33565]]
+closed = true
+width = 0
+fill = "mix(night, black, 0.35)"
+
+[[scene.draw]]
+kind = "lines"
+points = [[-0.14839, 0.02452], [-0.10222, 0.00444], [-0.10222, -0.22667], [-0.14839, -0.31097]]
+closed = true
+width = 0
+fill = "mix(night, black, 0.3)"
+
+# Their windows.
+[[scene.draw]]
+kind = "rect"
+count = 132
+let = ["col = floor(i / 6)", "row = mod(i, 6)", "zz = mix(2.1, 8.6, (col + 0.5) / 22)", "roof = zz < 2 ? -2.6 : zz < 3 ? -1.9 : zz < 4.6 ? -2.4 : zz < 6.2 ? -1.7 : -2.1", "yy = -0.75 - row * 0.3"]
+visible = "yy > roof + 0.15 && hash(i * 7.31 + -1) > 0.42"
+x = "-1.15 * 0.8 / zz"
+y = "-0.04 + yy * 0.8 / zz"
+w = "0.092 / sqr(zz)"
+h = "0.12 / zz"
+color = "alpha(pick(floor(hash(i * 1.9 + -1) * 4), mix(blue, ink, 0.4), mix(magenta, ink, 0.4), mix(bright_cyan, ink, 0.5), mix(yellow, ink, 0.4)), 0.22 * step(0.12, noise(time * 0.02 + i * 0.7)))"
+
+# Shopfronts at street level, lit from inside,
+[[scene.draw]]
+kind = "lines"
+count = 16
+samples = 4
+closed = true
+width = 0
+let = ["za = 1.05 + i * 0.5", "zb = za + 0.38"]
+visible = "zb < 9"
+px = "-0.92 / pick(j, za, zb, zb, za)"
+py = "-0.04 + pick(j, 0.5, 0.5, 0.14, 0.14) * 0.8 / pick(j, za, zb, zb, za)"
+fill = "alpha(pick(floor(hash(i * 2.3 + -1) * 5), mix(blue, ink, 0.3), mix(magenta, ink, 0.3), mix(bright_cyan, ink, 0.4), mix(bright_yellow, ink, 0.35), mix(red, ink, 0.35)), (0.17 + 0.06 * noise(time * 0.3 + i)) * min(1, za / 2.6))"
+
+# a short curtain over each door.
+[[scene.draw]]
+kind = "lines"
+count = 16
+samples = 4
+closed = true
+width = 0
+let = ["za = 1.05 + i * 0.5", "zb = za + 0.38"]
+visible = "zb < 9"
+px = "-0.92 / pick(j, za, zb, zb, za)"
+py = "-0.04 + pick(j, 0.14, 0.14, 0.02, 0.02) * 0.8 / pick(j, za, zb, zb, za)"
+fill = "mix(pick(floor(hash(i * 4.7 + -1) * 4), red, blue, magenta, accent), black, 0.5)"
+
+# and on the right,
+[[scene.draw]]
+kind = "lines"
+points = [[1, 0.39478], [0.4, 0.13391], [0.4, -0.84], [1, -2.04]]
+closed = true
+width = 0
+fill = "mix(night, black, 0.3)"
+
+[[scene.draw]]
+kind = "lines"
+points = [[0.4, 0.13391], [0.27879, 0.08121], [0.27879, -0.71879], [0.4, -1.01391]]
+closed = true
+width = 0
+fill = "mix(night, black, 0.25)"
+
+[[scene.draw]]
+kind = "lines"
+points = [[0.27879, -0.47636], [0.42424, -0.47636], [0.42424, -0.71879], [0.27879, -0.71879]]
+closed = true
+width = 0
+fill = "mix(night, black, 0.45)"
+
+[[scene.draw]]
+kind = "lines"
+points = [[0.27879, 0.08121], [0.184, 0.04], [0.184, -0.328], [0.27879, -0.47636]]
+closed = true
+width = 0
+fill = "mix(night, black, 0.34)"
+
+[[scene.draw]]
+kind = "lines"
+points = [[0.184, 0.04], [0.13143, 0.01714], [0.13143, -0.29143], [0.184, -0.392]]
+closed = true
+width = 0
+fill = "mix(night, black, 0.27)"
+
+[[scene.draw]]
+kind = "lines"
+points = [[0.13143, -0.25714], [0.2, -0.25714], [0.2, -0.29143], [0.13143, -0.29143]]
+closed = true
+width = 0
+fill = "mix(night, black, 0.47)"
+
+[[scene.draw]]
+kind = "lines"
+points = [[0.13143, 0.01714], [0.10222, 0.00444], [0.10222, -0.20889], [0.13143, -0.25714]]
+closed = true
+width = 0
+fill = "mix(night, black, 0.32)"
+
+# Their windows.
+[[scene.draw]]
+kind = "rect"
+count = 132
+let = ["col = floor(i / 6)", "row = mod(i, 6)", "zz = mix(2.1, 8.6, (col + 0.5) / 22)", "roof = zz < 2.3 ? -2.3 : zz < 3.3 ? -2.8 : zz < 5 ? -1.8 : zz < 7 ? -2.2 : -1.9", "yy = -0.75 - row * 0.3"]
+visible = "yy > roof + 0.15 && hash(i * 7.31 + 1) > 0.42"
+x = "1.15 * 0.8 / zz"
+y = "-0.04 + yy * 0.8 / zz"
+w = "0.092 / sqr(zz)"
+h = "0.12 / zz"
+color = "alpha(pick(floor(hash(i * 1.9 + 1) * 4), mix(blue, ink, 0.4), mix(magenta, ink, 0.4), mix(bright_cyan, ink, 0.5), mix(yellow, ink, 0.4)), 0.22 * step(0.12, noise(time * 0.02 + i * 0.7)))"
+
+[[scene.draw]]
+kind = "lines"
+count = 16
+samples = 4
+closed = true
+width = 0
+let = ["za = 1.05 + i * 0.5", "zb = za + 0.38"]
+visible = "zb < 9"
+px = "0.92 / pick(j, za, zb, zb, za)"
+py = "-0.04 + pick(j, 0.5, 0.5, 0.14, 0.14) * 0.8 / pick(j, za, zb, zb, za)"
+fill = "alpha(pick(floor(hash(i * 2.3 + 1) * 5), mix(blue, ink, 0.3), mix(magenta, ink, 0.3), mix(bright_cyan, ink, 0.4), mix(bright_yellow, ink, 0.35), mix(red, ink, 0.35)), (0.17 + 0.06 * noise(time * 0.3 + i)) * min(1, za / 2.6))"
+
+[[scene.draw]]
+kind = "lines"
+count = 16
+samples = 4
+closed = true
+width = 0
+let = ["za = 1.05 + i * 0.5", "zb = za + 0.38"]
+visible = "zb < 9"
+px = "0.92 / pick(j, za, zb, zb, za)"
+py = "-0.04 + pick(j, 0.14, 0.14, 0.02, 0.02) * 0.8 / pick(j, za, zb, zb, za)"
+fill = "mix(pick(floor(hash(i * 4.7 + 1) * 4), red, blue, magenta, accent), black, 0.5)"
+
+# The wet street,
+[[scene.draw]]
+kind = "lines"
+points = [[-1.31429, 0.53143], [1.31429, 0.53143], [0.10222, 0.00444], [-0.10222, 0.00444]]
+closed = true
+width = 0
+fill = "mix(night, black, 0.45)"
+
+# its kerbs
+[[scene.draw]]
+kind = "lines"
+count = 2
+samples = 2
+width = 0.002
+px = "(i * 2 - 1) * 0.9 * 0.8 / mix(0.92, 9, s)"
+py = "-0.04 + 0.4 / mix(0.92, 9, s)"
+color = "alpha(ink, 0.12)"
+
+# and the line down the middle.
+[[scene.draw]]
+kind = "rect"
+count = 9
+let = ["za = 1.1 + i * 0.85", "zb = za + 0.4"]
+x = 0
+y = "-0.04 + 0.4 * (1 / za + 1 / zb) / 2"
+w = "0.02 / za"
+h = "0.4 * (1 / za - 1 / zb)"
+color = "alpha(ink, 0.1)"
+
+# The signs' light, broken into ripples on the wet street.
+[[scene.draw]]
+kind = "rect"
+count = 120
+let = ["s0 = mod(i, 10)", "d = floor(i / 10) / 11", "ya = pick(s0, 0.47477, 0.37655, 0.34203, 0.23079, 0.17866, 0.5703, 0.40377, 0.27748, 0.26099, 0.13276)", "yb = pick(s0, 0.86323, 0.65787, 0.53647, 0.30286, 0.23059, 0.80571, 0.59704, 0.41128, 0.30182, 0.19243)", "wd = pick(s0, 0.15484, 0.08851, 0.06118, 0.03918, 0.02824, 0.128, 0.07704, 0.05333, 0.03491, 0.02378)", "on = s0 == 2 ? 1 - 0.85 * step(0.8, noise(time * 2.3)) : 1"]
+x = "pick(s0, -0.48516, -0.32681, -0.22588, -0.15837, -0.11412, 0.43429, 0.28444, 0.19692, 0.14109, 0.10595) + wd * 0.35 * (noise(time * 0.8 + i * 1.7) - 0.5)"
+y = "mix(ya, yb, d)"
+w = "wd * (0.35 + 0.6 * noise(time * 1.1 + i * 0.9))"
+h = "(yb - ya) / 12 * 0.45"
+color = "alpha(pick(s0, red, bright_yellow, bright_magenta, blue, bright_cyan, bright_cyan, accent, magenta, red, green), on * 0.32 * (1 - 0.7 * d))"
+
+# Wires across the street.
+[[scene.draw]]
+kind = "lines"
+samples = 24
+width = 0.0015
+sample_let = ["zz = mix(2.2, 3, s)", "yy = mix(-1.9, -1.75, s) + 0.15 * sin(s * pi)"]
+px = "mix(-1.15, 1.15, s) * 0.8 / zz"
+py = "-0.04 + yy * 0.8 / zz"
+color = "alpha(black, 0.7)"
+
+[[scene.draw]]
+kind = "lines"
+samples = 24
+width = 0.0015
+sample_let = ["zz = mix(3.6, 4.4, s)", "yy = mix(-1.7, -1.8, s) + 0.15 * sin(s * pi)"]
+px = "mix(-1.15, 1.15, s) * 0.8 / zz"
+py = "-0.04 + yy * 0.8 / zz"
+color = "alpha(black, 0.7)"
+
+[[scene.draw]]
+kind = "lines"
+samples = 24
+width = 0.0015
+sample_let = ["zz = mix(5.8, 6.6, s)", "yy = mix(-1.75, -1.6, s) + 0.15 * sin(s * pi)"]
+px = "mix(-1.15, 1.15, s) * 0.8 / zz"
+py = "-0.04 + yy * 0.8 / zz"
+color = "alpha(black, 0.7)"
+
+# A vending machine, glowing at the kerb.
+[[scene.draw]]
+kind = "lines"
+points = [[0.44267, 0.22667], [0.34051, 0.16513], [0.34051, -0.14256], [0.44267, -0.17333]]
+closed = true
+width = 0
+fill = "mix(night, ink, 0.25)"
+
+[[scene.draw]]
+kind = "lines"
+points = [[0.43117, -0.06597], [0.34764, -0.06094], [0.34764, -0.13215], [0.43117, -0.15429]]
+closed = true
+width = 0
+fill = "alpha(mix(ink, bright_cyan, 0.4), 0.8)"
+
+[[scene.draw]]
+kind = "rect"
+count = 12
+let = ["zz = mix(1.56, 1.89, (mod(i, 4) + 0.5) / 4)", "yy = 0.02 + floor(i / 4) * 0.1"]
+x = "0.83 * 0.8 / zz"
+y = "-0.04 + yy * 0.8 / zz"
+w = "0.0332 / sqr(zz)"
+h = "0.048 / zz"
+color = "pick(i, red, blue, bright_magenta, bright_yellow, magenta, bright_cyan, green, red, accent, bright_cyan, bright_yellow, blue)"
+
+# Two people with clear umbrellas, crossing the street far off.
+[[scene.draw]]
+kind = "group"
+count = 2
+let = ["wz = pick(i, 4.3, 6.6)", "pace = pick(i, 0.045, 0.032)", "dir = pick(i, 1, -1)", "wx = dir * (fract(time * pace / 2.6 + i * 0.4) * 2.6 - 1.3)"]
+x = "wx * 0.8 / wz"
+y = "-0.04 + 0.4 / wz"
+scale = "0.216 / wz"
+
+[[scene.draw.draw]]
+kind = "lines"
+count = 2
+samples = 2
+width = 0.07
+color = "mix(night, black, 0.6)"
+px = "(i - 0.5) * 0.12 + s * sin(time * 5 + i * 2) * 0.1 * (i * 2 - 1)"
+py = "-0.85 + s * 0.85"
+
+[[scene.draw.draw]]
+kind = "lines"
+samples = 20
+closed = true
+width = 0
+fill = "mix(night, black, 0.55)"
+px = "0.2 * cos(s * tau)"
+py = "-1.15 + 0.36 * sin(s * tau)"
+
+[[scene.draw.draw]]
+kind = "lines"
+samples = 16
+closed = true
+width = 0
+fill = "mix(night, black, 0.55)"
+px = "0.11 * cos(s * tau)"
+py = "-1.62 + 0.12 * sin(s * tau)"
+
+[[scene.draw.draw]]
+kind = "lines"
+samples = 2
+width = 0.02
+color = "alpha(white, 0.35)"
+px = "0.15"
+py = "-1.3 - s * 0.75"
+
+[[scene.draw.draw]]
+kind = "lines"
+samples = 24
+closed = true
+width = 0.012
+color = "alpha(white, 0.5)"
+fill = "alpha(white, 0.1)"
+px = "0.15 + 0.62 * cos(s * pi + pi)"
+py = "-2.02 + 0.42 * min(0, sin(s * pi + pi)) + 0.0"
+
+# Signs jutting from the walls, their neon lighting the rain. Being still, their glow is worked out once and kept.
+[[scene.draw]]
+kind = "group"
+glow = 1.6
+glow_radius = 0.01
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[-0.59355, -0.38581], [-0.56258, -0.38581]]
+width = "0.00619"
+color = "mix(night, black, 0.2)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[-0.56258, -0.4271], [-0.40774, -0.4271], [-0.40774, -0.03864], [-0.56258, -0.03864]]
+closed = true
+width = 0
+fill = "mix(red, black, 0.82)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[-0.54968, -0.41419], [-0.42065, -0.41419], [-0.42065, -0.05154], [-0.54968, -0.05154]]
+closed = true
+width = "0.00413"
+color = "red"
+
+[[scene.draw.draw]]
+kind = "text"
+font = "sign"
+text = "居\n酒\n屋"
+size = "0.096"
+line_height = 1.08
+align = "center"
+x = "-0.50916"
+y = "-0.38839"
+color = "mix(red, white, 0.35)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[-0.39149, -0.37021], [-0.37106, -0.37021]]
+width = "0.00409"
+color = "mix(night, black, 0.2)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[-0.37106, -0.39745], [-0.28255, -0.39745], [-0.28255, -0.11612], [-0.37106, -0.11612]]
+closed = true
+width = 0
+fill = "mix(bright_yellow, black, 0.82)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[-0.36255, -0.38894], [-0.29106, -0.38894], [-0.29106, -0.12464], [-0.36255, -0.12464]]
+closed = true
+width = "0.00272"
+color = "bright_yellow"
+
+[[scene.draw.draw]]
+kind = "text"
+font = "sign"
+text = "ラ\n｜\nメ\nン"
+size = "0.05488"
+line_height = 1.08
+align = "center"
+x = "-0.34053"
+y = "-0.37532"
+color = "mix(bright_yellow, white, 0.35)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[-0.18776, -0.20653], [-0.17796, -0.20653]]
+width = "0.00196"
+color = "mix(night, black, 0.2)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[-0.17796, -0.21959], [-0.13878, -0.21959], [-0.13878, -0.14753], [-0.17796, -0.14753]]
+closed = true
+width = 0
+fill = "mix(blue, black, 0.82)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[-0.17388, -0.21551], [-0.14286, -0.21551], [-0.14286, -0.15161], [-0.17388, -0.15161]]
+closed = true
+width = "0.00131"
+color = "blue"
+
+[[scene.draw.draw]]
+kind = "text"
+font = "sign"
+text = "焼\n鳥"
+size = "0.02429"
+line_height = 1.08
+align = "center"
+x = "-0.16444"
+y = "-0.2098"
+color = "mix(blue, white, 0.35)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[-0.13529, -0.18353], [-0.12824, -0.18353]]
+width = "0.00141"
+color = "mix(night, black, 0.2)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[-0.12824, -0.19294], [-0.1, -0.19294], [-0.1, -0.14101], [-0.12824, -0.14101]]
+closed = true
+width = 0
+fill = "mix(bright_cyan, black, 0.82)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[-0.12529, -0.19], [-0.10294, -0.19], [-0.10294, -0.14395], [-0.12529, -0.14395]]
+closed = true
+width = "0.00094"
+color = "bright_cyan"
+
+[[scene.draw.draw]]
+kind = "text"
+font = "sign"
+text = "喫\n茶"
+size = "0.01751"
+line_height = 1.08
+align = "center"
+x = "-0.11849"
+y = "-0.18588"
+color = "mix(bright_cyan, white, 0.35)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[0.52571, -0.392], [0.49829, -0.392]]
+width = "0.00549"
+color = "mix(night, black, 0.2)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[0.37029, -0.42857], [0.49829, -0.42857], [0.49829, -0.19315], [0.37029, -0.19315]]
+closed = true
+width = 0
+fill = "mix(bright_cyan, black, 0.82)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[0.38171, -0.41714], [0.48686, -0.41714], [0.48686, -0.20458], [0.38171, -0.20458]]
+closed = true
+width = "0.00366"
+color = "bright_cyan"
+
+[[scene.draw.draw]]
+kind = "text"
+font = "sign"
+text = "寿\n司"
+size = "0.07936"
+line_height = 1.08
+align = "center"
+x = "0.41445"
+y = "-0.39657"
+color = "mix(bright_cyan, white, 0.35)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[0.34074, -0.35704], [0.32296, -0.35704]]
+width = "0.00356"
+color = "mix(night, black, 0.2)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[0.24593, -0.38074], [0.32296, -0.38074], [0.32296, -0.18747], [0.24593, -0.18747]]
+closed = true
+width = 0
+fill = "mix(accent, black, 0.82)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[0.25333, -0.37333], [0.31556, -0.37333], [0.31556, -0.19488], [0.25333, -0.19488]]
+closed = true
+width = "0.00237"
+color = "accent"
+
+[[scene.draw.draw]]
+kind = "text"
+font = "sign"
+text = "営\n業\n中"
+size = "0.04776"
+line_height = 1.08
+align = "center"
+x = "0.2725"
+y = "-0.36148"
+color = "mix(accent, white, 0.35)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[0.2359, -0.26974], [0.22359, -0.26974]]
+width = "0.00246"
+color = "mix(night, black, 0.2)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[0.17026, -0.28615], [0.22359, -0.28615], [0.22359, -0.15235], [0.17026, -0.15235]]
+closed = true
+width = 0
+fill = "mix(magenta, black, 0.82)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[0.17538, -0.28103], [0.21846, -0.28103], [0.21846, -0.15748], [0.17538, -0.15748]]
+closed = true
+width = "0.00164"
+color = "magenta"
+
+[[scene.draw.draw]]
+kind = "text"
+font = "sign"
+text = "ゲ\n｜\nム"
+size = "0.03307"
+line_height = 1.08
+align = "center"
+x = "0.18866"
+y = "-0.27282"
+color = "mix(magenta, white, 0.35)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[0.16727, -0.22473], [0.15855, -0.22473]]
+width = "0.00175"
+color = "mix(night, black, 0.2)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[0.12364, -0.23636], [0.15855, -0.23636], [0.15855, -0.19553], [0.12364, -0.19553]]
+closed = true
+width = 0
+fill = "mix(red, black, 0.82)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[0.12727, -0.23273], [0.15491, -0.23273], [0.15491, -0.19917], [0.12727, -0.19917]]
+closed = true
+width = "0.00116"
+color = "red"
+
+[[scene.draw.draw]]
+kind = "text"
+font = "sign"
+text = "酒"
+size = "0.02164"
+line_height = 1.08
+align = "center"
+x = "0.13568"
+y = "-0.22764"
+color = "mix(red, white, 0.35)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[0.12432, -0.15568], [0.11784, -0.15568]]
+width = "0.0013"
+color = "mix(night, black, 0.2)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[0.09405, -0.16432], [0.11784, -0.16432], [0.11784, -0.10466], [0.09405, -0.10466]]
+closed = true
+width = 0
+fill = "mix(green, black, 0.82)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[0.09676, -0.16162], [0.11514, -0.16162], [0.11514, -0.10736], [0.09676, -0.10736]]
+closed = true
+width = "0.00086"
+color = "green"
+
+[[scene.draw.draw]]
+kind = "text"
+font = "sign"
+text = "B\nA\nR"
+size = "0.01475"
+line_height = 1.08
+align = "center"
+x = "0.10226"
+y = "-0.15838"
+color = "mix(green, white, 0.35)"
+
+[[scene.draw]]
+kind = "group"
+glow = 1.4
+glow_radius = 0.01
+
+# Red paper lanterns at the izakaya's door.
+[[scene.draw.draw]]
+kind = "lines"
+count = 2
+samples = 24
+closed = true
+width = 0
+let = ["lz = 1.9 + i * 0.32", "lx = -1.03 * 0.8 / lz", "ly = -0.04 + (-0.1 + 0.02 * sin(time * 0.8 + i)) * 0.8 / lz", "lr = 0.06 / lz"]
+px = "lx + lr * 0.8 * cos(s * tau)"
+py = "ly + lr * 1.15 * sin(s * tau)"
+fill = "mix(red, orange, 0.25)"
+
+[[scene.draw.draw]]
+kind = "rect"
+count = 6
+let = ["lz = 1.9 + floor(i / 3) * 0.32", "lr = 0.06 / lz", "band = mod(i, 3) - 1"]
+x = "-1.03 * 0.8 / lz"
+y = "-0.04 + (-0.1 + 0.02 * sin(time * 0.8 + floor(i / 3))) * 0.8 / lz + band * lr * 0.5"
+w = "lr * 1.45 * (1 - abs(band) * 0.25)"
+h = "lr * 0.06"
+color = "alpha(mix(red, black, 0.5), 0.8)"
+
+# The karaoke sign, its tube failing: its own glow, so the others' stays still.
+[[scene.draw]]
+kind = "group"
+glow = 1.6
+glow_radius = 0.01
+opacity = "1 - 0.85 * step(0.8, noise(time * 2.3)) - 0.3 * step(0.93, noise(time * 9.1 + 4))"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[-0.27059, -0.36235], [-0.25647, -0.36235]]
+width = "0.00282"
+color = "mix(night, black, 0.2)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[-0.25647, -0.38118], [-0.19529, -0.38118], [-0.19529, -0.18673], [-0.25647, -0.18673]]
+closed = true
+width = 0
+fill = "mix(bright_magenta, black, 0.82)"
+
+[[scene.draw.draw]]
+kind = "lines"
+points = [[-0.25059, -0.37529], [-0.20118, -0.37529], [-0.20118, -0.19262], [-0.25059, -0.19262]]
+closed = true
+width = "0.00188"
+color = "bright_magenta"
+
+[[scene.draw.draw]]
+kind = "text"
+font = "sign"
+text = "カ\nラ\nオ\nケ"
+size = "0.03793"
+line_height = 1.08
+align = "center"
+x = "-0.23536"
+y = "-0.36588"
+color = "mix(bright_magenta, white, 0.35)"
+
+# Drops swelling under every sign, then falling,
+[[scene.draw]]
+kind = "lines"
+count = 10
+samples = 2
+width = "0.009 / dz"
+visible = "rain > 0"
+let = ["dx = pick(i, -0.94, -0.96, -0.96, -0.97, -0.97, 0.95, 0.96, 0.96, 0.97, 0.98)", "dy = pick(i, 0.00264, -0.22362, -0.62362, -0.65859, -0.85859, -0.33502, -0.49771, -0.54771, -1.0693, -0.59806)", "dz = pick(i, 1.55, 2.35, 3.4, 4.9, 6.8, 1.75, 2.7, 3.9, 5.5, 7.4)", "period = 1.6 + 1.4 * hash(i * 5.3)", "age = mod(time + hash(i * 8.1) * 9, period)", "fall = sqrt(2 * (0.5 - dy) / 9)", "swell = clamp(age / (period - fall), 0, 1)", "fy = age < period - fall ? dy + 0.02 * swell : dy + 0.02 + 4.5 * sqr(age - period + fall)", "len = age < period - fall ? 0.015 : 0.06"]
+px = "dx * 0.8 / dz"
+py = "-0.04 + (fy - len * s) * 0.8 / dz"
+color = "alpha(mix(pick(i, red, bright_yellow, bright_magenta, blue, bright_cyan, bright_cyan, accent, magenta, red, green), white, 0.5), 0.85)"
+
+# and landing in rings.
+[[scene.draw]]
+kind = "lines"
+count = 20
+samples = 20
+closed = true
+width = 0.0012
+let = ["dx = pick(mod(i, 10), -0.94, -0.96, -0.96, -0.97, -0.97, 0.95, 0.96, 0.96, 0.97, 0.98)", "dy = pick(mod(i, 10), 0.00264, -0.22362, -0.62362, -0.65859, -0.85859, -0.33502, -0.49771, -0.54771, -1.0693, -0.59806)", "dz = pick(mod(i, 10), 1.55, 2.35, 3.4, 4.9, 6.8, 1.75, 2.7, 3.9, 5.5, 7.4)", "period = 1.6 + 1.4 * hash(i * 5.3)", "age = mod(time + hash(i * 8.1) * 9, period)", "fall = sqrt(2 * (0.5 - dy) / 9)", "since = age", "ring = floor(i / 10)", "gr = (0.04 + 0.1 * since) * (1 - ring * 0.4)"]
+sample_let = ["zz = dz + gr * sin(s * tau)"]
+px = "(dx + gr * cos(s * tau)) * 0.8 / zz"
+py = "-0.04 + 0.4 / zz"
+visible = "rain > 0 && since < 0.9"
+color = "alpha(mix(pick(mod(i, 10), red, bright_yellow, bright_magenta, blue, bright_cyan, bright_cyan, accent, magenta, red, green), white, 0.4), 0.6 * (1 - since / 0.9))"
+
+# Rain, falling at many depths.
+[[scene.draw]]
+kind = "lines"
+count = 260
+samples = 2
+width = 0.0012
+let = ["rz = 1.0 + 8 * hash(i * 1.37)", "rx = (hash(i * 4.11) * 2 - 1) * 1.5", "fall = fract(time * (0.9 + 0.3 * hash(i * 2.2)) + hash(i * 9.7))", "ry = -2.6 + fall * 3.1"]
+px = "(rx - s * 0.04) * 0.8 / rz"
+py = "-0.04 + (ry - s * 0.22) * 0.8 / rz"
+visible = "ry < 0.5 && hash(i * 5.9) < rain"
+color = "alpha(mix(ink, mix(blue, bright_cyan, 0.5), 0.35), 0.18 + 0.25 / rz)"
+
+# Rings where it lands.
+[[scene.draw]]
+kind = "lines"
+count = 40
+samples = 16
+closed = true
+width = 0.001
+visible = "hash(i * 4.2) < rain"
+let = ["gz = 1.2 + 7 * hash(i * 3.9)", "gx = (hash(i * 6.2) * 2 - 1) * 1.05", "age = fract(time * 0.8 + hash(i * 2.7))", "gr = 0.09 * age"]
+sample_let = ["zz = gz + gr * sin(s * tau)"]
+px = "(gx + gr * cos(s * tau)) * 0.8 / zz"
+py = "-0.04 + 0.4 / zz"
+color = "alpha(mix(ink, mix(blue, bright_cyan, 0.5), 0.4), 0.35 * (1 - age))"
