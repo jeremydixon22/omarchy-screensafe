@@ -1,12 +1,42 @@
-# ScreenSafe
+<p align="center">
+  <img src="docs/gallery/shield.png" width="96" alt="ScreenSafe's shield">
+</p>
 
-Screensavers for [Omarchy](https://omarchy.org) made of data, not code: ASCII art, line art, text and images, drawn sharp on every screen, in your theme's colors.
+<h1 align="center">ScreenSafe</h1>
+
+<p align="center">
+  <b>Screensavers for <a href="https://omarchy.org">Omarchy</a>, made of data, not code.</b><br>
+  ASCII art, line art, glowing curves, neon streets and pixel kingdoms: drawn sharp on every screen, in your theme's colors.
+</p>
+
+<p align="center">
+  <a href="https://github.com/jeremydixon22/omarchy-screensafe/actions/workflows/ci.yml"><img src="https://github.com/jeremydixon22/omarchy-screensafe/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/version-0.4.7-9ece6a" alt="Version 0.4.7">
+  <img src="https://img.shields.io/badge/Omarchy-4-9ece6a" alt="Omarchy 4">
+  <img src="https://img.shields.io/badge/license-MIT-9ece6a" alt="MIT license">
+</p>
 
 ![ScreenSafe's Harmonograph pack, and the ScreenSafe panel with Harmonograph chosen and open](preview.png)
 
-A screensaver here is a **pack**: a folder holding a `screensafe.toml` and its art. A pack can describe text and ASCII art, lines, curves and turning wireframes, glowing or not, and images, in ScreenSafe's font or its own. It can animate them with small formulas such as `sin(t * 2)`, written in a language that can't loop, read files or reach the network. ScreenSafe draws the pack itself. Nothing in a pack ever runs as a program, so a pack from someone else can't do any more than draw pictures.
+A screensaver in ScreenSafe is a **pack**: a folder with a `screensafe.toml` and its art. A pack describes what to draw and how it moves, with small formulas like `sin(t * 2)` in a language that can't loop, read files or reach the network. ScreenSafe draws the pack itself, and nothing in a pack ever runs as a program, **so a pack from someone else can only describe pictures.**
 
-ScreenSafe draws on Wayland's overlay layer rather than in a terminal: on every screen, over the desktop, its windows and the bar. The art is drawn at your screen's full resolution, at any scale, and a frame that hasn't changed isn't drawn again.
+- **Fourteen packs built in**, from a harmonograph's glowing figures to a rainy Tokyo side street.
+- **Your theme, everywhere.** Packs draw in the current theme's palette, and a theme can bring a pack of its own.
+- **Sharp at any size.** Drawn on Wayland's overlay layer at your screen's full resolution, on every screen.
+- **Settings without code.** Packs can offer a speed, a density or a picture; change them in the panel and watch the pack update live.
+- **Made to be safe.** A sandboxed renderer, a checked format, and a flash limit no pack can get past.
+
+## The packs
+
+| | | |
+|:---:|:---:|:---:|
+| ![Harmonograph](docs/gallery/harmonograph.webp)<br>**Harmonograph**<br><sub>Two pendulums draw a glowing figure that winds inwards, a new one each time round.</sub> | ![Tokyo Drip](docs/gallery/tokyo-drip.webp)<br>**Tokyo Drip**<br><sub>A rainy side street at night: neon signs, lanterns and an LED screen.</sub> | ![Distro Wars](docs/gallery/distro-wars.webp)<br>**Distro Wars**<br><sub>A parody of a popular God-game. The Omarch King's settlements fly Omarchy green, until segfault and Dependency Hell strike.</sub> |
+| ![Omnipotence](docs/gallery/omnipotence.webp)<br>**Omnipotence**<br><sub>Figures drawn over the lines of code that draw them, until the Hand of Omnipotence turns the page.</sub> | ![Fibonacci](docs/gallery/fibonacci.webp)<br>**Fibonacci**<br><sub>The sequence in pictures: squares and spirals, a sunflower, rabbits, Pascal's triangle.</sub> | ![Trying To Remember](docs/gallery/trying-to-remember.webp)<br>**Trying To Remember**<br><sub>Thoughts wander through a fog of half-remembered ones, each reaching for an idea just out of reach.</sub> |
+| ![Starfield](docs/gallery/starfield.webp)<br>**Starfield**<br><sub>Flying through stars that streak past as they come close.</sub> | ![Cascade](docs/gallery/cascade.webp)<br>**Cascade**<br><sub>Columns of ever-changing digits falling down the screen.</sub> | ![Constellations](docs/gallery/constellations.webp)<br>**Constellations**<br><sub>Drifting stars, joined by faint lines whenever two pass close.</sub> |
+| ![Echoes](docs/gallery/echoes.webp)<br>**Echoes**<br><sub>Two shapes bouncing around the screen, trailing echoes of where they've been.</sub> | ![Orbits](docs/gallery/orbits.webp)<br>**Orbits**<br><sub>The Omarchy box turning in its orbits, then a slowly changing Lissajous figure.</sub> | ![Badge](docs/gallery/badge.webp)<br>**Badge**<br><sub>ScreenSafe's shield, the Omarchy mark or your own badge: bouncing, shattering, waving and in orbit, smoothly or as pixel art.</sub> |
+| ![Omarchy](docs/gallery/omarchy.webp)<br>**Omarchy**<br><sub>Your screensaver art from <i>Style › Screensaver</i>, revealed a different way each time.</sub> | ![Theme backgrounds](docs/gallery/backgrounds.webp)<br>**Theme backgrounds**<br><sub>Your theme's own backgrounds, one after another, drifting slowly across the screen.</sub> | |
+
+<sub>Frames from the renderer at each pack's own preview moment, in Tokyo Night, Omarchy's default theme, with its first background and Omarchy's own screensaver art. To show your own badge in Badge, put an image at <code>~/.config/omarchy/screensafe/badge.png</code> (or <code>.webp</code>, <code>.jpg</code> or <code>.jpeg</code>).</sub>
 
 ## Install
 
@@ -15,21 +45,27 @@ omarchy plugin add https://github.com/jeremydixon22/omarchy-screensafe
 omarchy plugin enable io.github.jeremydixon22.screensafe
 ```
 
-Enabling puts ScreenSafe's shield in the bar, in your theme's accent. Nothing changes until you turn ScreenSafe on: Omarchy's own screensaver stays in use until then.
+ScreenSafe's shield appears in the bar, in your theme's accent. Nothing changes until you switch it on: Omarchy's own screensaver stays in use until then.
 
-ScreenSafe needs Omarchy 4, on an x86-64 or 64-bit ARM computer. It has been tested on Omarchy 4.0.4 with Hyprland 0.56 and Quickshell 0.3.1 on x86-64; the ARM build has been tested under emulation, drawing identical frames.
+ScreenSafe needs Omarchy 4 on an x86-64 or 64-bit ARM computer, and nothing else. It's tested on Omarchy 4.0.4 with Hyprland 0.56 and Quickshell 0.3.1 on x86-64; the ARM build is tested under emulation, drawing identical frames.
 
 ## Use
 
-Click the icon in the bar:
+Click the shield in the bar.
 
-- **Enable**, beside the tabs: show ScreenSafe instead of Omarchy's screensaver when you're idle. Right-clicking the icon does the same.
-- **After … idle**, at the top right: how long you're idle before it shows. It follows Omarchy's screensaver time until you choose your own with **−** and **+** (or the arrow keys), from 1 minute to an hour; step back below 1 minute to follow Omarchy's again. Omarchy's own setting isn't changed. Point at it to see whose time it is and when Omarchy locks. If anything stops ScreenSafe showing, such as Omarchy locking first, a note says so at the bottom of the panel.
-- **Pack**: which screensaver to show. **Automatic** shows the current theme's pack if it has one, and the Omarchy pack otherwise. Rest on a pack, with the pointer or the arrow keys, and its row opens to show a thumbnail of it in your theme's colors, beside what it shows; the chosen pack is ticked. Click a pack's ☆, or press `f`, to make it a favorite: favorites are listed first, by name. A pack with settings has a ⚙: click it, or press → or `s` on its row, to change them. The page shows the pack running live as you change them; turn **Live preview** off for a still thumbnail and the usual Preview.
-- **Preview**, at the bottom of the panel: show the chosen pack now. Any key, click, touch or mouse movement closes it.
-- **About**, the panel's second tab: links to this page, to the catalog of packs others have made (**Find a screensaver**), to how to make a screensaver (with the agent skill), and to how to share one.
+| | |
+|---|---|
+| **Enable** | Show ScreenSafe instead of Omarchy's screensaver when you're idle. Right-clicking the shield does the same. |
+| **After … idle** | How long you're idle before it shows. It follows Omarchy's screensaver time until you choose your own with **−** and **+** (or the arrow keys), from 1 minute to an hour; step back below 1 minute to follow Omarchy's again. Point at it to see whose time it is and when Omarchy locks. |
+| **Pack** | Which screensaver to show. **Automatic** shows the current theme's pack if it has one, and the Omarchy pack otherwise. Rest on a pack and its row opens with a thumbnail in your theme's colors. Press `f` or click ☆ to make it a favorite, listed first. |
+| **⚙ Settings** | For a pack that has them: click ⚙, or press → or `s` on its row. The page shows the pack running live as you change them; turn **Live preview** off for a still thumbnail and the usual Preview. |
+| **Preview** | Show the chosen pack now. Any key, click, touch or mouse movement closes it. |
+| **About** | Links to this page, to the [catalog of packs others have made](https://github.com/jeremydixon22/omarchy-screensafe-packs), and to guides for making and sharing your own. |
 
-From a terminal or a key binding:
+If anything stops ScreenSafe showing, such as Omarchy locking first, a note at the bottom of the panel says so.
+
+<details>
+<summary><b>From a terminal or a key binding</b></summary>
 
 ```sh
 omarchy-shell screensafe preview
@@ -40,7 +76,10 @@ omarchy-shell screensafe favorite PATH # star or unstar a pack the panel lists
 omarchy-shell screensafe status
 ```
 
-### With Omarchy's own screensaver
+</details>
+
+<details>
+<summary><b>How it works with Omarchy's own screensaver</b></summary>
 
 While **Enable** is on, ScreenSafe switches Omarchy's screensaver off and opens its own when Omarchy's would have opened. Turning it off, disabling the plugin or removing it switches Omarchy's back on. If you had already switched Omarchy's screensaver off yourself, ScreenSafe leaves it as you set it.
 
@@ -57,42 +96,39 @@ The **Screensaver** entry in Omarchy's menu always opens Omarchy's own screensav
 
 If the shell stops while ScreenSafe holds Omarchy's screensaver off, Omarchy's stays off until ScreenSafe next loads, or until you remove `~/.local/state/omarchy/toggles/screensaver-off`.
 
-## Packs
+</details>
 
-ScreenSafe comes with fourteen:
+## More packs
 
-- **Omarchy**: your screensaver art from *Style > Screensaver*, revealed a different way each time, in the theme's colors.
-- **Orbits**: the Omarchy box, its mark on two sides, turning in its orbits; then a slowly changing Lissajous figure.
-- **Theme backgrounds**: your theme's own backgrounds, one after another, drifting slowly across the screen.
-- **Starfield**: flying through stars that streak past as they come close.
-- **Echoes**: two shapes bouncing around the screen, trailing echoes of where they've been.
-- **Cascade**: columns of ever-changing digits falling down the screen.
-- **Harmonograph**: two pendulums drawing a glowing figure that winds inwards, a new one each time round.
-- **Constellations**: drifting stars, joined by faint lines whenever two pass close.
-- **Trying To Remember**: aimless thoughts wandering through a fog of half-remembered ones, each reaching for an idea that glows just out of reach.
-- **Distro Wars**: a parody of a popular God-game. The Omarch King defends his realm from rivals. One by one, settlements fly Omarchy green. Eventually, disaster strikes in the form of segfault and Dependency Hell.
-- **Omnipotence**: figures drawn over the very lines of code that draw them, each line lighting up as it works, until the Hand of Omnipotence turns the page.
-- **Fibonacci**: the sequence in pictures: squares and their spiral, a sunflower, generations of rabbits, Pascal's triangle, the golden ratio, and the Fibonacci word fractal.
-- **Tokyo Drip**: a rainy Tokyo side street at night: neon signs, lanterns and an LED screen, as rain drips onto the wet street, in your theme's colors.
-- **Badge**: ScreenSafe's shield or the Omarchy mark, or your own badge, bouncing, shattering, waving and in orbit, smoothly or as pixel art in your theme's colors. To show yours, put an image at `~/.config/omarchy/screensafe/badge.png` (or `.webp` or `.jpg`).
+- **Find one:** see [the ScreenSafe pack catalog](https://github.com/jeremydixon22/omarchy-screensafe-packs) for community listings and the current submission status.
+- **From a theme:** a theme can ship a pack in a `screensafe` folder next to its `colors.toml`. Omarchy keeps that folder when it installs the theme, since it's only data, and **Automatic** shows it while that theme is in use.
+- **Your own:** put a pack folder in `~/.config/omarchy/screensafe/packs/`, and it appears in the panel the next time you open it.
 
-**From a theme:** a theme can ship a pack in a `screensafe` folder next to its `colors.toml`. Omarchy keeps that folder when it installs the theme, since it's only data, and ScreenSafe shows it while that theme is in use.
+## Make your own
 
-**Your own:** put a pack folder in `~/.config/omarchy/screensafe/packs/`, and it appears in the panel the next time you open it.
+Start with [Making a screensaver](docs/MAKING.md); the format is in [Making packs](docs/PACKS.md) and [Expressions](docs/EXPRESSIONS.md). The built-in packs in [`packs/`](packs) are worked examples.
 
-To make a pack, start with [Making a screensaver](docs/MAKING.md); the format is in [Making packs](docs/PACKS.md) and [Expressions](docs/EXPRESSIONS.md). If you work with a coding agent, [`skills/screensafe-packs`](skills/screensafe-packs/SKILL.md) is an agent skill (a `SKILL.md`) that walks it through making, checking and sharing packs: link that folder into your agent's skills folder, such as `~/.claude/skills/`. The renderer checks a pack and reports anything wrong, line by line:
+**With a coding agent:** [`skills/screensafe-packs`](skills/screensafe-packs/SKILL.md) is an agent skill that walks your agent through making, checking and sharing a pack. Link it into your agent's skills folder, such as `~/.claude/skills/`, and describe the screensaver you want.
+
+The renderer checks a pack line by line, measures its cost and its flashing, and renders any frame:
 
 ```sh
-~/.config/omarchy/plugins/io.github.jeremydixon22.screensafe/bin/screensafe-$(uname -m) check path/to/pack
+screensafe=~/.config/omarchy/plugins/io.github.jeremydixon22.screensafe/bin/screensafe-$(uname -m)
+$screensafe check path/to/pack
+$screensafe render path/to/pack --time 12 --out /tmp/frame.png
 ```
+
+To share it, see [Community packs](docs/COMMUNITY.md).
 
 ## Safety
 
 - **Packs are data.** The format has no way to run a program, open a file outside its own folder, reach the network or loop without end. Everything a pack asks for is checked and compiled before it's shown, and every per-frame cost is bounded.
-- **The renderer confines itself.** Before reading a pack it can only read the packs, theme and art it was given; after loading it, it gives up all file access. It can never reach the network or start programs. This uses Linux's Landlock, wherever the kernel supports it.
+- **The renderer confines itself.** Before reading a pack it can only read the packs, theme and art it was given; after loading it, it gives up all file access. It can never reach the network or start programs. This uses Linux's Landlock, and the renderer refuses to read a pack if the kernel can't confine it.
 - **Flashing is limited.** The renderer measures every frame and won't show more than three large-area flashes a second, the WCAG 2.2 limit for photosensitivity, whatever a pack asks for.
+- **Stalled frames are stopped.** If drawing a frame stalls for about five seconds, the renderer exits and ScreenSafe falls back to the built-in pack.
+- **The binaries are checkable.** Both renderers are built reproducibly from [`renderer/`](renderer), and CI attests each one; see [how to rebuild and compare them](docs/BINARY-PROVENANCE.md).
 
-See [SECURITY.md](SECURITY.md) for the details and how to report a problem.
+[SECURITY.md](SECURITY.md) has the details and how to report a problem; [Notes for reviewers](docs/REVIEW-NOTES.md) lists everything ScreenSafe runs and writes.
 
 ## Remove
 
@@ -105,8 +141,8 @@ Removing the plugin switches Omarchy's screensaver back on if ScreenSafe had swi
 ## What's inside
 
 - `Service.qml`, `Panel.qml` and `ShieldMark.qml`: the plugin. They start only ScreenSafe's own renderer and Omarchy's `omarchy-shell` (to ask whether the session is locked).
-- `bin/screensafe-x86_64` and `bin/screensafe-aarch64`: the renderer, static Linux executables built reproducibly from [`renderer/`](renderer). The plugin runs the one for your machine. See [how to rebuild them and check that they match](docs/BINARY-PROVENANCE.md).
-- `packs/`: the built-in packs.
+- `bin/screensafe-x86_64` and `bin/screensafe-aarch64`: the renderer, static Linux executables built reproducibly from [`renderer/`](renderer). The plugin runs the one for your machine.
+- `packs/`: the built-in packs, and `tools/`: the generators for the larger ones.
 - `skills/screensafe-packs/`: instructions for coding agents that make packs. The plugin doesn't install or read them.
 
 The renderer embeds [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) (SIL Open Font License 1.1) and uses the Rust libraries listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). It needs nothing else at run time.
