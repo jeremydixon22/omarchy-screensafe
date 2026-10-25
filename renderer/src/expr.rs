@@ -2,8 +2,8 @@
 //!
 //! An expression is a pure, total function of the names in scope: it cannot loop, recurse, define functions,
 //! read or write anything outside its slots, or fail at run time. Every arithmetic result that is not finite
-//! becomes 0. Expressions are type-checked when a pack loads and compiled to a flat list of stack operations
-//! whose length is the expression's cost; nothing is ever compiled to native code.
+//! becomes 0. Expressions are type-checked when a pack loads and compiled to bounded interpreted instructions.
+//! Admission costs are measured before optimization; generated branches only go forward. Nothing is native code.
 
 use std::collections::HashMap;
 use std::fmt;
@@ -64,11 +64,19 @@ impl fmt::Display for Error {
 #[derive(Clone, Default)]
 pub struct Scope {
     names: HashMap<String, (u16, Ty)>,
+    /// Values fixed for this loaded pack (settings, palette and constant local bindings).
+    constants: HashMap<u16, f64>,
     /// Names that exist elsewhere but not here, with why.
     reserved: HashMap<String, &'static str>,
 }
 
 impl Scope {
+    pub fn freeze(&mut self, slot: u16, values: &[f64]) {
+        for (i, value) in values.iter().enumerate() {
+            self.constants.insert(slot + i as u16, *value);
+        }
+    }
+
     pub fn bind(&mut self, name: &str, slot: u16, ty: Ty) {
         self.names.insert(name.to_string(), (slot, ty));
     }
@@ -503,6 +511,23 @@ enum Op {
     Load4(u16),
     F1(F1),
     F2(F2),
+    /// Fused operands avoid separate load/constant dispatch and intermediate stack traffic.
+    UnarySlot(F1, u16),
+    /// Preserve both operations and their finite-result boundaries while avoiding stack round trips.
+    UnaryBinary(F1, F2),
+    UnaryBinarySlots(F1, F2, u16, u16),
+    UnarySlotConstant(F1, F2, u16, f64, bool),
+    UnaryStackConstant(F1, F2, f64, bool),
+    UnaryStackSlot(F1, F2, u16, bool),
+    UnaryUnary(F1, F1),
+    UnaryUnarySlot(F1, F1, u16),
+    SeededConstant(f64),
+    BinarySlots(F2, u16, u16),
+    BinarySlotConstant(F2, u16, f64, bool),
+    BinaryRightConstant(F2, f64),
+    BinaryLeftConstant(F2, f64),
+    BinaryRightSlot(F2, u16),
+    BinaryLeftSlot(F2, u16),
     Clamp,
     Mix,
     MixColor,
@@ -512,6 +537,10 @@ enum Op {
     Max(u8),
     /// cond, a, b -> a or b, each `lanes` wide.
     Select(u8),
+    /// Pop the condition; skip forward over the first arm and its jump when false. Compiler-generated only.
+    BranchFalse(usize),
+    /// Skip forward over the other arm. There are no backward branches.
+    Jump(usize),
     /// index, then `count` options each `lanes` wide.
     Pick(u8, u8),
     /// x, then `pairs` (x, y) pairs.
@@ -526,13 +555,292 @@ pub struct Program {
     ops: Vec<Op>,
     pub ty: Ty,
     max_stack: usize,
+    /// Keep the original conservative admission cost even when optimization removes work.
+    source_cost: usize,
+    /// The raw stack result, before the usual numeric/color result normalization.
+    constant: Option<Vec<f64>>,
 }
 
 impl Program {
-    /// The number of operations one evaluation performs.
+    /// Conservative expression work before optimization, retained for admission checks.
     pub fn cost(&self) -> usize {
-        self.ops.len()
+        self.source_cost
     }
+
+    pub fn inputs(&self) -> impl Iterator<Item = u16> + '_ {
+        self.ops
+            .iter()
+            .flat_map(|op| {
+                if self.constant.is_some() {
+                    return [None; 4];
+                }
+                match *op {
+                    Op::Load(s)
+                    | Op::UnarySlot(_, s)
+                    | Op::BinarySlotConstant(_, s, _, _)
+                    | Op::BinaryRightSlot(_, s)
+                    | Op::BinaryLeftSlot(_, s)
+                    | Op::UnarySlotConstant(_, _, s, _, _)
+                    | Op::UnaryStackSlot(_, _, s, _)
+                    | Op::UnaryUnarySlot(_, _, s) => [Some(s), None, None, None],
+                    Op::Load4(s) => [Some(s), Some(s + 1), Some(s + 2), Some(s + 3)],
+                    Op::BinarySlots(_, a, b) | Op::UnaryBinarySlots(_, _, a, b) => [Some(a), Some(b), None, None],
+                    _ => [None; 4],
+                }
+            })
+            .flatten()
+    }
+
+    pub fn constant_values(&self) -> Option<Vec<f64>> {
+        self.constant.as_ref().map(|values| {
+            values
+                .iter()
+                .map(|v| {
+                    let v = fin(*v);
+                    if self.ty == Ty::Color {
+                        v.clamp(0.0, 1.0)
+                    } else {
+                        v
+                    }
+                })
+                .collect()
+        })
+    }
+}
+
+/// Each fragment holds whole scalar/color values; typed bytecode never splits a color's four lanes.
+struct Fragment {
+    ops: Vec<Op>,
+    value: Option<Vec<f64>>,
+    lanes: usize,
+}
+
+fn take_fragment(stack: &mut Vec<Fragment>, lanes: usize) -> Fragment {
+    let (mut start, mut found) = (stack.len(), 0);
+    while found < lanes {
+        start -= 1;
+        found += stack[start].lanes;
+    }
+    assert_eq!(found, lanes, "typed expression values stay whole");
+    let mut out = Fragment { ops: Vec::new(), value: Some(Vec::new()), lanes };
+    for fragment in stack.drain(start..) {
+        out.ops.extend(fragment.ops);
+        match (&mut out.value, fragment.value) {
+            (Some(values), Some(more)) => values.extend(more),
+            _ => out.value = None,
+        }
+    }
+    out
+}
+
+/// Fold using the interpreter's operations and finite-result rules; never reassociate floating-point arithmetic.
+fn optimize(program: &mut Program, known: &HashMap<u16, f64>) {
+    let mut slots = vec![0.0; known.keys().max().map_or(0, |slot| *slot as usize + 1)];
+    for (slot, value) in known {
+        slots[*slot as usize] = *value;
+    }
+    let mut machine = Machine::new(0);
+    let mut stack = Vec::new();
+    for op in std::mem::take(&mut program.ops) {
+        let fragment = match op {
+            Op::Const(value) => Fragment { ops: vec![op], value: Some(vec![value]), lanes: 1 },
+            Op::Load(slot) => match known.get(&slot) {
+                Some(value) => Fragment { ops: vec![Op::Const(*value)], value: Some(vec![*value]), lanes: 1 },
+                None => Fragment { ops: vec![op], value: None, lanes: 1 },
+            },
+            Op::Load4(slot) => Fragment { ops: vec![op], value: (0..4).map(|i| known.get(&(slot + i)).copied()).collect(), lanes: 4 },
+            Op::F1(f) => {
+                let mut argument = take_fragment(&mut stack, 1);
+                if let Some(value) = &argument.value {
+                    if f == F1::Rand {
+                        argument.ops = vec![Op::SeededConstant(value[0])];
+                        argument.value = None;
+                    } else {
+                        let value = apply1(f, value[0], 0);
+                        argument.ops = vec![Op::Const(value)];
+                        argument.value = Some(vec![value]);
+                    }
+                } else if let [Op::Load(slot)] = argument.ops.as_slice() {
+                    argument.ops = vec![Op::UnarySlot(f, *slot)];
+                } else {
+                    let fused = if extra_fusion_enabled() {
+                        argument.ops.last().and_then(|last| {
+                            Some(match *last {
+                                Op::F2(binary) => Op::UnaryBinary(f, binary),
+                                Op::BinarySlots(binary, a, b) => Op::UnaryBinarySlots(f, binary, a, b),
+                                Op::BinarySlotConstant(binary, slot, value, reverse) => Op::UnarySlotConstant(f, binary, slot, value, reverse),
+                                Op::BinaryRightConstant(binary, value) => Op::UnaryStackConstant(f, binary, value, false),
+                                Op::BinaryLeftConstant(binary, value) => Op::UnaryStackConstant(f, binary, value, true),
+                                Op::BinaryRightSlot(binary, slot) => Op::UnaryStackSlot(f, binary, slot, false),
+                                Op::BinaryLeftSlot(binary, slot) => Op::UnaryStackSlot(f, binary, slot, true),
+                                Op::F1(inner) => Op::UnaryUnary(f, inner),
+                                Op::UnarySlot(inner, slot) => Op::UnaryUnarySlot(f, inner, slot),
+                                _ => return None,
+                            })
+                        })
+                    } else {
+                        None
+                    };
+                    if let Some(fused) = fused {
+                        *argument.ops.last_mut().unwrap() = fused;
+                    } else {
+                        argument.ops.push(op);
+                    }
+                }
+                argument
+            }
+            Op::F2(f) => {
+                let mut b = take_fragment(&mut stack, 1);
+                let mut a = take_fragment(&mut stack, 1);
+                let fixed = |value: &Option<Vec<f64>>, expected: bool| value.as_ref().is_some_and(|v| truth(v[0]) == expected);
+                if (f == F2::And && (fixed(&a.value, false) || fixed(&b.value, false))) || (f == F2::Or && (fixed(&a.value, true) || fixed(&b.value, true))) {
+                    let value = flag(f == F2::Or);
+                    Fragment { ops: vec![Op::Const(value)], value: Some(vec![value]), lanes: 1 }
+                } else if let (Some(av), Some(bv)) = (&a.value, &b.value) {
+                    let value = apply2(f, av[0], bv[0]);
+                    Fragment { ops: vec![Op::Const(value)], value: Some(vec![value]), lanes: 1 }
+                } else {
+                    let ops = match (a.ops.as_slice(), b.ops.as_slice()) {
+                        ([Op::Load(left)], [Op::Load(right)]) => vec![Op::BinarySlots(f, *left, *right)],
+                        ([Op::Load(slot)], _) if b.value.is_some() => vec![Op::BinarySlotConstant(f, *slot, b.value.as_ref().unwrap()[0], false)],
+                        (_, [Op::Load(slot)]) if a.value.is_some() => vec![Op::BinarySlotConstant(f, *slot, a.value.as_ref().unwrap()[0], true)],
+                        _ if b.value.is_some() => {
+                            a.ops.push(Op::BinaryRightConstant(f, b.value.as_ref().unwrap()[0]));
+                            a.ops
+                        }
+                        _ if a.value.is_some() => {
+                            b.ops.push(Op::BinaryLeftConstant(f, a.value.as_ref().unwrap()[0]));
+                            b.ops
+                        }
+                        (_, [Op::Load(slot)]) => {
+                            a.ops.push(Op::BinaryRightSlot(f, *slot));
+                            a.ops
+                        }
+                        ([Op::Load(slot)], _) => {
+                            b.ops.push(Op::BinaryLeftSlot(f, *slot));
+                            b.ops
+                        }
+                        _ => {
+                            a.ops.extend(b.ops);
+                            a.ops.push(op);
+                            a.ops
+                        }
+                    };
+                    Fragment { ops, value: None, lanes: 1 }
+                }
+            }
+            Op::Select(lanes) => {
+                let b = take_fragment(&mut stack, lanes as usize);
+                let a = take_fragment(&mut stack, lanes as usize);
+                let mut condition = take_fragment(&mut stack, 1);
+                if let Some(value) = condition.value {
+                    if truth(value[0]) {
+                        a
+                    } else {
+                        b
+                    }
+                } else {
+                    condition.ops.push(Op::BranchFalse(a.ops.len() + 1));
+                    condition.ops.extend(a.ops);
+                    condition.ops.push(Op::Jump(b.ops.len()));
+                    condition.ops.extend(b.ops);
+                    Fragment { ops: condition.ops, value: None, lanes: lanes as usize }
+                }
+            }
+            _ => {
+                let (popped, lanes) = match op {
+                    Op::F1(_) => (1, 1),
+                    Op::F2(_) => (2, 1),
+                    Op::Clamp | Op::Mix | Op::Smoothstep => (3, 1),
+                    Op::Remap => (5, 1),
+                    Op::MixColor => (9, 4),
+                    Op::Min(n) | Op::Max(n) => (n as usize, 1),
+                    Op::Pick(n, lanes) => (1 + n as usize * lanes as usize, lanes as usize),
+                    Op::Interp(n) => (1 + 2 * n as usize, 1),
+                    Op::Rgba => (4, 4),
+                    Op::Hsv => (3, 4),
+                    Op::Alpha => (5, 4),
+                    _ => unreachable!("optimizer consumes original typed bytecode"),
+                };
+                let mut fragment = take_fragment(&mut stack, popped);
+                fragment.ops.push(op);
+                // rand() is pure, but its run seed is deliberately not fixed when a pack loads.
+                if fragment.value.is_some() && op != Op::F1(F1::Rand) {
+                    let temporary =
+                        Program { ops: fragment.ops.clone(), ty: program.ty, max_stack: program.max_stack, source_cost: program.source_cost, constant: None };
+                    machine.run(&temporary, &slots);
+                    let values = machine.stack.clone();
+                    assert_eq!(values.len(), lanes);
+                    // Do not expand a one-instruction color load into four instructions.
+                    if lanes <= fragment.ops.len() {
+                        fragment.ops = values.iter().copied().map(Op::Const).collect();
+                    }
+                    fragment.value = Some(values);
+                } else {
+                    fragment.value = None;
+                }
+                fragment.lanes = lanes;
+                fragment
+            }
+        };
+        stack.push(fragment);
+    }
+    let result = take_fragment(&mut stack, program.ty.lanes());
+    assert!(stack.is_empty());
+    program.ops = result.ops;
+    program.constant = result.value;
+}
+
+#[cfg(test)]
+thread_local! { static OPTIMIZE: std::cell::Cell<bool> = const { std::cell::Cell::new(true) }; }
+
+pub(crate) fn optimizations_enabled() -> bool {
+    #[cfg(test)]
+    {
+        OPTIMIZE.get()
+    }
+    #[cfg(not(test))]
+    {
+        true
+    }
+}
+
+#[cfg(test)]
+thread_local! { static EXTRA_FUSION: std::cell::Cell<bool> = const { std::cell::Cell::new(true) }; }
+
+fn extra_fusion_enabled() -> bool {
+    #[cfg(test)]
+    {
+        EXTRA_FUSION.get()
+    }
+    #[cfg(not(test))]
+    {
+        true
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn unfused<T>(f: impl FnOnce() -> T) -> T {
+    struct Restore(bool);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            EXTRA_FUSION.set(self.0);
+        }
+    }
+    let _restore = Restore(EXTRA_FUSION.replace(false));
+    f()
+}
+
+#[cfg(test)]
+pub(crate) fn unoptimized<T>(f: impl FnOnce() -> T) -> T {
+    struct Restore(bool);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            OPTIMIZE.set(self.0);
+        }
+    }
+    let _restore = Restore(OPTIMIZE.replace(false));
+    f()
 }
 
 struct Compiler<'a> {
@@ -847,16 +1155,58 @@ pub fn compile(src: &str, scope: &Scope, want: Ty) -> Result<Program, Error> {
 }
 
 pub fn compile_any(src: &str, scope: &Scope) -> Result<Program, Error> {
+    let (node, at) = parse_node(src)?;
+    compile_node(&node, at, scope, optimizations_enabled())
+}
+
+fn parse_node(src: &str) -> Result<(Node, usize), Error> {
     let toks = lex(src)?;
     let mut parser = Parser { toks, pos: 0, nodes: 0, depth: 0 };
     let (node, at) = parser.expr()?;
     if !matches!(parser.peek(), Tok::End) {
         return Err(Error::at(parser.here(), "unexpected text after the expression"));
     }
+    Ok((node, at))
+}
+
+fn compile_node(node: &Node, at: usize, scope: &Scope, optimized: bool) -> Result<Program, Error> {
     let mut compiler = Compiler { scope, ops: Vec::new(), depth: 0, max_depth: 0 };
-    let ty = compiler.compile(&node, at)?;
+    let ty = compiler.compile(node, at)?;
     debug_assert_eq!(compiler.depth, ty.lanes());
-    Ok(Program { ops: compiler.ops, ty, max_stack: compiler.max_depth })
+    let mut program = Program { source_cost: compiler.ops.len(), ops: compiler.ops, ty, max_stack: compiler.max_depth, constant: None };
+    if optimized {
+        optimize(&mut program, &scope.constants);
+    }
+    Ok(program)
+}
+
+/// Validate and cost the original predicate, then split only its top-level conjunction into ordered guards.
+pub fn compile_predicates(src: &str, scope: &Scope) -> Result<(usize, Vec<Program>), Error> {
+    let (node, at) = parse_node(src)?;
+    let mut original = compile_node(&node, at, scope, false)?;
+    if original.ty != Ty::Bool {
+        return Err(Error { message: format!("expected a {}, but this is a {}", Ty::Bool.name(), original.ty.name()), at: None });
+    }
+    let cost = original.cost();
+    if !optimizations_enabled() {
+        return Ok((cost, vec![original]));
+    }
+    optimize(&mut original, &scope.constants);
+    if original.constant.is_some() {
+        return Ok((cost, vec![original]));
+    }
+    fn collect(node: &Node, at: usize, scope: &Scope, out: &mut Vec<Program>) -> Result<(), Error> {
+        if let Node::Binary("&&", a, b) = node {
+            collect(a, at, scope, out)?;
+            collect(b, at, scope, out)?;
+        } else {
+            out.push(compile_node(node, at, scope, true)?);
+        }
+        Ok(())
+    }
+    let mut out = Vec::new();
+    collect(&node, at, scope, &mut out)?;
+    Ok((cost, out))
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -1053,8 +1403,63 @@ impl Machine {
         let stack = &mut self.stack;
         stack.clear();
         stack.reserve(program.max_stack);
-        for op in &program.ops {
+        let mut cursor = 0;
+        while let Some(op) = program.ops.get(cursor) {
+            cursor += 1;
             match *op {
+                Op::BranchFalse(skip) => {
+                    if !truth(stack.pop().unwrap_or(0.0)) {
+                        cursor += skip;
+                    }
+                }
+                Op::Jump(skip) => cursor += skip,
+                Op::UnarySlot(f, slot) => stack.push(apply1(f, slots[slot as usize], self.seed)),
+                Op::UnaryBinary(f, binary) => {
+                    let b = stack.pop().unwrap_or(0.0);
+                    let a = stack.pop().unwrap_or(0.0);
+                    stack.push(apply1(f, apply2(binary, a, b), self.seed));
+                }
+                Op::UnaryBinarySlots(f, binary, a, b) => stack.push(apply1(f, apply2(binary, slots[a as usize], slots[b as usize]), self.seed)),
+                Op::UnarySlotConstant(f, binary, slot, value, reverse) => {
+                    let input = slots[slot as usize];
+                    stack.push(apply1(f, if reverse { apply2(binary, value, input) } else { apply2(binary, input, value) }, self.seed));
+                }
+                Op::UnaryStackConstant(f, binary, value, reverse) => {
+                    let input = stack.pop().unwrap_or(0.0);
+                    stack.push(apply1(f, if reverse { apply2(binary, value, input) } else { apply2(binary, input, value) }, self.seed));
+                }
+                Op::UnaryStackSlot(f, binary, slot, reverse) => {
+                    let input = stack.pop().unwrap_or(0.0);
+                    let value = slots[slot as usize];
+                    stack.push(apply1(f, if reverse { apply2(binary, value, input) } else { apply2(binary, input, value) }, self.seed));
+                }
+                Op::UnaryUnary(f, inner) => {
+                    let input = stack.pop().unwrap_or(0.0);
+                    stack.push(apply1(f, apply1(inner, input, self.seed), self.seed));
+                }
+                Op::UnaryUnarySlot(f, inner, slot) => stack.push(apply1(f, apply1(inner, slots[slot as usize], self.seed), self.seed)),
+                Op::SeededConstant(value) => stack.push(apply1(F1::Rand, value, self.seed)),
+                Op::BinarySlots(f, a, b) => stack.push(apply2(f, slots[a as usize], slots[b as usize])),
+                Op::BinarySlotConstant(f, slot, value, reverse) => {
+                    let input = slots[slot as usize];
+                    stack.push(if reverse { apply2(f, value, input) } else { apply2(f, input, value) });
+                }
+                Op::BinaryRightConstant(f, value) => {
+                    let a = stack.pop().unwrap_or(0.0);
+                    stack.push(apply2(f, a, value));
+                }
+                Op::BinaryLeftConstant(f, value) => {
+                    let b = stack.pop().unwrap_or(0.0);
+                    stack.push(apply2(f, value, b));
+                }
+                Op::BinaryRightSlot(f, slot) => {
+                    let a = stack.pop().unwrap_or(0.0);
+                    stack.push(apply2(f, a, slots[slot as usize]));
+                }
+                Op::BinaryLeftSlot(f, slot) => {
+                    let b = stack.pop().unwrap_or(0.0);
+                    stack.push(apply2(f, slots[slot as usize], b));
+                }
                 Op::Const(v) => stack.push(v),
                 Op::Load(slot) => stack.push(slots[slot as usize]),
                 Op::Load4(slot) => stack.extend_from_slice(&slots[slot as usize..slot as usize + 4]),
@@ -1185,6 +1590,9 @@ impl Machine {
     }
 
     pub fn num(&mut self, program: &Program, slots: &[f64]) -> f64 {
+        if let Some(value) = &program.constant {
+            return fin(value[0]);
+        }
         self.run(program, slots);
         fin(self.stack.last().copied().unwrap_or(0.0))
     }
@@ -1193,7 +1601,22 @@ impl Machine {
         self.num(program, slots) != 0.0
     }
 
+    /// A conjunct uses the raw boolean value consumed by &&, before final-result finite normalization.
+    pub fn predicate(&mut self, program: &Program, slots: &[f64], conjunction: bool) -> bool {
+        if !conjunction {
+            return self.truth(program, slots);
+        }
+        if let Some(value) = &program.constant {
+            return truth(value[0]);
+        }
+        self.run(program, slots);
+        truth(self.stack.last().copied().unwrap_or(0.0))
+    }
+
     pub fn color(&mut self, program: &Program, slots: &[f64]) -> [f64; 4] {
+        if let Some(value) = &program.constant {
+            return std::array::from_fn(|i| fin(value[i]).clamp(0.0, 1.0));
+        }
         self.run(program, slots);
         let n = self.stack.len();
         if n < 4 {
@@ -1210,6 +1633,170 @@ impl Machine {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn visibility_guards_match_eager_boolean_results() {
+        for source in [
+            "ok",
+            "ok && t < 1",
+            "ok && (t < 1 ? ok : false)",
+            "(ok && t<1) || u>2",
+            "false && ok",
+            "true || ok",
+            "(ok && t<1) && (ok || u>2)",
+            "true && true && true",
+        ] {
+            for value in [0.0, 1.0, -0.0, f64::NAN, f64::INFINITY] {
+                let mut values = slots();
+                values[6] = value;
+                for known in [false, true] {
+                    let mut s = scope();
+                    if known {
+                        s.freeze(6, &[value]);
+                    }
+                    let original = unoptimized(|| compile(source, &s, Ty::Bool)).unwrap();
+                    let (cost, guards) = compile_predicates(source, &s).unwrap();
+                    assert_eq!(cost, original.cost());
+                    let mut machine = Machine::new(1);
+                    let result = guards.iter().all(|guard| machine.predicate(guard, &values, guards.len() > 1));
+                    assert_eq!(result, machine.truth(&original, &values), "{source}, value={value}, known={known}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn fused_math_pairs_keep_slot_dependencies_and_admission_cost() {
+        for source in [
+            "hash(t+u)",
+            "hash(t+2)",
+            "hash((t*u)+2)",
+            "hash(2-(t*u))",
+            "hash((t*u)+t)",
+            "hash(t+(t*u))",
+            "hash((t*u)+(u*2))",
+            "floor(hash(t))",
+            "floor(sin(t<1 ? u : t))",
+        ] {
+            let previous = unfused(|| compile_any(source, &scope())).unwrap();
+            let fused = compile_any(source, &scope()).unwrap();
+            let inputs = |p: &Program| {
+                let mut v: Vec<_> = p.inputs().collect();
+                v.sort_unstable();
+                v.dedup();
+                v
+            };
+            assert_eq!(inputs(&previous), inputs(&fused), "{source}");
+            assert_eq!(previous.cost(), fused.cost());
+            assert!(fused.ops.len() < previous.ops.len(), "{source}");
+        }
+    }
+
+    #[test]
+    fn optimizer_matches_original_numeric_and_color_semantics() {
+        let numeric = [
+            "1 + 2 * 3",
+            "(1e308 * 1e308) + 1",
+            "(-0) * 2",
+            "t + (-0)",
+            "hash(t+u)",
+            "hash(t+2)",
+            "hash((t*u)+2)",
+            "hash(2-(t*u))",
+            "hash((t*u)+t)",
+            "hash(t+(t*u))",
+            "hash((t*u)+(u*2))",
+            "floor(hash(t))",
+            "floor(sin(t<1 ? u : t))",
+            "t < 1 ? rand(t) : pow(u, 1.6)",
+            "t < 1 ? (u < 0 ? t : u) : (t > 2 ? u : t)",
+            "true ? rand(t) : 1/0",
+            "false ? rand(t) : (2+3)*4",
+            "min(t,u,1,2)",
+            "max(t,u,-2,4)",
+            "clamp(t, u, 1)",
+            "mix(t,u,2)",
+            "smoothstep(2,0,t)",
+            "remap(t,0,1,2,3)",
+            "interp(t,0,1,2,3,4,5)",
+            "pick(t,u,rand(7),1/0)",
+            "hash(t)+rand(u)+noise(t)+noise2(t,u)",
+            "atan2(t,u)+sigmoid(t,u)",
+            "sin(2)+cos(3)+sqrt(-2)+log(0)+exp(1000)",
+            "(t % u) + fract(t)",
+        ];
+        let colors = [
+            "#abcdef",
+            "accent",
+            "t < 1 ? accent : rgb(u,t,0)",
+            "mix(accent,gray(t),u)",
+            "alpha(hsv(t,u,2),u)",
+            "pick(t,#ff0000,accent,rgb(t,u,0))",
+            "true ? mix(#ff0000,#00ff00,.25) : gray(rand(0))",
+            "gray(rand(t))",
+        ];
+        for known in [false, true] {
+            for seed in [0, 1, 73, u64::MAX] {
+                for value in [-0.0, 0.0, -3.0, 0.25, 1.0, 2.1, 1e308, f64::INFINITY, f64::NAN] {
+                    let mut s = scope();
+                    let mut values = slots();
+                    values[0] = value;
+                    values[1] = -value;
+                    if known {
+                        s.freeze(0, &values[..2]);
+                        s.freeze(2, &values[2..6]);
+                    }
+                    for (sources, ty) in [(&numeric[..], Ty::Num), (&colors[..], Ty::Color)] {
+                        for source in sources {
+                            let original = unoptimized(|| compile(source, &s, ty)).unwrap();
+                            let optimized = compile(source, &s, ty).unwrap();
+                            assert_eq!(original.cost(), optimized.cost());
+                            let mut a = Machine::new(seed);
+                            let mut b = Machine::new(seed);
+                            if ty == Ty::Color {
+                                assert_eq!(
+                                    a.color(&original, &values).map(f64::to_bits),
+                                    b.color(&optimized, &values).map(f64::to_bits),
+                                    "{source}, known={known}, value={value}"
+                                );
+                            } else {
+                                assert_eq!(a.num(&original, &values).to_bits(), b.num(&optimized, &values).to_bits(), "{source}, known={known}, value={value}");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn conditional_paths_only_branch_forward_and_stay_within_original_budget() {
+        fn explore(p: &Program, mut pc: usize, mut steps: usize) -> usize {
+            while pc < p.ops.len() {
+                steps += 1;
+                match p.ops[pc] {
+                    Op::BranchFalse(skip) => {
+                        assert!(skip > 0 && pc + 1 + skip <= p.ops.len());
+                        return explore(p, pc + 1, steps).max(explore(p, pc + 1 + skip, steps));
+                    }
+                    Op::Jump(skip) => {
+                        assert!(skip > 0 && pc + 1 + skip <= p.ops.len());
+                        pc += skip;
+                    }
+                    _ => {}
+                }
+                pc += 1;
+            }
+            steps
+        }
+        for source in ["t < 0 ? u : 1", "t < 0 ? (u < 0 ? 1 : 2) : (u > 0 ? 3 : 4)", "t < 0 ? rgb(t,u,0) : accent"] {
+            let p = compile_any(source, &scope()).unwrap();
+            assert!(explore(&p, 0, 0) <= p.cost());
+        }
+        assert!(compile_any("true ? 1 : #ffffff", &scope()).is_err(), "even unused arms are type checked");
+        let random = compile("rand(3)", &scope(), Ty::Num).unwrap();
+        assert!(random.constant_values().is_none(), "run seed stays dynamic");
+    }
 
     fn scope() -> Scope {
         let mut s = Scope::default();

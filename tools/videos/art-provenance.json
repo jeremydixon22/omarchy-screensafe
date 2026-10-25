@@ -1,0 +1,74 @@
+{
+  "generator": "OpenAI built-in image_gen",
+  "date": "2026-10-17",
+  "reference": "Prior ScreenSafe native vector surrounds; CRT cabinet badge requested as an Omarchy parody. No original Zenith graphic used.",
+  "visual_reference": "https://zenith.com/heritage/",
+  "assets": [
+    {
+      "asset": "packs/videos/art/crt.png",
+      "size": [
+        1585,
+        992
+      ],
+      "sha256": "0cb74bee90a06dc38ed1cc2e010b56c6e792858d89c0780bba570a6f823e9704",
+      "bytes": 1759308,
+      "previous_sha256": "71033cee731d19f305c6b90352dc829a0f6f1dbbd00c2f3a47f419788cc75601",
+      "revision": "Targeted upper channel-3/lower fine-tuning dial edit, built-in image_gen; 1 pixel narrower canvas, same screen/cabinet proportions.",
+      "edit_prompt": "Use case: precise-object-edit. Edit target: the supplied transparent ScreenSafe CRT cabinet PNG. Change ONLY the two circular dial faces on the right-hand gold control column. Make the top a convincingly tuned analog channel selector: rotate its ivory indicator clockwise to about 1 o'clock, aligned with a small engraved numeral 3 on its outer black ring; add restrained engraved 2 and 4 and tiny tick marks near it, realistic vintage precision. Rotate the lower dial's ivory indicator to about 10 o'clock, a different purposeful fine-tuning setting, with subtle tick marks. Preserve the existing brushed-metal concentric dial finish, lighting and perspective. STRICT invariants: exactly preserve the full image canvas, cabinet position and outline, black screen opening shape/position/dimensions, walnut sides, gold panel, speaker, all other pixels, and especially the upper-right Omarchy lightning wordmark. Do not rotate or alter the cabinet or video opening. Do not place anything in the black screen. No new text except the tiny channel numerals. Keep genuine existing transparency outside the cabinet. This is a surgical knob adjustment, not a redesign.\n",
+      "generated_original_sha256": "0cb74bee90a06dc38ed1cc2e010b56c6e792858d89c0780bba570a6f823e9704",
+      "previous_generated_original_sha256": "71033cee731d19f305c6b90352dc829a0f6f1dbbd00c2f3a47f419788cc75601"
+    },
+    {
+      "asset": "packs/videos/art/flatscreen.png",
+      "size": [
+        1586,
+        992
+      ],
+      "sha256": "2b35212f5e2ec876e54b0274ac5e9f7006d8d94019e15efd951c6b45e2a7b27b",
+      "bytes": 569935,
+      "generated_original_sha256": "2b35212f5e2ec876e54b0274ac5e9f7006d8d94019e15efd951c6b45e2a7b27b"
+    },
+    {
+      "asset": "packs/videos/art/film-cell.png",
+      "size": [
+        1774,
+        887
+      ],
+      "sha256": "8c75f4ac99d8a145eacd01208553470a009939cc0e710e49f617c72992c7512d",
+      "bytes": 1469081,
+      "generated_original_sha256": "8c75f4ac99d8a145eacd01208553470a009939cc0e710e49f617c72992c7512d"
+    },
+    {
+      "asset": "packs/videos/art/projector.png",
+      "method": "Original procedural SVG, baked once with librsvg; runtime composites the static PNG.",
+      "source": "tools/videos/projector.svg",
+      "source_sha256": "de829b83544c74e1977492fdc4b98eaa456a35a5ae1379f3c9ef939ff9863436",
+      "sha256": "6b0480871b22039bc96c3564a00bbd557d3cd909592c31c6365c57eeaf5cd9f5",
+      "bytes": 87918,
+      "render_command": "rsvg-convert tools/videos/projector.svg -o packs/videos/art/projector.png",
+      "renderer_version": "rsvg-convert version 2.58.0",
+      "revision": "Visible warm projector cone plus a soft source glow; still one baked transparent image."
+    }
+  ],
+  "prompts": [
+    {
+      "name": "crt",
+      "prompt": "Use case: production product artwork for a local screensaver, a static cabinet drawn behind live video. Image 1 is the existing code-drawn CRT layout reference; preserve its front-facing silhouette, control placements and screen aperture. Replace the flat placeholder materials with high quality, photorealistic late-1970s industrial design: very dark walnut side edges, charcoal molded cabinet, warm brushed aluminum control column, milled knurled tuner dials, fine speaker slots, softly worn chamfers, realistic restrained studio reflections and fine surface detail. Straight-on orthographic view, centered, no perspective tilt, no room or props. Preserve the approximate 16:10 canvas composition: entire TV inside x=9%-91%, y=5%-95%. Screen opening stays at x=16%-73%, y=14%-83%, rounded 4:3 bowed tube area, EMPTY uniform near-black with no picture, no bright reflections, no artwork or text on the glass: the renderer will place moving video there. Controls remain in the right column. Add a small, sharply legible gold badge at upper right above the dials, reading exactly \"OMARCHY\" (O M A R C H Y); an original affectionate parody of mid-century Zenith television lettering, forward-slanted engineering capitals, an energetic lightning-like underline, embossed metallic lettering; never write ZENITH. No other lettering. Genuine transparent background outside the TV; no painted checkerboard, no environment or cast shadow outside the silhouette. Clean production asset, sophisticated physical materials, aligned to the reference layout, no extraneous elements.",
+      "reference_image": "the code-drawn crt surround from an earlier ScreenSafe build",
+      "reference_image_sha256": "6f101bf5adf479e744436f08e71feff31fdc6f416be1c6873c93e91647a57c6b"
+    },
+    {
+      "name": "flatscreen",
+      "prompt": "Use case: production product artwork for a screensaver, a static monitor surround drawn behind live video. Image 1 is the current code-drawn flatscreen layout reference; preserve the front orthographic view, wide 16:9 display, slim rectangular silhouette, centered stem and low flat stand. Upgrade the placeholder to high-quality photorealistic product artwork: precision graphite aluminum micro-bezel, tiny machined bevel catching a soft cool highlight, subtle brushed-metal lower edge, elegant solid metal center stand, restrained warm/cool studio lighting, an almost imperceptible blue status LED at bottom right. Entire object centered on the same wide 16:10 canvas, no perspective tilt. Display area must be an EMPTY flat near-black rectangle, no image, no gradients or reflections in the active screen, no UI or lettering; moving video will be drawn onto it. Active screen should occupy x=5%-95%, y=6%-86%; outer display bezel near x=3.5%-96.5%, y=4%-89%; stand base below y=93%. Do not make the active screen narrow like the black 4:3 placeholder in the reference: the intended opening is full 16:9. No logos, no branding, no text, no environment or props. Genuine transparent background outside the object, no painted checkerboard and no external cast shadow. Precise symmetry and product photography quality, with subtle material character rather than a generic vector outline.",
+      "reference_image": "the code-drawn flatscreen surround from an earlier ScreenSafe build",
+      "reference_image_sha256": "1004f2fe290eb23e69e6c1255f41a0523d46af75358862fb1d4323c40a62226e"
+    },
+    {
+      "name": "film",
+      "prompt": "Use case: one repeatable physical 35mm-style film-strip cell for an animated screensaver. Image 1 is ONLY a material/layout ancestry reference from the old code-drawn film style. REMOVE BOTH ROUND REELS COMPLETELY. Create a close straight-on orthographic view of ONE horizontal rectangular cell in a vertical strip of translucent dark amber celluloid, never a projector or camera. The cell is landscape 16:9 within a wider 2:1 film tile, with narrow aged amber borders and exactly four evenly spaced rounded rectangular sprocket holes on each of the left and right rails. The central active aperture is a perfectly clean EMPTY solid black rectangle at x=10%-90%, y=5%-95%, almost the whole height, with no content or reflections. Fine photorealistic edge wear, faint lengthwise emulsion scratches in the rails only, very subtle cyan/amber edge glints and small anonymous edge ticks, tastefully aged physical film. No letters, no numbers, no brands, no real film stills, no text. The outer tile shape is strictly rectangular and fills the canvas to its top and bottom edges so identical tiles can stack vertically with no gaps; no curled ends, no perspective, no diagonal rotation. Make the left and right outer background and sprocket-hole centers genuinely transparent, not a checkerboard drawing; the center aperture itself may stay solid black because live video is placed over it. High quality tactile material, extremely crisp mechanical alignment, horizontal tile canvas roughly 2:1. No reels, hubs or circular mechanisms anywhere.",
+      "reference_image": "the code-drawn film surround from an earlier ScreenSafe build",
+      "reference_image_sha256": "8e21fc2c0d48942257a563d571809d9cae93c7dec86a9a6676357428e0232f3a"
+    }
+  ],
+  "film_revision_prompt": "Image 1 is the edit target, a production film-cell tile. Make only this cleanup: remove every saturated red fringe, red smear and red pixel around the sprocket holes and outside edges. Those red regions must become genuinely transparent alpha, with clean physically plausible amber film edges. Preserve the amber emulsion texture, eight sprocket holes (four on each side), single black central aperture, straight-on rectangular shape, exact 2:1 composition and mechanical alignment. Keep it tileable vertically at the top/bottom. Reduce the brightest orange speckle slightly for a restrained premium dark-amber celluloid finish, still tactile and realistic. The central live-video aperture must be solid, opaque near-black, with no image, labels or reflections. No reels, numbers, text, logos, new objects or painted checkerboard. Transparent outside edges and transparent holes, no red anywhere.\n"
+}

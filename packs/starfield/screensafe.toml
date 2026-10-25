@@ -1,6 +1,6 @@
 # Flying through a field of stars: each star keeps its own place in the sky and comes towards you, streaking as it
 # passes, in the theme's colors. Worked out from the time alone, so the flight never repeats a frame or jumps.
-format = 1
+format = 2
 name = "Starfield"
 author = "ScreenSafe"
 license = "MIT"
@@ -12,6 +12,8 @@ fade = 0
 background = "background"
 
 # What can be changed in the panel: how fast the flight goes, and how many stars pass.
+colorize = "tint_color"
+
 [[setting]]
 name = "speed"
 label = "Speed"
@@ -28,6 +30,12 @@ choices = ["Sparse", "Normal", "Dense"]
 values = [220, 420, 700]
 default = 420
 
+
+[[setting]]
+name = "tint_color"
+label = "Color"
+kind = "color"
+default = 0
 
 [[scene]]
 name = "Flight"

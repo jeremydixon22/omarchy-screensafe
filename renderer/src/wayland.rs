@@ -33,7 +33,7 @@ use wayland_protocols_wlr::layer_shell::v1::client::{
     zwlr_layer_surface_v1::{self, Anchor, KeyboardInteractivity, ZwlrLayerSurfaceV1},
 };
 
-use crate::eval::{Evaluator, Frame};
+use crate::eval::{Evaluator, Frame, ImageSrc, Item};
 use crate::flash;
 use crate::pack::Pack;
 use crate::raster::{Raster, View};
@@ -81,12 +81,37 @@ pub struct Options {
     pub start: f64,
     /// The wall clock packs read; the fixed one if none.
     pub clock: Option<crate::clock::Clock>,
+    pub overlay: crate::overlay::Config,
 }
 
 struct Buffer {
     memfd: OwnedFd,
     wl: WlBuffer,
     busy: bool,
+}
+
+/// Pause the media clock until the surround has actually been submitted, then give the
+/// unlit device a short settling interval. Loading speed never consumes the opening shot.
+#[derive(Default)]
+struct VideoStart {
+    origin: Option<f64>,
+    ready_at: Option<f64>,
+}
+
+impl VideoStart {
+    fn clock(&mut self, time: f64) -> (f64, bool) {
+        let origin = *self.origin.get_or_insert(time);
+        match self.ready_at {
+            Some(at) if time >= at => (origin + time - at, false),
+            _ => (origin, true),
+        }
+    }
+
+    fn presented(&mut self, time: f64, ready: bool) {
+        if ready && self.ready_at.is_none() {
+            self.ready_at = Some(time + 0.25);
+        }
+    }
 }
 
 struct Surface {
@@ -107,6 +132,7 @@ struct Surface {
     pixmap: Option<Pixmap>,
     /// The last frame shown, so an unchanged one isn't drawn again.
     shown: Option<Frame>,
+    video_start: VideoStart,
 }
 
 struct Output {
@@ -128,6 +154,7 @@ struct Globals {
 
 struct State {
     globals: Globals,
+    overlay: Option<crate::overlay::Overlay>,
     outputs: Vec<Output>,
     xbgr: bool,
     pointer: Option<WlPointer>,
@@ -177,6 +204,7 @@ impl State {
             guard: flash::Guard::new(),
             pixmap: None,
             shown: None,
+            video_start: VideoStart::default(),
         }
     }
 
@@ -215,6 +243,7 @@ impl State {
             guard: flash::Guard::new(),
             pixmap: None,
             shown: None,
+            video_start: VideoStart::default(),
         }
     }
 
@@ -311,6 +340,8 @@ impl State {
                 let k = s.integer_scale.max(output_scale).clamp(1, 8) as u32;
                 (s.logical.0 * k, s.logical.1 * k)
             };
+            let physical_scale = View::new(w, h, pack.stage).scale;
+            let (w, h) = if pack.uses_videos && s.viewport.is_some() { crate::video::render_size(w, h) } else { (w, h) };
             if (w, h) != s.size {
                 for b in s.buffers.drain(..) {
                     b.wl.destroy();
@@ -322,7 +353,17 @@ impl State {
             }
             let Some(pixmap) = s.pixmap.as_mut() else { return Err(format!("can't draw a {w} x {h} screen")) };
             let view = View::new(w, h, pack.stage);
-            let frame = eval.frame(pack, time, view.aspect());
+            let (media_time, warming) = if pack.uses_videos { s.video_start.clock(time) } else { (time, false) };
+            eval.set_pixel_scale(physical_scale);
+            let mut frame = eval.frame(pack, media_time, view.aspect());
+            let surround_ready = !pack.uses_videos || raster.video_surround_ready(pack, &frame, view);
+            if warming || !surround_ready {
+                // Keep the device and its black glass; don't queue or reveal the picture yet.
+                frame.items.retain(|item| !matches!(item, Item::Image { source, .. } if matches!(source.src, ImageSrc::Video { .. })));
+            }
+            if let Some(overlay) = &self.overlay {
+                overlay.append(&mut frame, time, view, physical_scale, pack.foreground, raster.metrics()[0]);
+            }
             if s.shown.as_ref() == Some(&frame) && !arrived {
                 // Nothing has changed: keep what's on screen, and spend nothing on it.
                 continue;
@@ -370,6 +411,9 @@ impl State {
             s.wl.damage_buffer(0, 0, w as i32, h as i32);
             s.wl.frame(qh, name);
             s.wl.commit();
+            if pack.uses_videos {
+                s.video_start.presented(time, surround_ready);
+            }
             s.waiting = true;
             s.shown = Some(frame);
         }
@@ -430,6 +474,7 @@ fn connect_to(region: Option<Region>) -> Result<Display, String> {
     let viewporter = globals.bind::<WpViewporter, _, _>(&qh, 1..=1, ()).ok();
     let fractional = globals.bind::<WpFractionalScaleManagerV1, _, _>(&qh, 1..=1, ()).ok();
     let mut state = State {
+        overlay: None,
         globals: Globals { compositor, shm, layer_shell, viewporter, fractional },
         outputs: Vec::new(),
         xbgr: false,
@@ -479,6 +524,8 @@ impl Display {
     /// Shows the pack until input dismisses it, returning why it closed.
     pub fn run(mut self, pack: &Pack, options: &Options, raster: &mut Raster) -> Result<&'static str, String> {
         let qh = self.queue.handle();
+        self.state.overlay = Some(crate::overlay::Overlay::new(options.overlay.clone(), options.clock.clone().unwrap_or_else(crate::clock::Clock::fixed)));
+        let mut control = crate::overlay::Input::default();
         let mut eval = Evaluator::new(pack, options.seed, raster.metrics());
         if let Some(clock) = &options.clock {
             eval.set_clock(clock.clone());
@@ -499,7 +546,15 @@ impl Display {
                 return Ok("time limit");
             }
             let now = Instant::now();
-            if now >= looked_ahead && (!pack.images.is_empty() || !pack.backgrounds.is_empty()) {
+            for line in control.poll() {
+                if line.trim() == "quit" {
+                    return Ok("asked to stop");
+                }
+                if let Some(overlay) = &mut self.state.overlay {
+                    overlay.control(&line, options.start + start.elapsed().as_secs_f64());
+                }
+            }
+            if now >= looked_ahead && pack.prefetches_images() {
                 // Start decoding and resampling the images the pack will show a little later, so they're ready in time.
                 let ahead = options.start + start.elapsed().as_secs_f64() + LOOK_AHEAD;
                 let frame = eval.frame(pack, ahead, 16.0 / 9.0);
@@ -556,6 +611,7 @@ impl Display {
         reload: &mut dyn FnMut(&str) -> Result<Pack, String>,
     ) -> Result<&'static str, String> {
         let qh = self.queue.handle();
+        self.state.overlay = Some(crate::overlay::Overlay::new(options.overlay.clone(), options.clock.clone().unwrap_or_else(crate::clock::Clock::fixed)));
         let stdin = std::io::stdin();
         let input = stdin.as_fd();
         let flags = rustix::fs::fcntl_getfl(input).map_err(|e| format!("can't read standard input: {e}"))?;
@@ -576,7 +632,7 @@ impl Display {
                 return Ok("closed");
             }
             let now = Instant::now();
-            if now >= looked_ahead && (!pack.images.is_empty() || !pack.backgrounds.is_empty()) {
+            if now >= looked_ahead && pack.prefetches_images() {
                 let ahead = options.start + start.elapsed().as_secs_f64() + LOOK_AHEAD;
                 let frame = eval.frame(&pack, ahead, 16.0 / 9.0);
                 raster.prefetch(&pack, &frame, &self.state.views(&pack));
@@ -654,6 +710,11 @@ impl Display {
                 }
                 match verb {
                     "quit" => return Ok("asked to stop"),
+                    "overlay" | "stats" => {
+                        if let Some(overlay) = &mut self.state.overlay {
+                            overlay.control(command.trim(), options.start + start.elapsed().as_secs_f64());
+                        }
+                    }
                     "settings" => match reload(rest) {
                         Ok(p) => {
                             // The same moment of the pack, as it now is: a new evaluator and raster for its new
@@ -669,6 +730,7 @@ impl Display {
                             raster.load_fonts(&pack);
                             for s in self.state.outputs.iter_mut().filter_map(|o| o.surface.as_mut()) {
                                 s.shown = None;
+                                s.video_start = VideoStart::default();
                             }
                             next = Instant::now();
                         }
@@ -875,3 +937,22 @@ delegate_noop!(State: ignore ZwlrLayerShellV1);
 delegate_noop!(State: ignore WpViewporter);
 delegate_noop!(State: ignore WpViewport);
 delegate_noop!(State: ignore WpFractionalScaleManagerV1);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn video_clock_waits_for_a_presented_surround_without_consuming_media_time() {
+        let mut start = VideoStart::default();
+        assert_eq!(start.clock(0.0), (0.0, true));
+        start.presented(0.0, false);
+        assert_eq!(start.clock(12.0), (0.0, true), "slow loading must not skip the opening");
+        start.presented(12.0, true);
+        assert_eq!(start.clock(12.125), (0.0, true), "device exists before playback");
+        assert_eq!(start.clock(12.25), (0.0, false));
+        assert_eq!(start.clock(15.0), (2.75, false));
+        start.presented(15.0, true);
+        assert_eq!(start.clock(16.0), (3.75, false), "later submissions don't restart playback");
+    }
+}

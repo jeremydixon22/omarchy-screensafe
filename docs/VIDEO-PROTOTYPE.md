@@ -1,0 +1,45 @@
+# Local Videos prototype
+
+This development build contains the retained compiler, prefetch and sprite optimizations, plus a Photos-like Videos pack. It is a local prototype, not a published release.
+
+Videos has Full screen, Whole, Film, CRT Fit, CRT Box and Flatscreen styles; Original, Greyscale, Sepia and Theme tones; shuffle/in-order selection; and a display interval or Full length. Loop is on by default and repeats the playlist. With Loop off, the playlist plays once, then holds the final video's frame at the end of the chosen interval (or the clip's end, if earlier). Full length uses the longest imported clip as a common interval; shorter clips hold their final frame until the next selection.
+
+Film transports four adjacent source frames downward, with later frames above earlier ones. Requests still run in ascending frame order, preserving shared decoding. The strip slowly drifts within a ±1% stage-height band, with a small gate weave and under 1% film brightness variation. The visible warm projector cone and source glow have gentle low-frequency flicker, baked once from an original SVG into a cached transparent image, without an animated blur pass. There are no reels above it. Loop off freezes transport, weave and projector light along with playback. The independent OLED drift continues. CRT uses an illustrated walnut-and-metal cabinet with its channel selector and fine-tuning dial set to distinct positions, an Omarchy lightning badge, actual barrel curvature based on Multimillion's opening, and faint static scanlines/aperture mask. CRT Box preserves the entire picture with letterboxing as needed; CRT Fit fills the tube and crops the source's sides. Existing CRT setting value 3 remains Box; Fit uses value 5. Fit crops in the native sampling map, keeping the original decoded frame and avoiding an extra per-frame crop/resize. Its geometry is cached rather than recalculated per frame; held frames reuse the warped pixels. Flatscreen uses an illustrated brushed-metal bezel and stand. Full screen, Whole, either CRT mode and Flatscreen each draw one playback surface. Video supplies its own motion, so the Photos pack's extra pan/zoom is omitted.
+
+Video surrounds decode and resize asynchronously before playback begins. The device is shown with black glass for a quarter second, then the media clock starts; loading never consumes the opening shot. Surround artwork appears at full opacity. CRT powers on from a restrained center line into the picture, then briefly shows horizontal tuning interference when the selected video changes. Repeating the same video does not retune. These effects use existing declarative drawing primitives and remain subject to the unchanged flash guard.
+
+The surrounds are generated bitmap artwork distributed with this prototype under the repository's MIT license; generation prompts and source hashes are in `tools/videos/art-provenance.json`. No private clip or original Zenith graphic was used to generate them.
+
+## Import a clip
+
+The prototype imports ordinary MP4 files once, then plays the prepared result. Dropping an MP4 into the folder does not yet import it automatically.
+
+```sh
+python3 tools/videos/import.py INPUT.mp4 "$HOME/Videos/Screensaver/clip.ssv"
+```
+
+Import needs Python 3, bubblewrap, ffmpeg and ffprobe. Playback uses the bundled renderer and needs none of those tools. The source is read only. Import refuses an existing output, including symlinks, and publishes the finished file atomically. Keep the original MP4 if you want to reimport it.
+
+The importer runs media tools with a private network/PID/mount namespace, no capabilities, no home or graphics devices, one selected read-only input descriptor and public system runtime files. It has fixed commands, no author-supplied player/filter arguments, bounded output, CPU/address-space limits and deadlines. Failure to establish isolation is an error; there is no unconfined fallback.
+
+Current limits: MP4 up to 2 GiB and five minutes; normalized JPEG frames up to 1280×720 at 24 FPS without enlarging a smaller source; prepared file up to 512 MiB, 7,200 frames and 2 MiB per frame. At most 32 prepared videos are opened from `~/Videos/Screensaver`, without following file symlinks. Invalid files are skipped with a warning. The user-provided example is not included in the repository.
+
+## Playback and safety
+
+Prepared files have a fixed header and checked frame offsets/lengths. The renderer retains read-only descriptors, then gives up new file access as it does for Photos. It uses the existing confined image decoder, a maximum of two pending video decodes and six completed video frames. It keeps the latest completed frame while an exact request decodes. Two frames of lookahead share that same two-job budget, allowing four adjacent film cells to reuse an overlapping six-frame window instead of decoding four fresh frames per tick. There is no unbounded decode queue. Prepared frames already fit within 720p, so small style frames do not perform another high-quality resize on every decode; the drawing path fits the bounded decoded image to its display box.
+
+CRT adds at most four sampling maps (16 MiB total) and two warped outputs (8 MiB total), each at most 1280×720. Weak input identities avoid retaining additional decoded source frames. This native effect opens no files, starts no processes and adds no runtime dependency or sandbox permission.
+
+Packs use `kind = "image"`, `source = "videos"`, an `index` and a `position` in seconds. The new `videos` and `video_longest` variables exist only for packs declaring that source. Existing packs retain their slot allocation and admission limits. A video is a bounded data source; it cannot supply commands, URLs or executable content.
+
+When Wayland viewports are available, a pack showing video uses an internal canvas fitted within 1280×720; the compositor scales the checked canvas to the display. All styles, overlays and tone effects are drawn before the existing flash guard, and only admitted frames are committed. Without a viewport the renderer retains its native-buffer path. The flash check remains an approximation, not certification.
+
+The prototype also adds a seccomp policy denying non-Unix socket creation, including UDP, and io_uring creation; after connecting to Wayland it denies all new sockets and connections. It applies across existing threads. Watchdogs in media-reading commands give up all new filesystem access before startup is acknowledged; later image workers inherit their caller's restrictions. The existing Wayland socket and approved media descriptors remain usable.
+
+Before publication: review the new data format, import workflow, dependency/provenance notices and confinement; test on real ARM hardware and supported kernels; decide how ordinary-video import should appear in the UI. No CI counterpart or public submission is part of this prototype.
+
+Video image elements may use a numeric `frame_offset` (rounded and bounded to ±4 frames), boolean `wrap` for neighboring frames, and a constant `curve` from 0 to 0.08. Curvature requires a `w`/`h` box. Other image sources reject these fields. Defaults preserve existing packs.
+
+Film, CRT and Flatscreen also shift together with their video by up to 10 output pixels on each axis, with slow 17-minute and 23-minute cycles. This adds to the film's existing weave and drift. It uses output geometry rather than a fixed monitor size and keeps the curvature and image-size caches intact. It may reduce static-image exposure; it is not a guarantee against OLED burn-in.
+
+Flatscreen powers up with a dark LED, an illuminated LED, an original native-vector Omarchy boot mark, then an input label and the picture. The logo has fully disappeared before the label is shown. Playback starts 6.8 seconds into the media clock (after the existing artwork-readiness gate), preserving the opening frame; the label fades out at 7.9–8.15 seconds. Repeats do not run the boot sequence again. Input labels are fixed strings selected from checked prepared-video dimensions: HDMI1 at 720 vertical pixels or more, COMP1 below. The existing archive format, importer, cache budgets and sandbox are unchanged. Only a numeric 32-bit resolution mask is added to packs that declare video sources; no filenames or arbitrary strings are exposed.

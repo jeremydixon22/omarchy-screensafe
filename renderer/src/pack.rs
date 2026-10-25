@@ -9,7 +9,10 @@ use crate::palette::Palette;
 use crate::safefs::{self, Dir};
 
 pub const MANIFEST: &str = "screensafe.toml";
-pub const FORMAT: i64 = 1;
+/// The newest pack format this renderer reads. Format 1 is everything up to ScreenSafe 0.4.8; format 2 adds videos,
+/// `color` settings and `colorize`, so that an older ScreenSafe refuses a pack using them with a clear message rather
+/// than an error about a field it doesn't know.
+pub const FORMAT: i64 = 2;
 
 pub const MANIFEST_LIMIT: u64 = 1024 * 1024;
 pub const ART_LIMIT: u64 = 64 * 1024;
@@ -88,6 +91,8 @@ pub enum SettingKind {
     Choice { labels: Vec<String>, values: Vec<f64> },
     /// A number from `min` to `max` in steps of `step`, shown with `unit`.
     Range { min: f64, max: f64, step: f64, unit: String },
+    /// Theme swatch or packed custom RGB; optional dependency on an earlier setting.
+    Color { when: Option<(String, f64)> },
 }
 
 impl Setting {
@@ -97,6 +102,13 @@ impl Setting {
         match &self.kind {
             SettingKind::Toggle => (v != 0.0) as u8 as f64,
             SettingKind::Choice { values, .. } => values.iter().copied().find(|c| (c - v).abs() < 1e-9).unwrap_or(self.default),
+            SettingKind::Color { .. } => {
+                if crate::palette::valid_choice(v) {
+                    v
+                } else {
+                    self.default
+                }
+            }
             SettingKind::Range { min, max, step, .. } => {
                 if v < *min || v > *max {
                     return self.default;
@@ -140,6 +152,10 @@ pub struct Builtins {
     pub utc_clock: u16,
     /// How many photos there are to show, set as the pack loads.
     pub photos: u16,
+    pub videos: u16,
+    pub video_longest: u16,
+    pub video_pixel: u16,
+    pub video_hd_mask: u16,
 }
 
 /// Words a text's braces may hold for the clock's names, rather than a number.
@@ -255,6 +271,7 @@ pub enum ImageFrom {
     Backgrounds,
     /// The viewer's photos (see `Pack::photos`).
     Photos,
+    Videos,
 }
 
 /// A look applied to an image as it's decoded, so it costs nothing to draw.
@@ -280,6 +297,10 @@ pub struct Image {
     pub pan_x: Program,
     pub pan_y: Program,
     pub index: Program,
+    pub position: Option<Program>,
+    pub frame_offset: Option<Program>,
+    pub wrap: Option<Program>,
+    pub curve: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -363,7 +384,9 @@ pub struct Element {
     /// Whether the element has its own `count`, and so its own i, n and k.
     pub repeats: bool,
     pub lets: Vec<Let>,
-    pub visible: Option<Program>,
+    /// Cumulative bindings required before opacity; each visibility guard has its own earlier boundary.
+    pub opacity_lets: usize,
+    pub visible: Vec<VisibilityGate>,
     pub opacity: Program,
     pub x: Program,
     pub y: Program,
@@ -385,6 +408,37 @@ pub struct Scene {
     pub draw: Vec<Element>,
     pub cost: usize,
     pub points: usize,
+}
+
+pub struct VisibilityGate {
+    pub after: usize,
+    pub condition: Program,
+}
+
+/// Keep the declaration order within each dependency-closed stage. Every binding has a unique slot, and a
+/// binding can only read earlier declarations, so moving independent work past culling preserves its value.
+fn schedule_lets(lets: Vec<Let>, visible: Vec<Program>, opacity: &Program) -> (Vec<Let>, Vec<VisibilityGate>, usize) {
+    if !expr::optimizations_enabled() {
+        let count = lets.len();
+        return (lets, visible.into_iter().map(|condition| VisibilityGate { after: count, condition }).collect(), count);
+    }
+    let mut stages = vec![visible.len() + 1; lets.len()];
+    for (stage, program) in visible.iter().chain(std::iter::once(opacity)).enumerate() {
+        let mut needed: HashSet<u16> = program.inputs().collect();
+        for (i, binding) in lets.iter().enumerate().rev() {
+            let lanes = if binding.program.ty == Ty::Color { 4 } else { 1 };
+            if (binding.slot..binding.slot + lanes).any(|slot| needed.contains(&slot)) {
+                stages[i] = stages[i].min(stage);
+                needed.extend(binding.program.inputs());
+            }
+        }
+    }
+    let opacity_count = stages.iter().filter(|&&stage| stage <= visible.len()).count();
+    let gates =
+        visible.into_iter().enumerate().map(|(i, condition)| VisibilityGate { after: stages.iter().filter(|&&stage| stage <= i).count(), condition }).collect();
+    let mut ordered: Vec<_> = stages.into_iter().zip(lets).collect();
+    ordered.sort_by_key(|(stage, _)| *stage);
+    (ordered.into_iter().map(|(_, binding)| binding).collect(), gates, opacity_count)
 }
 
 impl Scene {
@@ -416,6 +470,7 @@ pub const BADGE_FILE_LIMIT: u64 = 8 * 1024 * 1024;
 pub struct Pack {
     pub meta: Meta,
     pub stage: Stage,
+    pub foreground: [f32; 4],
     pub scenes: Vec<Scene>,
     pub builtins: Builtins,
     pub initial: Vec<f64>,
@@ -428,6 +483,8 @@ pub struct Pack {
     pub photos: Vec<Photo>,
     /// Whether the pack shows the viewer's photos, whether or not there are any.
     pub uses_photos: bool,
+    pub videos: Vec<crate::video::Video>,
+    pub uses_videos: bool,
     pub warnings: Vec<String>,
     /// A digest of everything the pack was made from: its manifest and files, the theme's colors and backgrounds it
     /// uses, the art it shows, and this renderer's version. The panel keeps a pack's thumbnail until it changes.
@@ -451,6 +508,18 @@ pub const PHOTO_FILE_LIMIT: u64 = 64 << 20;
 const PHOTO_EXTENSIONS: &[&str] = &[".png", ".jpg", ".jpeg", ".webp"];
 
 impl Pack {
+    /// Whether look-ahead decoding can do any work. Sprite sheets have a separate cache and do not use it.
+    pub fn prefetches_images(&self) -> bool {
+        fn contains(draw: &[Element]) -> bool {
+            draw.iter().any(|element| match &element.kind {
+                Kind::Image(image) => !matches!(image.source, ImageFrom::Videos),
+                Kind::Group { children, .. } => contains(children),
+                _ => false,
+            })
+        }
+        self.scenes.iter().any(|scene| contains(&scene.draw))
+    }
+
     pub fn length(&self) -> f64 {
         self.scenes.iter().map(Scene::length).sum()
     }
@@ -473,6 +542,7 @@ pub struct Environment<'a> {
     pub logo: Option<&'a Path>,
     /// The viewer's photos folder, for `source = "photos"`.
     pub photos: Option<&'a Path>,
+    pub videos: Option<&'a Path>,
     /// With more photos than are held open, which are chosen: by this seed, or else the first by name.
     pub photo_seed: Option<u64>,
 }
@@ -641,6 +711,7 @@ impl<'a> Fields<'a> {
 struct Loader<'a> {
     dir: Dir,
     env: &'a Environment<'a>,
+    palette: Palette,
     slots: usize,
     initial: Vec<f64>,
     builtins: Builtins,
@@ -763,7 +834,12 @@ impl Loader<'_> {
             budget.cost += program.cost();
             let slot = self.alloc(if program.ty == Ty::Color { 4 } else { 1 })?;
             scope.bind(name, slot, program.ty);
-            lets.push(Let { slot, program });
+            if let Some(values) = program.constant_values() {
+                self.initial[slot as usize..slot as usize + values.len()].copy_from_slice(&values);
+                scope.freeze(slot, &values);
+            } else {
+                lets.push(Let { slot, program });
+            }
         }
         Ok(lets)
     }
@@ -785,7 +861,14 @@ impl Loader<'_> {
         scope.bind("k", b.k, Ty::Num);
         let mut budget = Budget::default();
         let lets = self.lets(&mut f, &mut scope, &mut budget)?;
-        let visible = self.optional_expr(&mut f, "visible", &scope, Ty::Bool, &mut budget)?;
+        let visible = match f.expr_source("visible")? {
+            Some(src) => {
+                let (cost, gates) = expr::compile_predicates(&src, &scope).or_else(|e| f.err("visible", format!("{e}\n    {src}{}", caret(e.at))))?;
+                budget.cost += cost;
+                gates
+            }
+            None => Vec::new(),
+        };
         let opacity = self.expr(&mut f, "opacity", "1", &scope, Ty::Num, &mut budget)?;
         let x = self.expr(&mut f, "x", "0", &scope, Ty::Num, &mut budget)?;
         let y = self.expr(&mut f, "y", "0", &scope, Ty::Num, &mut budget)?;
@@ -962,7 +1045,8 @@ impl Loader<'_> {
                         self.uses_photos = true;
                         ImageFrom::Photos
                     }
-                    (None, None, Some(_)) => return f.err("source", "an image's source is \"theme-backgrounds\" or \"photos\""),
+                    (None, None, Some("videos")) => ImageFrom::Videos,
+                    (None, None, Some(_)) => return f.err("source", "an image's source is \"theme-backgrounds\", \"photos\" or \"videos\""),
                     (None, None, None) => return f.err("", "an image needs file = \"name.webp\", files = [...], or a source"),
                     _ => return f.err("source", "use one of file, files or source"),
                 };
@@ -988,7 +1072,15 @@ impl Loader<'_> {
                 let pan_y = self.expr(&mut f, "pan_y", "0", &scope, Ty::Num, &mut budget)?;
                 let index = self.expr(&mut f, "index", "0", &scope, Ty::Num, &mut budget)?;
                 budget.points += 4;
-                Kind::Image(Image { source, fit, frame, filter, zoom, pan_x, pan_y, index })
+                let video = matches!(source, ImageFrom::Videos);
+                let position = if video { Some(self.expr(&mut f, "position", "t", &scope, Ty::Num, &mut budget)?) } else { None };
+                let frame_offset = if video { self.optional_expr(&mut f, "frame_offset", &scope, Ty::Num, &mut budget)? } else { None };
+                let wrap = if video { self.optional_expr(&mut f, "wrap", &scope, Ty::Bool, &mut budget)? } else { None };
+                let curve = if video { f.number("curve", 0.0, 0.0, 0.08)? as f32 } else { 0.0 };
+                if curve > 0.0 && frame.is_none() {
+                    return f.err("curve", "needs a video box with both w and h");
+                }
+                Kind::Image(Image { source, fit, frame, filter, zoom, pan_x, pan_y, index, position, frame_offset, wrap, curve })
             }
             "ascii" => {
                 let art_file = f.string("art")?;
@@ -1095,7 +1187,8 @@ impl Loader<'_> {
             other => return f.err("kind", format!("'{other}' isn't a kind; use group, text, lines, mesh, rect, image, ascii or sprite")),
         };
         f.finish()?;
-        let element = Element { kind, glow, count, repeats, lets, visible, opacity, x, y, rotate, scale, color, depth: order };
+        let (lets, visible, opacity_lets) = schedule_lets(lets, visible, &opacity);
+        let element = Element { kind, glow, count, repeats, lets, opacity_lets, visible, opacity, x, y, rotate, scale, color, depth: order };
         Ok((element, budget.times(count as usize)))
     }
 
@@ -1156,7 +1249,7 @@ impl Loader<'_> {
             "greyscale" => Filter::Greyscale,
             "sepia" => Filter::Sepia,
             "theme" => {
-                let palette = self.env.palette.cloned().unwrap_or_else(Palette::default_theme);
+                let palette = &self.palette;
                 let rgb = |name: &str| {
                     let c = palette.colors.iter().find(|(n, _)| *n == name).map(|(_, c)| *c).unwrap_or([0.5, 0.5, 0.5, 1.0]);
                     [(c[0] * 255.0).round() as u8, (c[1] * 255.0).round() as u8, (c[2] * 255.0).round() as u8]
@@ -1201,8 +1294,7 @@ impl Loader<'_> {
             }
         }
         if themed {
-            let palette = self.env.palette.cloned().unwrap_or_else(Palette::default_theme);
-            crate::raster::to_palette(&mut rgba, width, &palette);
+            crate::raster::to_palette(&mut rgba, width, &self.palette);
         }
         self.images.push(ImageSource::Pixels { name: key.clone(), width, height, rgba });
         self.image_names.push(key);
@@ -1379,7 +1471,23 @@ fn read_setting(f: &mut Fields, scope: &Scope, earlier: &[Setting], given: &[(St
             let unit = f.text("unit", 8)?;
             (SettingKind::Range { min, max, step, unit }, default)
         }
-        _ => return f.err("kind", "must be \"toggle\", \"choice\" or \"range\""),
+        "color" => {
+            let default = f.number("default", 0.0, 0.0, (2 * crate::palette::CUSTOM_COLOR - 1) as f64)?;
+            if !crate::palette::valid_choice(default) {
+                return f.err("default", "must be a valid color selection");
+            }
+            let when = if let Some(name) = f.string("when")? {
+                let value = f.number("when_value", 0.0, f64::MIN, f64::MAX)?;
+                if !earlier.iter().any(|s| s.name == name && s.accept(Some(value)) == value) {
+                    return f.err("when", "must name an earlier setting and a value it accepts");
+                }
+                Some((name, value))
+            } else {
+                None
+            };
+            (SettingKind::Color { when }, default)
+        }
+        _ => return f.err("kind", "must be \"toggle\", \"choice\", \"range\" or \"color\""),
     };
     let mut setting = Setting { name, label, kind, default, value: default };
     setting.default = setting.accept(Some(default));
@@ -1596,6 +1704,12 @@ fn fingerprint(manifest: &str, pack: &Pack, env: &Environment) -> u64 {
         h.bytes(&photo.modified.0.to_le_bytes());
         h.bytes(&photo.modified.1.to_le_bytes());
     }
+    for video in &pack.videos {
+        h.bytes(video.name.as_bytes());
+        h.bytes(&video.size.to_le_bytes());
+        h.bytes(&video.modified.0.to_le_bytes());
+        h.bytes(&video.modified.1.to_le_bytes());
+    }
     for art in &pack.arts {
         for row in art {
             h.bytes(row.iter().collect::<String>().as_bytes());
@@ -1623,9 +1737,11 @@ fn load_manifest(dir: Dir, text: &str, env: &Environment) -> Result<Pack> {
     })?;
     let mut f = Fields::new(&table, "");
     let format = f.integer("format", 0, 0, i64::MAX)?;
-    if format != FORMAT {
-        return f.err("format", format!("must be {FORMAT} (this ScreenSafe reads pack format {FORMAT})"));
+    if !(1..=FORMAT).contains(&format) {
+        return f.err("format", format!("must be 1 or {FORMAT} (this ScreenSafe reads pack formats 1 to {FORMAT})"));
     }
+    // A format 1 pack can't use what format 2 added.
+    let needs_2 = |what: &str| format!("{what} needs format = 2 (ScreenSafe 0.5 or later)");
     let preview = match f.get("preview") {
         None => None,
         Some(_) => Some(f.number("preview", 0.0, 0.0, 86400.0)?),
@@ -1672,9 +1788,19 @@ fn load_manifest(dir: Dir, text: &str, env: &Environment) -> Result<Pack> {
             &palette_owned
         }
     };
+    fn video_source(table: &toml::Table) -> bool {
+        table.get("source").and_then(toml::Value::as_str) == Some("videos")
+            || table.get("draw").and_then(toml::Value::as_array).is_some_and(|draw| draw.iter().filter_map(toml::Value::as_table).any(video_source))
+    }
+    let uses_videos =
+        table.get("scene").and_then(toml::Value::as_array).is_some_and(|scenes| scenes.iter().filter_map(toml::Value::as_table).any(video_source));
+    if uses_videos && format < 2 {
+        return f.err("format", needs_2("source = \"videos\""));
+    }
     let mut loader = Loader {
         dir,
         env,
+        palette: palette.clone(),
         slots: 0,
         initial: Vec::new(),
         builtins: Builtins {
@@ -1706,6 +1832,10 @@ fn load_manifest(dir: Dir, text: &str, env: &Environment) -> Result<Pack> {
             utc_offset: 0,
             utc_clock: 0,
             photos: 0,
+            videos: 0,
+            video_longest: 0,
+            video_pixel: 0,
+            video_hd_mask: 0,
         },
         images: Vec::new(),
         image_names: Vec::new(),
@@ -1780,6 +1910,25 @@ fn load_manifest(dir: Dir, text: &str, env: &Environment) -> Result<Pack> {
     for (name, _) in CLOCK_TEXT {
         scope.reserve(name, "is only for text, in braces: {zone}");
     }
+    if uses_videos {
+        b.videos = loader.alloc(1)?;
+        b.video_longest = loader.alloc(1)?;
+        b.video_pixel = loader.alloc(1)?;
+        b.video_hd_mask = loader.alloc(1)?;
+        loader.builtins = b;
+        scope.bind("videos", b.videos, Ty::Num);
+        scope.bind("video_longest", b.video_longest, Ty::Num);
+        scope.bind("video_pixel", b.video_pixel, Ty::Num);
+        scope.bind("video_hd_mask", b.video_hd_mask, Ty::Num);
+    }
+    let videos = if uses_videos { env.videos.map(|folder| crate::video::open(folder, &mut loader.warnings)).unwrap_or_default() } else { Vec::new() };
+    if uses_videos {
+        loader.initial[b.videos as usize] = videos.len() as f64;
+        loader.initial[b.video_longest as usize] = if videos.is_empty() { 5.0 } else { videos.iter().map(crate::video::Video::duration).fold(0.1, f64::max) };
+        // At most 32 clips: an exact numeric bitset of already-checked prepared dimensions.
+        // No new files, strings, system readings or expression callbacks enter this path.
+        loader.initial[b.video_hd_mask as usize] = videos.iter().enumerate().fold(0u32, |mask, (i, video)| mask | (u32::from(video.height >= 720) << i)) as f64;
+    }
     // Reserved so a pack value can't take a name that a scene, element or curve provides.
     for name in ["t", "u", "dur"] {
         scope.reserve(name, "is only available inside a scene");
@@ -1793,16 +1942,20 @@ fn load_manifest(dir: Dir, text: &str, env: &Environment) -> Result<Pack> {
     for name in ["e", "ex", "ey", "ez"] {
         scope.reserve(name, "is only available in edge_color");
     }
+    let mut palette_slots = Vec::new();
     for (name, color) in &palette.colors {
         let slot = loader.alloc(4)?;
         loader.initial[slot as usize..slot as usize + 4].copy_from_slice(color);
         scope.bind(name, slot, Ty::Color);
+        scope.freeze(slot, color);
+        palette_slots.push((*name, slot));
     }
     // Whether the theme is light or dark, so a pack can choose what suits it: `dark` is always `!light`.
     for (name, value) in [("light", palette.light), ("dark", !palette.light)] {
         let slot = loader.alloc(1)?;
         loader.initial[slot as usize] = if value { 1.0 } else { 0.0 };
         scope.bind(name, slot, Ty::Bool);
+        scope.freeze(slot, &[loader.initial[slot as usize]]);
     }
 
     let mut new_names: Vec<(String, u16, Ty)> = Vec::new();
@@ -1823,6 +1976,7 @@ fn load_manifest(dir: Dir, text: &str, env: &Environment) -> Result<Pack> {
     }
     for (name, slot, ty) in new_names.drain(..) {
         scope.bind(&name, slot, ty);
+        scope.freeze(slot, &[loader.initial[slot as usize]]);
     }
     // `[[setting]]`: what someone may change in the panel. Each is a name like a param's, holding the value chosen.
     let declared = f.tables("setting")?;
@@ -1837,7 +1991,33 @@ fn load_manifest(dir: Dir, text: &str, env: &Environment) -> Result<Pack> {
         loader.initial[slot as usize] = setting.value;
         let ty = if setting.kind == SettingKind::Toggle { Ty::Bool } else { Ty::Num };
         scope.bind(&setting.name, slot, ty);
+        scope.freeze(slot, &[setting.value]);
         meta.settings.push(setting);
+    }
+    if format < 2 {
+        if let Some(s) = meta.settings.iter().find(|s| matches!(s.kind, SettingKind::Color { .. })) {
+            return f.err("setting", needs_2(&format!("the color setting '{}'", s.name)));
+        }
+        if f.get("colorize").is_some() {
+            return f.err("colorize", needs_2("colorize"));
+        }
+    }
+    if let Some(name) = f.string("colorize")? {
+        let Some(setting) = meta.settings.iter().find(|s| s.name == name) else {
+            return f.err("colorize", "must name a color setting");
+        };
+        let SettingKind::Color { when } = &setting.kind else {
+            return f.err("colorize", "must name a color setting");
+        };
+        let active = when.as_ref().is_none_or(|(name, value)| meta.settings.iter().any(|s| s.name == *name && s.value == *value));
+        if active && setting.value != 0.0 {
+            loader.palette = palette.recolored(setting.value);
+            for (name, slot) in &palette_slots {
+                let color = loader.palette.colors.iter().find(|(n, _)| n == name).unwrap().1;
+                loader.initial[*slot as usize..*slot as usize + 4].copy_from_slice(&color);
+                scope.freeze(*slot, &color);
+            }
+        }
     }
     if let Some(value) = f.get("colors") {
         let Some(colors) = value.as_table() else { return f.err("colors", "must be a table: [colors]") };
@@ -1859,6 +2039,8 @@ fn load_manifest(dir: Dir, text: &str, env: &Environment) -> Result<Pack> {
     }
     for (name, slot, ty) in new_names {
         scope.bind(&name, slot, ty);
+        let lanes = if ty == Ty::Color { 4 } else { 1 };
+        scope.freeze(slot, &loader.initial[slot as usize..slot as usize + lanes]);
     }
 
     loader.fonts(&mut f)?;
@@ -1895,6 +2077,7 @@ fn load_manifest(dir: Dir, text: &str, env: &Environment) -> Result<Pack> {
     };
     loader.initial[loader.builtins.photos as usize] = photos.len() as f64;
     Ok(Pack {
+        foreground: palette.colors.iter().find(|(name, _)| *name == "foreground").map(|(_, c)| c.map(|v| v as f32)).unwrap_or([0.8, 0.8, 0.8, 1.0]),
         meta,
         stage,
         scenes,
@@ -1906,6 +2089,8 @@ fn load_manifest(dir: Dir, text: &str, env: &Environment) -> Result<Pack> {
         fonts: loader.fonts,
         photos,
         uses_photos: loader.uses_photos,
+        videos,
+        uses_videos,
         warnings: loader.warnings,
         fingerprint: 0,
     })
@@ -2025,7 +2210,59 @@ pub(crate) mod tests {
         }
     }
 
-    const HEADER: &str = "format = 1\nname = \"Test\"\n";
+    const HEADER: &str = "format = 2\nname = \"Test\"\n";
+
+    #[test]
+    fn video_builtins_preserve_legacy_names_and_handle_short_clips() {
+        let base = "format=1\nname=\"Legacy\"\n[[scene]]\nduration=5\n";
+        let simple = load_str("video-legacy-slots", base).unwrap();
+        let named = load_str("video-legacy-names", "format=1\nname=\"Legacy\"\n[params]\nvideos=3\nvideo_longest=7\n[[scene]]\nduration=5\n").unwrap();
+        assert_eq!(named.initial.len(), simple.initial.len() + 2, "only the user's two params add slots");
+        assert_eq!(simple.builtins.videos, 0);
+        let manifest = std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../packs/videos/screensafe.toml")).unwrap();
+        let archive = crate::video::tests::archive_colors(&[[20; 3]; 2]);
+        let dir = temp_pack("video-short-preview", &manifest, &[("short.ssv", &archive)]);
+        let pack =
+            load(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../packs/videos"), &Environment { videos: Some(&dir), ..Default::default() }).unwrap();
+        std::fs::remove_dir_all(dir).unwrap();
+        assert_eq!(pack.videos.len(), 1);
+        assert_eq!(pack.length(), 0.1);
+        assert!(pack.meta.preview.is_none(), "automatic midpoint preview stays inside a short clip");
+        assert!(pack.warnings.is_empty());
+    }
+
+    #[test]
+    fn video_curvature_and_neighbor_fields_are_checked() {
+        let head = "format=2\nname=\"Video fields\"\n[[scene]]\nduration=5\n[[scene.draw]]\nkind=\"image\"\nsource=\"videos\"\n";
+        assert!(load_str("video-curve-box", &format!("{head}curve=0.045\n")).is_err());
+        assert!(load_str("video-curve-bound", &format!("{head}w=1\nh=1\ncurve=0.081\n")).is_err());
+        assert!(load_str("video-wrap-type", &format!("{head}wrap=\"1\"\n")).is_err());
+        assert!(load_str("video-curve-valid", &format!("{head}w=1\nh=1\ncurve=0.045\nframe_offset=\"-1\"\nwrap=\"true\"\n")).is_ok());
+        let photo = head.replace("source=\"videos\"", "source=\"photos\"");
+        for field in ["curve=0.045", "frame_offset=\"1\"", "wrap=\"true\""] {
+            assert!(load_str("photo-video-field", &format!("{photo}{field}\n")).is_err());
+        }
+    }
+
+    #[test]
+    fn prefetch_follows_image_elements_including_nested_photos() {
+        let png = crate::raster::tests::tiny_png();
+        for (name, kind, expected) in [("sprite-prefetch", "sprite", false), ("image-prefetch", "image", true)] {
+            let text = format!("{HEADER}[[scene]]\nduration=2\n[[scene.draw]]\nkind=\"group\"\n[[scene.draw.draw]]\nkind=\"{kind}\"\nfile=\"a.png\"\n");
+            let dir = temp_pack(name, &text, &[("a.png", &png)]);
+            let pack = load(&dir, &Environment::default()).unwrap();
+            assert!(!pack.images.is_empty());
+            assert_eq!(pack.prefetches_images(), expected);
+            std::fs::remove_dir_all(dir).unwrap();
+        }
+        let photos = load_str(
+            "photos-prefetch",
+            &format!("{HEADER}[[scene]]\nduration=2\n[[scene.draw]]\nkind=\"group\"\n[[scene.draw.draw]]\nkind=\"image\"\nsource=\"photos\"\n"),
+        )
+        .unwrap();
+        assert!(photos.images.is_empty() && photos.backgrounds.is_empty());
+        assert!(photos.prefetches_images());
+    }
 
     #[test]
     fn settings_are_declared_checked_and_bound() {
@@ -2068,6 +2305,54 @@ pub(crate) mod tests {
         assert_eq!((pack.scenes[0].duration, pack.scenes[0].hold), (60.0, 4.0));
         std::fs::remove_dir_all(&dir).unwrap();
         assert!(err("timedbad", &format!("{HEADER}[[scene]]\nduration = \"0 - 5\"\n")).contains("comes to -5"));
+    }
+
+    #[test]
+    fn color_settings_recolor_only_when_active_and_reject_invalid_codes() {
+        let decl = "colorize=\"tint_color\"\n[[setting]]\nname=\"themed\"\nlabel=\"Theme\"\nkind=\"toggle\"\n[[setting]]\nname=\"tint_color\"\nlabel=\"Color\"\nkind=\"color\"\nwhen=\"themed\"\nwhen_value=1\n";
+        let scene = "[colors]\ncloud=\"mix(red, white, 0.4)\"\n[[scene]]\nduration=5\n[[scene.draw]]\nkind=\"rect\"\ncolor=\"cloud\"\n";
+        let dir = temp_pack("color-setting-activation", &format!("{HEADER}{decl}{scene}"), &[]);
+        let load_with = |settings: &[(String, f64)]| load(&dir, &Environment { settings, ..Default::default() }).unwrap();
+        let frame = |p: &Pack| crate::eval::Evaluator::new(p, 1, Vec::new()).frame(p, 1.0, 1.6);
+        let original = load_with(&[]);
+        let code = (crate::palette::CUSTOM_COLOR + 0x0000ff) as f64;
+        let off = load_with(&[("tint_color".into(), code)]);
+        assert_eq!(frame(&original), frame(&off), "inactive color must not change the effect");
+        let on = load_with(&[("themed".into(), 1.0), ("tint_color".into(), code)]);
+        assert_ne!(frame(&original), frame(&on), "palette constants, including [colors], must take the chosen hue");
+        // Thumbnail cache keys include settings separately; a color edit is not a pack-file change.
+        assert_eq!(original.fingerprint, on.fingerprint);
+        for wrong in [-1.0, 28.0, 1.5, f64::NAN, f64::INFINITY, (2 * crate::palette::CUSTOM_COLOR) as f64] {
+            let p = load_with(&[("tint_color".into(), wrong)]);
+            assert_eq!(p.meta.settings[1].value, 0.0);
+            assert_eq!(frame(&original), frame(&p));
+        }
+        std::fs::remove_dir_all(dir).unwrap();
+        assert!(err("color-ref", &format!("{HEADER}colorize=\"missing\"\n[[scene]]\n")).contains("colorize"));
+        assert!(err("color-when", &format!("{HEADER}[[setting]]\nname=\"ink\"\nlabel=\"Color\"\nkind=\"color\"\nwhen=\"missing\"\nwhen_value=1\n[[scene]]\n"))
+            .contains("when"));
+    }
+
+    #[test]
+    fn image_theme_filters_use_the_recolored_palette_and_leave_original_pixels_alone() {
+        let body = format!("{HEADER}colorize=\"ink\"\n[[setting]]\nname=\"ink\"\nlabel=\"Color\"\nkind=\"color\"\n[[scene]]\n[[scene.draw]]\nkind=\"image\"\nfile=\"a.png\"\nfilter=\"theme\"\n");
+        let png = crate::raster::tests::tiny_png();
+        let dir = temp_pack("color-filter-palette", &body, &[("a.png", &png)]);
+        let before = load(&dir, &Environment::default()).unwrap();
+        let settings = [("ink".into(), (crate::palette::CUSTOM_COLOR + 0x0000ff) as f64)];
+        let after = load(&dir, &Environment { settings: &settings, ..Default::default() }).unwrap();
+        let filter = |p: &Pack| {
+            let Kind::Image(image) = &p.scenes[0].draw[0].kind else { panic!() };
+            image.filter
+        };
+        assert_ne!(filter(&before), filter(&after));
+        let (Filter::Theme(a), Filter::Theme(b)) = (filter(&before), filter(&after)) else { panic!() };
+        assert_eq!(a[0], b[0], "canvas/shadows stay compatible with the current theme");
+        assert!(b[1][2] > b[1][0], "midtones take the blue hue");
+        std::fs::write(dir.join(MANIFEST), body.replace("filter=\"theme\"", "")).unwrap();
+        let p = load(&dir, &Environment { settings: &settings, ..Default::default() }).unwrap();
+        assert_eq!(filter(&p), Filter::None, "an Original image is never tinted by this control");
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
@@ -2131,8 +2416,8 @@ colors = ["accent", "foreground"]
     #[test]
     fn helpful_errors() {
         let scene = "[[scene]]\nduration = 2\n";
-        assert!(err("fmt", "format = 2\nname = \"x\"\n").contains("must be 1"));
-        assert!(err("noname", "format = 1\n").contains("name: is required"));
+        assert!(err("fmt", "format = 3\nname = \"x\"\n").contains("must be 1 or 2"));
+        assert!(err("noname", "format = 2\n").contains("name: is required"));
         assert!(err("noscene", HEADER).contains("at least one [[scene]]"));
         assert!(err("unknown", &format!("{HEADER}colour = 1\n{scene}")).contains("colour: isn't a setting"));
         assert!(err("preview", &format!("{HEADER}preview = 2\n{scene}")).contains("preview: is at or past the pack's end"));
@@ -2305,8 +2590,17 @@ colors = ["accent", "foreground"]
         std::fs::create_dir_all(theme.join("backgrounds")).unwrap();
         std::fs::write(theme.join("backgrounds/1.png"), crate::raster::tests::tiny_png()).unwrap();
         std::fs::write(theme.join("backgrounds/notes.md"), "x").unwrap();
-        let env =
-            Environment { palette: None, theme: Some(&theme), branding: Some(&art), logo: None, badge: None, settings: &[], photos: None, photo_seed: None };
+        let env = Environment {
+            palette: None,
+            theme: Some(&theme),
+            branding: Some(&art),
+            logo: None,
+            badge: None,
+            settings: &[],
+            photos: None,
+            videos: None,
+            photo_seed: None,
+        };
         let pack = load(&dir, &env).unwrap();
         assert_eq!(pack.arts[0], vec!["OMARCHY".chars().collect::<Vec<_>>()]);
         assert_eq!(pack.backgrounds.len(), 1);
@@ -2316,8 +2610,17 @@ colors = ["accent", "foreground"]
         let logo = dir.join("logo.txt");
         std::fs::write(&logo, "LOGO").unwrap();
         let missing = dir.join("missing.txt");
-        let env =
-            Environment { palette: None, theme: None, branding: Some(&missing), logo: Some(&logo), badge: None, settings: &[], photos: None, photo_seed: None };
+        let env = Environment {
+            palette: None,
+            theme: None,
+            branding: Some(&missing),
+            logo: Some(&logo),
+            badge: None,
+            settings: &[],
+            photos: None,
+            videos: None,
+            photo_seed: None,
+        };
         let pack = load(&dir, &env).unwrap();
         assert_eq!(pack.arts[0], vec!["LOGO".chars().collect::<Vec<_>>()]);
         std::fs::remove_dir_all(&dir).unwrap();
@@ -2333,7 +2636,7 @@ colors = ["accent", "foreground"]
         dir
     }
 
-    const PHOTOS_PACK: &str = "format = 1\nname = \"T\"\n[[scene]]\nduration = 2\n[[scene.draw]]\nkind = \"image\"\nsource = \"photos\"\n";
+    const PHOTOS_PACK: &str = "format = 2\nname = \"T\"\n[[scene]]\nduration = 2\n[[scene.draw]]\nkind = \"image\"\nsource = \"photos\"\n";
 
     #[test]
     fn photos_are_held_open_by_name() {
@@ -2377,7 +2680,7 @@ colors = ["accent", "foreground"]
     fn image_boxes_and_filters() {
         let png = crate::raster::tests::tiny_png();
         let image = |extra: &str| {
-            format!("format = 1\nname = \"T\"\n[[setting]]\nname = \"tone\"\nlabel = \"Tone\"\nkind = \"choice\"\nchoices = [\"A\", \"B\"]\nvalues = [0, 3]\ndefault = 3\n[[scene]]\nduration = 2\n[[scene.draw]]\nkind = \"image\"\nfile = \"a.png\"\n{extra}")
+            format!("format = 2\nname = \"T\"\n[[setting]]\nname = \"tone\"\nlabel = \"Tone\"\nkind = \"choice\"\nchoices = [\"A\", \"B\"]\nvalues = [0, 3]\ndefault = 3\n[[scene]]\nduration = 2\n[[scene.draw]]\nkind = \"image\"\nfile = \"a.png\"\n{extra}")
         };
         let only_w = temp_pack("box-w", &image("w = 0.5\n"), &[("a.png", &png)]);
         assert!(matches!(load(&only_w, &Environment::default()), Err(e) if e.0.contains("both w and h")));
@@ -2390,5 +2693,14 @@ colors = ["accent", "foreground"]
         for d in [only_w, toned, bad] {
             std::fs::remove_dir_all(d).unwrap();
         }
+    }
+
+    #[test]
+    fn format_2_marks_what_older_renderers_cant_read() {
+        let color = "[[setting]]\nname = \"tint\"\nlabel = \"Tint\"\nkind = \"color\"\ndefault = 0\n[[scene]]\nduration = 2\n";
+        assert!(load_str("fmt-1-color", &format!("format = 1\nname = \"T\"\n{color}")).is_err_and(|e| e.0.contains("needs format = 2")));
+        assert!(load_str("fmt-2-color", &format!("format = 2\nname = \"T\"\n{color}")).is_ok());
+        assert!(load_str("fmt-1-plain", "format = 1\nname = \"T\"\n[[scene]]\nduration = 2\n").is_ok(), "format 1 packs still load");
+        assert!(load_str("fmt-3", "format = 3\nname = \"T\"\n[[scene]]\nduration = 2\n").is_err_and(|e| e.0.contains("formats 1 to 2")));
     }
 }

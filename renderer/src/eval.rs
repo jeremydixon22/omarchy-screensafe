@@ -51,6 +51,7 @@ pub enum ImageSrc {
     Pack(usize),
     Background(usize),
     Photo(usize),
+    Video { video: u16, frame: u16 },
 }
 
 /// An image as it's shown: where its pixels come from, and how they're prepared as it's decoded. Each distinct one
@@ -103,6 +104,7 @@ pub enum Item {
         pan_y: f32,
         alpha: f32,
         transform: Affine,
+        curve: f32,
     },
     /// Clip what follows, until the matching `Unclip`, to a quadrilateral.
     Clip([(f32, f32); 4]),
@@ -147,6 +149,7 @@ pub struct FontMetrics {
 
 pub struct Evaluator {
     slots: Vec<f64>,
+    pixels_per_stage: f64,
     /// Where the clock's values come from: fixed unless set otherwise, and its reading for the frame being drawn.
     clock: crate::clock::Clock,
     reading: crate::clock::Reading,
@@ -176,12 +179,17 @@ impl Evaluator {
     pub fn new(pack: &Pack, seed: u64, metrics: Vec<FontMetrics>) -> Evaluator {
         let clock = crate::clock::Clock::fixed();
         let reading = clock.at(0.0);
-        Evaluator { slots: pack.initial.clone(), clock, reading, machine: Machine::new(seed), metrics, text: String::new() }
+        Evaluator { slots: pack.initial.clone(), pixels_per_stage: 720.0, clock, reading, machine: Machine::new(seed), metrics, text: String::new() }
     }
 
     /// Shows the clock from `clock` rather than the fixed moment.
     pub fn set_clock(&mut self, clock: crate::clock::Clock) {
         self.clock = clock;
+    }
+
+    /// Output geometry only; no system readings enter pack expressions.
+    pub fn set_pixel_scale(&mut self, scale: f64) {
+        self.pixels_per_stage = scale.clamp(1.0, 65536.0);
     }
 
     fn num(&mut self, p: &Program) -> f64 {
@@ -230,6 +238,9 @@ impl Evaluator {
 
     pub fn frame(&mut self, pack: &Pack, time: f64, screen_aspect: f64) -> Frame {
         let b = pack.builtins;
+        if pack.uses_videos {
+            self.set(b.video_pixel, 1.0 / self.pixels_per_stage);
+        }
         let aspect = match pack.stage {
             pack::Stage::Aspect(a) => a,
             pack::Stage::Screen | pack::Stage::Pixels(_) => screen_aspect,
@@ -301,20 +312,25 @@ impl Evaluator {
         mut sorted: Option<&mut Vec<(f64, usize, Vec<Item>)>>,
     ) {
         let mut chunk = Vec::new();
-        for i in 0..el.count {
+        'copies: for i in 0..el.count {
             if el.repeats {
                 self.set_index(pack, i, el.count);
             }
-            self.run_lets(&el.lets);
-            if let Some(visible) = &el.visible {
-                if !self.machine.truth(visible, &self.slots) {
-                    continue;
+            let mut at = 0;
+            let draw_at = el.opacity_lets;
+            for gate in &el.visible {
+                self.run_lets(&el.lets[at..gate.after]);
+                at = gate.after;
+                if !self.machine.predicate(&gate.condition, &self.slots, el.visible.len() > 1) {
+                    continue 'copies;
                 }
             }
+            self.run_lets(&el.lets[at..draw_at]);
             let alpha = self.num(&el.opacity).clamp(0.0, 1.0) * parent_alpha;
             if alpha <= 0.0 {
                 continue;
             }
+            self.run_lets(&el.lets[draw_at..]);
             let depth = el.depth.as_ref().map_or(0.0, |d| self.num(d));
             let out: &mut Vec<Item> = if sorted.is_some() { &mut chunk } else { &mut *out };
             let x = self.num(&el.x);
@@ -411,11 +427,20 @@ impl Evaluator {
                         pack::ImageFrom::Files(files) => Some(ImageSrc::Pack(files[pick(files.len())])),
                         pack::ImageFrom::Backgrounds if !pack.backgrounds.is_empty() => Some(ImageSrc::Background(pick(pack.backgrounds.len()))),
                         pack::ImageFrom::Photos if !pack.photos.is_empty() => Some(ImageSrc::Photo(pick(pack.photos.len()))),
+                        pack::ImageFrom::Videos if !pack.videos.is_empty() => {
+                            let index = pick(pack.videos.len());
+                            let position = image.position.as_ref().map(|p| self.num(p)).unwrap_or(0.0);
+                            let offset = image.frame_offset.as_ref().map(|p| self.num(p)).unwrap_or(0.0);
+                            let wrap = image.wrap.as_ref().is_some_and(|p| self.machine.truth(p, &self.slots));
+                            Some(ImageSrc::Video { video: index as u16, frame: pack.videos[index].frame_offset(position, offset, wrap) as u16 })
+                        }
                         _ => None,
                     };
                     if let Some(src) = src {
                         let crop = match (image.frame, image.fit) {
-                            (Some((w, h)), Fit::Cover) => (w / h * 10_000.0).round() as u32,
+                            // Curved video fits and clips in its sampling map: retain the original frame so
+                            // CRT Fit avoids an extra crop/resample on each decoded frame.
+                            (Some((w, h)), Fit::Cover) if image.curve == 0.0 => (w / h * 10_000.0).round() as u32,
                             _ => 0,
                         };
                         out.push(Item::Image {
@@ -427,6 +452,7 @@ impl Evaluator {
                             pan_y: self.num(&image.pan_y).clamp(-1.0, 1.0) as f32,
                             alpha: alpha as f32,
                             transform,
+                            curve: image.curve,
                         });
                     }
                 }
@@ -745,6 +771,58 @@ impl Evaluator {
     }
 }
 
+#[cfg(test)]
+mod optimizer_differential {
+    use super::*;
+
+    fn compare(dir: &std::path::Path, chosen: &[(String, f64)]) {
+        let env = pack::Environment { settings: chosen, ..Default::default() };
+        let original = crate::expr::unoptimized(|| pack::load(dir, &env)).unwrap();
+        let previous = crate::expr::unfused(|| pack::load(dir, &env)).unwrap();
+        let optimized = pack::load(dir, &env).unwrap();
+        assert_eq!(original.scenes.iter().map(|s| s.cost).collect::<Vec<_>>(), optimized.scenes.iter().map(|s| s.cost).collect::<Vec<_>>());
+        let mut raster = crate::raster::Raster::new();
+        raster.load_fonts(&optimized);
+        for seed in [0, 1, 73] {
+            let mut a = Evaluator::new(&original, seed, raster.metrics());
+            let mut b = Evaluator::new(&optimized, seed, raster.metrics());
+            let mut c = Evaluator::new(&previous, seed, raster.metrics());
+            for aspect in [0.75, 1.6, 16.0 / 9.0] {
+                // Deliberately revisit earlier times: look-ahead must not poison later evaluations.
+                for time in [0.0, 0.125, 1.25, 6.5, 17.9, 57.23, 119.75, optimized.length() - 0.01, 4.0, 45.0, 0.0] {
+                    let expected = a.frame(&original, time, aspect);
+                    assert_eq!(expected, c.frame(&previous, time, aspect));
+                    assert_eq!(expected, b.frame(&optimized, time, aspect), "{} t={time}, aspect={aspect}, seed={seed}, settings={chosen:?}", dir.display());
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn bundled_packs_match_original_evaluation() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../packs");
+        for entry in std::fs::read_dir(root).unwrap() {
+            let dir = entry.unwrap().path();
+            if dir.join("screensafe.toml").is_file() {
+                compare(&dir, &[]);
+            }
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn laser_code_matches_original_evaluation() {
+        let dir = std::env::var("SCREENSAFE_OPTIMIZER_PACK").unwrap();
+        for chosen in [
+            vec![],
+            vec![("pace".into(), 1.7), ("fallspeed".into(), 2.0), ("density".into(), 310.0), ("colour".into(), 4.0)],
+            vec![("pace".into(), 0.25), ("fallspeed".into(), 0.5), ("density".into(), 80.0), ("colour".into(), 1.0)],
+        ] {
+            compare(std::path::Path::new(&dir), &chosen);
+        }
+    }
+}
+
 const ART_KEY: usize = 1000;
 
 /// A color, and the points and subpath starts of the mesh edges drawn in it.
@@ -791,7 +869,7 @@ mod tests {
     const METRICS: FontMetrics = FontMetrics { advance: 0.6, ascent: 0.8, line: 1.2 };
 
     fn pack(name: &str, body: &str) -> Pack {
-        let dir = temp_pack(name, &format!("format = 1\nname = \"T\"\n{body}"), &[("art.txt", b"AB\n C\n")]);
+        let dir = temp_pack(name, &format!("format = 2\nname = \"T\"\n{body}"), &[("art.txt", b"AB\n C\n")]);
         let pack = load(&dir, &Environment::default()).unwrap_or_else(|e| panic!("{e}"));
         std::fs::remove_dir_all(&dir).unwrap();
         pack
@@ -1012,7 +1090,7 @@ mod tests {
         let png = crate::raster::tests::tiny_png();
         let dir = temp_pack(
             "files",
-            "format = 1\nname = \"T\"\n[[scene]]\nduration = 10\n[[scene.draw]]\nkind = \"image\"\nfiles = [\"a.png\", \"b.png\", \"c.png\"]\nindex = \"t\"\nw = 0.4\nh = 0.2\nfilter = \"sepia\"\n",
+            "format = 2\nname = \"T\"\n[[scene]]\nduration = 10\n[[scene.draw]]\nkind = \"image\"\nfiles = [\"a.png\", \"b.png\", \"c.png\"]\nindex = \"t\"\nw = 0.4\nh = 0.2\nfilter = \"sepia\"\n",
             &[("a.png", &png), ("b.png", &png), ("c.png", &png)],
         );
         let p = load(&dir, &Environment::default()).unwrap();

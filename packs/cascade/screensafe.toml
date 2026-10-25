@@ -1,6 +1,6 @@
 # Columns of digits fall down the screen at their own speeds, each led by a bright digit and trailing dimmer ones
 # that keep changing, in the theme's colors.
-format = 1
+format = 2
 name = "Cascade"
 author = "ScreenSafe"
 license = "MIT"
@@ -9,6 +9,8 @@ stage = "screen"
 fps = 30
 fade = 0
 background = "background"
+
+colorize = "tint_color"
 
 [params]
 # Digit size.
@@ -31,6 +33,12 @@ choices = ["Short", "Long"]
 values = [10, 18]
 default = 18
 
+
+[[setting]]
+name = "tint_color"
+label = "Color"
+kind = "color"
+default = 0
 
 [[scene]]
 name = "Falling"

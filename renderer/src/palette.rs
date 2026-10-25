@@ -2,6 +2,55 @@
 
 use crate::expr::parse_hex;
 
+pub const CUSTOM_COLOR: u32 = 1 << 24;
+
+/// A color choice is numeric data: 0 = original palette, 1..=N = theme swatch,
+/// CUSTOM_COLOR + 24-bit RGB = custom. Gaps/fractions/non-finite values are invalid.
+pub fn valid_choice(value: f64) -> bool {
+    value.is_finite()
+        && value.fract() == 0.0
+        && ((0.0..=NAMES.len() as f64).contains(&value) || (CUSTOM_COLOR as f64..=(2 * CUSTOM_COLOR - 1) as f64).contains(&value))
+}
+
+fn linear(v: f64) -> f64 {
+    if v <= 0.04045 {
+        v / 12.92
+    } else {
+        ((v + 0.055) / 1.055).powf(2.4)
+    }
+}
+fn srgb(v: f64) -> f64 {
+    if v <= 0.0031308 {
+        12.92 * v
+    } else {
+        1.055 * v.powf(1.0 / 2.4) - 0.055
+    }
+}
+fn luminance(c: [f64; 3]) -> f64 {
+    c[0] * 0.2126 + c[1] * 0.7152 + c[2] * 0.0722
+}
+
+/// Tint by moving along black -> chosen hue -> white in linear light. Matching
+/// relative luminance preserves light/dark detail and contrast against the background,
+/// even for a dark blue, bright yellow, black or white selection.
+fn tint(original: [f64; 4], selected: [f64; 4]) -> [f64; 4] {
+    let target = luminance([linear(original[0]), linear(original[1]), linear(original[2])]);
+    let ink = [linear(selected[0]), linear(selected[1]), linear(selected[2])];
+    let middle = luminance(ink);
+    let mut out = [0.0, 0.0, 0.0, original[3]];
+    for i in 0..3 {
+        let value = if target <= middle && middle > 0.0 {
+            ink[i] * target / middle
+        } else if middle < 1.0 {
+            ink[i] + (1.0 - ink[i]) * (target - middle) / (1.0 - middle)
+        } else {
+            target
+        };
+        out[i] = srgb(value.clamp(0.0, 1.0)).clamp(0.0, 1.0);
+    }
+    out
+}
+
 /// The color names every pack can use, with Omarchy's default (Tokyo Night) values for themes that leave one out.
 /// A missing name falls back to another name's value where the theme has one (see `fallback`).
 pub const NAMES: &[(&str, &str)] = &[
@@ -61,6 +110,33 @@ pub struct Palette {
 }
 
 impl Palette {
+    pub fn choice(&self, value: f64) -> Option<[f64; 4]> {
+        if !valid_choice(value) || value == 0.0 {
+            return None;
+        }
+        let value = value as u32;
+        if value < CUSTOM_COLOR {
+            return self.colors.get(value as usize - 1).map(|(_, c)| *c);
+        }
+        let rgb = value - CUSTOM_COLOR;
+        Some([((rgb >> 16) & 255) as f64 / 255.0, ((rgb >> 8) & 255) as f64 / 255.0, (rgb & 255) as f64 / 255.0, 1.0])
+    }
+
+    pub fn recolored(&self, value: f64) -> Self {
+        let Some(ink) = self.choice(value) else {
+            return self.clone();
+        };
+        let colors = self
+            .colors
+            .iter()
+            .map(|(name, color)| {
+                // Preserve the canvas and absolute black/white. Other inks retain their luminance.
+                let c = if name.ends_with("background") || matches!(*name, "black" | "white") { *color } else { tint(*color, ink) };
+                (*name, c)
+            })
+            .collect();
+        Self { colors, light: self.light }
+    }
     pub fn default_theme() -> Palette {
         Palette::from_toml("").expect("an empty palette parses")
     }
@@ -99,6 +175,39 @@ impl Palette {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn color_choices_are_exact_bounded_numbers_and_keep_theme_swatches_live() {
+        let p = Palette::from_toml("accent = \"#123456\"\n").unwrap();
+        assert!(p.choice(0.0).is_none());
+        assert_eq!(p.choice(3.0), p.get("accent"));
+        assert_eq!(p.choice((CUSTOM_COLOR + 0xff0000) as f64), Some([1.0, 0.0, 0.0, 1.0]));
+        for value in [-1.0, 1.5, 28.0, 1000.0, (CUSTOM_COLOR - 1) as f64, (2 * CUSTOM_COLOR) as f64, f64::NAN, f64::INFINITY] {
+            assert!(!valid_choice(value));
+            assert!(p.choice(value).is_none());
+        }
+        assert_eq!(p.recolored(0.0).colors, p.colors);
+    }
+
+    #[test]
+    fn recoloring_preserves_luminance_alpha_and_canvas_for_extreme_hues() {
+        for theme in ["", "mode=\"light\"\nbackground=\"#ffffff\"\nforeground=\"#1b1d20\"\n"] {
+            let original = Palette::from_toml(theme).unwrap();
+            for rgb in [0, 0xffffff, 0x0000ff, 0xffff00, 0xff0000, 0x003344, 0x858585] {
+                let changed = original.recolored((CUSTOM_COLOR + rgb) as f64);
+                assert_eq!(changed.light, original.light);
+                for ((name, a), (_, b)) in original.colors.iter().zip(&changed.colors) {
+                    assert!(b.iter().all(|v| v.is_finite() && (0.0..=1.0).contains(v)));
+                    assert_eq!(a[3], b[3]);
+                    if name.ends_with("background") || matches!(*name, "black" | "white") {
+                        assert_eq!(a, b);
+                    }
+                    let y = |c: &[f64; 4]| luminance([linear(c[0]), linear(c[1]), linear(c[2])]);
+                    assert!((y(a) - y(b)).abs() < 1e-10, "lost contrast: {name}/{rgb:x}");
+                }
+            }
+        }
+    }
 
     #[test]
     fn reads_theme_and_falls_back() {

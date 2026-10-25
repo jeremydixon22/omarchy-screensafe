@@ -211,7 +211,8 @@ def scene_bodies(sheet, crisp, picture):
 SETTINGS = (
     '[[setting]]\nname = "logo"\nlabel = "Picture"\nkind = "choice"\nchoices = ["ScreenSafe", "Omarchy"]\n'
     'values = [0, 1]\ndefault = 0\n\n'
-    '[[setting]]\nname = "pixelart"\nlabel = "Pixel art in theme colors"\nkind = "toggle"\ndefault = false\n'
+    '[[setting]]\nname = "pixelart"\nlabel = "Pixel art in theme colors"\nkind = "toggle"\ndefault = false\n\n'
+    '[[setting]]\nname = "tint_color"\nlabel = "Theme color"\nkind = "color"\ndefault = 0\nwhen = "pixelart"\nwhen_value = 1\n'
 )
 
 
@@ -238,7 +239,8 @@ def build(packs):
     description = ("ScreenSafe's shield or the Omarchy mark, or your own badge, bouncing, shattering, waving and in orbit. To show "
                    "yours, put an image at ~/.config/omarchy/screensafe/badge.png.")
     head = (f"# Badge: {description} Written by tools/badge/build.py.\n"
-            f'format = 1\nname = "Badge"\nauthor = "ScreenSafe"\nlicense = "MIT"\ndescription = {q(description)}\n'
+            f'format = 2\nname = "Badge"\nauthor = "ScreenSafe"\nlicense = "MIT"\ndescription = {q(description)}\n'
+            f'colorize = "tint_color"\n'
             f"preview = {num(DUR * 4 + 10)}\nfps = 30\nfade = 0\n\n" + SETTINGS)
     with open(os.path.join(folder, "screensafe.toml"), "w") as f:
         f.write(head + "\n" + "\n".join(scenes))

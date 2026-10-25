@@ -1,7 +1,7 @@
 # Photos: your own photos, or a set of examples, shown full screen, whole, or dropped onto a pile as prints or
 # Polaroids. Your photos are read from ~/Pictures/Screensaver. The examples are in examples/; see tools/photos for
 # where each came from.
-format = 1
+format = 2
 name = "Photos"
 author = "ScreenSafe"
 license = "MIT"
@@ -12,6 +12,8 @@ fade = 0
 background = "black"
 # Keep the thumbnail moment inside even the shortest "Each photo" choice (5 s).
 preview = 4
+
+colorize = "tint_color"
 
 [[setting]]
 name = "source"
@@ -46,14 +48,6 @@ values = [5, 10, 20, 45]
 default = 10
 
 [[setting]]
-name = "tone"
-label = "Tone"
-kind = "choice"
-choices = ["Original", "Greyscale", "Sepia", "Theme"]
-values = [0, 1, 2, 3]
-default = 0
-
-[[setting]]
 name = "hint"
 label = "Example notice"
 kind = "toggle"
@@ -66,6 +60,22 @@ kind = "choice"
 choices = ["Shuffle", "In order"]
 values = [0, 1]
 default = 0
+
+[[setting]]
+name = "tone"
+label = "Tone"
+kind = "choice"
+choices = ["Original", "Greyscale", "Sepia", "Theme"]
+values = [0, 1, 2, 3]
+default = 0
+
+[[setting]]
+name = "tint_color"
+label = "Color"
+kind = "color"
+default = 0
+when = "tone"
+when_value = 3
 
 # One photo each time round. Yours when there are any and they're chosen; otherwise the chosen set of examples.
 # Shuffled, each pass through them shows every one once, in an order of its own: a step by a prime larger than the

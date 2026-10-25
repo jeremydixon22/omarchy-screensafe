@@ -4,10 +4,12 @@ import QtQuick.Layouts
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
+import "OverlayModel.js" as OverlayModel
+import "ColorModel.js" as ColorModel
 
 // The bar icon and its panel: whether ScreenSafe is the screensaver, which pack it shows, and a preview. The
-// service does the work; this is a handle on it. Every string from a pack is shown as plain text. The row the
-// cursor rests on opens to show a thumbnail of the pack beside its description; the chosen pack is ticked. Starred
+// service does the work; this is a handle on it. Every string from a pack is shown as plain text. The
+// thumbnail and description stay visible in each card; the chosen pack is ticked. Starred
 // packs are listed first, by name; the title stays pinned above the list, and Preview below it.
 Panel {
   id: root
@@ -35,13 +37,13 @@ Panel {
   readonly property color dim: Qt.darker(foreground, 1.55)
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
 
-  // Two tabs: the screensaver's settings, and About. The panel reopens on the one it was left on, so someone
+  // Screensaver, Overlay and About tabs. The panel reopens on the one it was left on, so someone
   // following About's links comes back to them.
   property string tab: "screensaver"
   function setTab(t) {
     if (t === root.tab) return
+    root.settingsPath = ""
     root.tab = t
-    root.expandedRow = ""
     root.setScroll(0)
   }
 
@@ -74,12 +76,30 @@ Panel {
   // The keyboard cursor walks these rows top to bottom.
   readonly property var rows: {
     // In the order they appear: the time at the top, then the tabs and Enable, then the list.
+    if (root.tab === "overlay") {
+      var overlayRows = ["delay", "tabs", "enable"]
+      var declared = root.overlayScrollingDecl
+      for (var o = 0; o < declared.length; o++) overlayRows.push("set:" + declared[o].name)
+      return overlayRows.concat(["overlay:reset"]).concat(root.overlayPositionDecl ? ["set:position", "preview"] : ["preview"])
+    }
     if (root.tab === "about") return ["delay", "tabs", "enable", "about:project", "about:find", "about:make", "about:share"]
     if (root.settingsPath !== "") {
       var page = ["delay", "tabs", "enable", "settings:back", "settings:live"]
       if (root.settingsPhotos >= 0) page.push("settings:photos")
-      for (var s = 0; s < root.settingsDecl.length; s++) page.push("set:" + root.settingsDecl[s].name)
+      if (root.settingsVideos >= 0) page.push("settings:videos")
+      for (var s = 0; s < root.scrollingSettingsDecl.length; s++) {
+        var declaration = root.scrollingSettingsDecl[s]
+        if (!root.settingActive(declaration)) continue
+        page.push("set:" + declaration.name)
+        if (declaration.kind === "color" && root.settingsValues[declaration.name] >= ColorModel.customBase)
+          page = page.concat(["color:" + declaration.name + ":h", "color:" + declaration.name + ":s", "color:" + declaration.name + ":v"])
+      }
       page.push("settings:reset")
+      if (root.pinnedColorDecl) {
+        page.push("set:" + root.pinnedColorDecl.name)
+        if (root.settingsValues[root.pinnedColorDecl.name] >= ColorModel.customBase)
+          page = page.concat(["color:" + root.pinnedColorDecl.name + ":h", "color:" + root.pinnedColorDecl.name + ":s", "color:" + root.pinnedColorDecl.name + ":v"])
+      }
       // With a live preview on the page, there's no need for the pinned one.
       if (!root.liveOn) page.push("preview")
       return page
@@ -100,9 +120,11 @@ Panel {
   onCursorChanged: {
     cursorRow = rows[cursor] || ""
     if (cursorActive) lastRow = cursorRow
-    expandTimer.restart()
   }
-  onRowsChanged: if (cursorRow !== "" && rows.indexOf(cursorRow) >= 0) cursor = rows.indexOf(cursorRow)
+  onRowsChanged: {
+    if (cursorRow !== "" && rows.indexOf(cursorRow) >= 0) cursor = rows.indexOf(cursorRow)
+    else cursor = Math.max(0, Math.min(cursor, rows.length - 1))
+  }
   function at(row) { return root.cursorActive && root.rows[root.cursor] === row }
   // Whether the cursor last moved by keyboard. Only then does the list scroll to follow it: a row the pointer is on
   // is already in view, and scrolling under the pointer would hide that the list goes on.
@@ -136,7 +158,7 @@ Panel {
     }
   }
   // The settings page's live preview: the renderer drawing the pack, laid over the thumbnail's box while the page is
-  // open and the box is wholly in view; the thumbnail stays beneath it, for the moment before it shows.
+  // open; its fixed box stays above the scrolling options. The thumbnail remains beneath it until it shows.
   readonly property bool liveOn: svc ? svc.livePreviews : true
   // Started once a page has stayed open a moment, so passing through pages quickly starts nothing.
   property bool liveSettled: false
@@ -150,9 +172,9 @@ Panel {
   onLiveWantedChanged: root.syncLive()
   function syncLive() {
     if (!root.svc) return
-    if (!root.liveWanted) { root.svc.stopLive(); return }
-    var top = pageThumbBox.mapToItem(pageScroller, 0, 0).y
-    if (top < 0 || top + pageThumbBox.height > pageScroller.height) { root.svc.stopLive(); return }
+    if (!root.liveWanted || !pageThumbBox.visible || pageThumbBox.width < 18 || pageThumbBox.height < 11) { root.svc.stopLive(); return }
+    var top = pageThumbBox.mapToItem(settingsView, 0, 0).y
+    if (top < 0 || top + pageThumbBox.height > settingsView.height) { root.svc.stopLive(); return }
     // The panel covers its whole screen, so a place in it is a place on that screen, in logical pixels.
     var at = pageThumbBox.mapToItem(null, 1, 1)
     var screen = panel.screen ? panel.screen.name : ""
@@ -175,30 +197,24 @@ Panel {
     if (settingsPath !== "") svc.requestThumbnail(settingsPath, root.thumbSize)
     else svc.stopLive()
   }
-  // Keeps a row of the settings page in view.
+  function inside(item, ancestor) {
+    for (var node = item; node; node = node.parent) if (node === ancestor) return true
+    return false
+  }
+  // Scroll only the control's own region; pinned rows never move the options.
   function revealInPage(item) {
-    var top = item.mapToItem(settingsPage, 0, 0).y
+    if ((root.tab !== "overlay" && item === backRow) || root.inside(item, overlayPositionDock)) return
+    var page = root.tab === "overlay" ? overlayPage : settingsPage
+    var scroller = root.tab === "overlay" ? overlayScroller : pageScroller
+    if (root.inside(item, colorDockPage)) { page = colorDockPage; scroller = colorDock }
+    var top = item.mapToItem(page, 0, 0).y
     var bottom = top + item.height
-    var view = pageScroller.height
-    if (bottom > pageScroller.contentY + view) pageScroller.contentY = Math.min(Math.max(0, settingsPage.implicitHeight - view), bottom - view)
-    if (top < pageScroller.contentY) pageScroller.contentY = Math.max(0, top)
+    var view = scroller.height
+    if (bottom > scroller.contentY + view) scroller.contentY = Math.min(Math.max(0, page.implicitHeight - view), bottom - view)
+    if (top < scroller.contentY) scroller.contentY = Math.max(0, top)
   }
 
-  // The pack row that's open, showing its thumbnail and description: the one the cursor rests on, after a moment.
-  property string expandedRow: ""
-  onCursorActiveChanged: {
-    if (cursorActive) lastRow = rows[cursor] || ""
-    expandTimer.restart()
-  }
-  // Longer for the pointer, so passing over rows on the way somewhere doesn't open each one.
-  Timer {
-    id: expandTimer
-    interval: root.keyMoved ? 250 : 600
-    onTriggered: {
-      var row = root.cursorActive ? (root.rows[root.cursor] || "") : ""
-      root.expandedRow = row.indexOf("pack:") === 0 ? row : ""
-    }
-  }
+  onCursorActiveChanged: if (cursorActive) lastRow = rows[cursor] || ""
   // Thumbnails are drawn at the screen's shape, at about twice the size they're shown.
   readonly property real screenAspect: panel.screenW > 0 && panel.screenH > 0
     ? Math.max(1.0, Math.min(2.4, panel.screenW / panel.screenH)) : 16 / 10
@@ -215,85 +231,24 @@ Panel {
     root.lastPointer = at
     root.point(row)
   }
-  // Keeps the cursor's row in view, as it moves and as rows open and close around it: the list scrolls only when the
-  // row isn't wholly in view, and then just far enough to show it and a little of what's beyond, so the list never
-  // looks as if it ends there when it doesn't.
-  //
-  // The cursor's row is anchored: it stays where it is on screen however the rows around it open and close, and only
-  // then is the list scrolled, if it must be. When the pointer chose the row, never so far that the row leaves the
-  // pointer. The scroll is worked out afresh from the anchor each time, so rows opening and closing one after the
-  // other don't add up to a jump.
+  // Keyboard navigation reveals a whole card. Pointer movement never scrolls the list.
   property Item revealTarget: null
-  property real anchorOffset: NaN      // the cursor's row's top, from the top of the list's view
-  property bool adjusting: false       // the list is being scrolled here, not by the user
   function reveal(item) {
     root.revealTarget = item
-    scrollTo(item)
+    if (root.keyMoved) scrollTo(item)
   }
-  function anchor(item) {
-    root.anchorOffset = item.mapToItem(column, 0, 0).y - scroller.contentY
-  }
-  function setScroll(y) {
-    root.adjusting = true
-    scroller.contentY = y
-    root.adjusting = false
-  }
+  function setScroll(y) { scroller.contentY = y }
   function scrollTo(item) {
-    var peek = Style.space(28)
+    var peek = Style.space(16)
     var top = item.mapToItem(column, 0, 0).y
     var bottom = top + item.height
-    var view = scroller.height
-    var most = Math.max(0, scroller.contentHeight - view)
-    var anchored = item === root.revealTarget && !isNaN(root.anchorOffset)
-    var byPointer = anchored && !root.keyMoved && root.pointerSeen
-    var to = anchored ? top - root.anchorOffset : scroller.contentY
-    if (bottom > to + view) to = bottom + peek - view
+    var to = scroller.contentY
+    if (bottom > to + scroller.height) to = bottom + peek - scroller.height
     if (top < to) to = top - peek
-    if (byPointer) {
-      // Where the pointer is in the list's view; the content under it is to + that.
-      var at = scroller.mapFromGlobal(root.lastPointer.x, root.lastPointer.y).y
-      if (at >= 0 && at <= view) to = Math.max(top - at + 1, Math.min(bottom - at - 1, to))
-    }
-    // The anchor keeps where the row should be; a list briefly too short to scroll there (as one row closes before
-    // the next opens) doesn't move it.
-    if (anchored) root.anchorOffset = top - to
-    to = Math.max(0, Math.min(most, to))
-    if (to !== scroller.contentY) root.setScroll(to)
+    root.setScroll(Math.max(0, Math.min(Math.max(0, scroller.contentHeight - scroller.height), to)))
   }
-  // The panel's height. When the list doesn't fit, its bottom edge cuts through a row rather than falling between
-  // two, so a list that goes on never looks complete.
-  // The panel keeps that height wherever the cursor is: a row the cursor holds open is measured as if it were closed.
-  function panelHeight() {
-    var kids = packList.children
-    var extra = 0
-    for (var k = 0; k < kids.length; k++) if (kids[k].visible && kids[k].openHeight > 0) extra += kids[k].openHeight
-    var listHeight = column.implicitHeight - extra
-    var bottom = statusRow.visible ? statusRow.implicitHeight : 0
-    var content = Math.max(listHeight + footer.implicitHeight, about.implicitHeight) + bottom
-    var full = panel.fittedContentHeight(header.implicitHeight + content, Style.space(620))
-    if (listHeight + footer.implicitHeight < about.implicitHeight) return full
-    var shown = full - panel.verticalContentInset - header.implicitHeight - footer.implicitHeight - bottom
-    if (shown >= listHeight - 0.5) return full
-    var y = shown - packList.y
-    var prev = null
-    var shift = 0
-    for (var i = 0; i < kids.length; i++) {
-      var c = kids[i]
-      if (!c.visible || c.height <= 0) continue
-      var opened = c.openHeight > 0 ? c.openHeight : 0
-      var top = c.y - shift
-      var height = c.height - opened
-      shift += opened
-      if (y >= top + height + packList.spacing) { prev = { y: top, height: height }; continue }
-      var cut = y - top
-      // A separator is too thin to cut through; the row above it is cut instead.
-      var thin = height < Style.space(16)
-      if (!thin && cut >= height * 0.3 && cut <= height * 0.7) return full
-      if (!thin && cut > height * 0.7) return full - (cut - height * 0.5)
-      return prev ? full - (y - (prev.y + prev.height * 0.5)) : full
-    }
-    return full
-  }
+  // Keep list and settings views equally tall; expanded cards no longer need row-cut sizing.
+  function panelHeight() { return panel.fittedContentHeight(Style.space(620), Style.space(620)) }
 
   function durationText(s) {
     if (s < 60) return s + " s"
@@ -353,6 +308,18 @@ Panel {
   property bool keepSettingsPage: false
   readonly property var settingsDecl: settingsPath !== "" && svc ? svc.declarationsOf(settingsPath) : []
   readonly property var settingsValues: settingsPath !== "" && svc ? svc.settingsOf(settingsPath) : ({})
+  readonly property var pinnedColorDecl: {
+    for (var i = 0; i < root.settingsDecl.length; i++)
+      if (root.settingsDecl[i].kind === "color" && root.settingActive(root.settingsDecl[i])) return root.settingsDecl[i]
+    return null
+  }
+  readonly property var scrollingSettingsDecl: root.settingsDecl.filter(function(d) { return !root.pinnedColorDecl || d.name !== root.pinnedColorDecl.name })
+  readonly property var overlayPositionDecl: {
+    var declared = root.svc ? root.svc.overlayDeclarations : []
+    for (var i = 0; i < declared.length; i++) if (declared[i].name === "position") return declared[i]
+    return null
+  }
+  readonly property var overlayScrollingDecl: (root.svc ? root.svc.overlayDeclarations : []).filter(function(d) { return d.name !== "position" })
   readonly property string settingsName: {
     for (var i = 0; i < root.packs.length; i++) if (root.packs[i].path === root.settingsPath) return root.packs[i].name
     return ""
@@ -365,12 +332,17 @@ Panel {
     root.close()
     root.svc.openPhotosFolder()
   }
+  readonly property int settingsVideos: settingsPath !== "" && svc ? svc.videosOf(settingsPath) : -1
+  function openVideos() {
+    if (!root.svc) return
+    root.close()
+    root.svc.openVideosFolder()
+  }
 
   function openSettings(row) {
     if (row.indexOf("pack:") !== 0 || row === "pack:auto" || !root.hasSettings(row.slice(5))) return
     root.settingsReturn = row
     root.settingsPath = row.slice(5)
-    root.expandedRow = ""
     root.cursorActive = true
     var first = root.settingsDecl.length > 0 ? "set:" + root.settingsDecl[0].name : "settings:back"
     root.cursor = Math.max(0, root.rows.indexOf(first))
@@ -385,27 +357,37 @@ Panel {
   }
 
   function declOf(name) {
-    for (var i = 0; i < root.settingsDecl.length; i++) if (root.settingsDecl[i].name === name) return root.settingsDecl[i]
+    var list = root.tab === "overlay" && root.svc ? root.svc.overlayDeclarations : root.settingsDecl
+    for (var i = 0; i < list.length; i++) if (list[i].name === name) return list[i]
     return null
   }
+  function settingActive(d) { return !d.when || root.settingsValues[d.when] === d.whenValue }
 
   // Changes a setting by a step: a toggle flips; a choice moves to the next or previous one (going round when
   // `wrap`); a range moves by its step, within its bounds.
   function stepSetting(name, direction, wrap) {
     var d = root.declOf(name)
     if (!d || !root.svc) return
-    var v = root.settingsValues[name]
+    var v = (root.tab === "overlay" ? root.svc.overlayValues : root.settingsValues)[name]
     var next = v
     if (d.kind === "toggle") next = v ? 0 : 1
+    else if (d.kind === "color") next = ColorModel.step(v, direction, wrap, root.svc.themeSwatches)
     else if (d.kind === "choice") {
       var i = Math.max(0, d.values.indexOf(v)) + direction
       next = d.values[wrap ? (i + d.values.length) % d.values.length : Math.max(0, Math.min(d.values.length - 1, i))]
     } else next = Math.max(d.min, Math.min(d.max, v + direction * d.step))
-    if (next !== v) root.svc.setSetting(root.settingsPath, name, next)
+    if (next !== v) root.setSettingValue(name, next)
+  }
+
+  function setSettingValue(name, value) {
+    if (!root.svc) return
+    if (root.tab === "overlay") root.svc.setOverlay(name, value)
+    else root.svc.setSetting(root.settingsPath, name, value)
   }
 
   function settingValueText(d) {
-    var v = root.settingsValues[d.name]
+    var v = (root.tab === "overlay" && root.svc ? root.svc.overlayValues : root.settingsValues)[d.name]
+    if (root.tab === "overlay" && d.name === "opacity") return Math.round(v * 100) + "%"
     if (d.kind === "range") return (Math.round(v * 1000) / 1000) + (d.unit !== "" ? " " + d.unit : "")
     return ""
   }
@@ -436,13 +418,15 @@ Panel {
 
   function activate() {
     var row = root.rows[root.cursor]
-    if (row === "tabs") setTab(root.tab === "about" ? "screensaver" : "about")
+    if (row === "tabs") setTab(["screensaver", "overlay", "about"][( ["screensaver", "overlay", "about"].indexOf(root.tab) + 1) % 3])
     else if (row.indexOf("about:") === 0) openLink(row)
     else if (row === "enable") toggleOnIdle()
     else if (row === "delay") stepDelay(1)
     else if (row === "settings:back") closeSettings()
     else if (row === "settings:live") { if (svc) svc.setLivePreviews(!root.liveOn) }
     else if (row === "settings:photos") openPhotos()
+    else if (row === "settings:videos") openVideos()
+    else if (row === "overlay:reset") { if (svc) svc.resetOverlay() }
     else if (row === "settings:reset") { if (svc) svc.resetSettings(root.settingsPath) }
     else if (row.indexOf("set:") === 0) stepSetting(row.slice(4), 1, true)
     else if (row === "preview") preview()
@@ -463,11 +447,10 @@ Panel {
     openRow = rows.indexOf(lastRow) >= 0 ? lastRow : rows.indexOf(chosenRow) >= 0 ? chosenRow : rows[0]
     cursor = rows.indexOf(openRow)
     cursorRow = openRow
-    // Then it shows there from the start, and its row opens after a moment, as when it's moved there.
+    // Show the chosen card immediately without resizing neighboring rows.
     cursorActive = true
     pointerSeen = false
     keyMoved = false
-    expandedRow = ""
     root.setScroll(0)
     showChosen = true
     Qt.callLater(root.scrollToChosen)
@@ -515,7 +498,7 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: keyCatcher
-    contentWidth: panel.fittedContentWidth(Style.space(380))
+    contentWidth: panel.fittedContentWidth(Style.space(420))
     contentHeight: root.panelHeight()
 
     PanelKeyCatcher {
@@ -530,9 +513,12 @@ Panel {
         } else if (dx !== 0 && root.rows[root.cursor] === "delay") {
           root.stepDelay(dx)
         } else if (dx !== 0 && root.rows[root.cursor] === "tabs") {
-          root.setTab(dx > 0 ? "about" : "screensaver")
+          root.setTab(["screensaver", "overlay", "about"][( ["screensaver", "overlay", "about"].indexOf(root.tab) + (dx > 0 ? 1 : 2)) % 3])
         } else if (dx !== 0 && root.rows[root.cursor].indexOf("set:") === 0) {
           root.stepSetting(root.rows[root.cursor].slice(4), dx > 0 ? 1 : -1, false)
+        } else if (dx !== 0 && root.rows[root.cursor].indexOf("color:") === 0) {
+          var parts = root.rows[root.cursor].split(":")
+          root.setSettingValue(parts[1], ColorModel.adjust(root.settingsValues[parts[1]], parts[2], dx > 0 ? 1 : -1, root.svc.themeSwatches))
         } else if (dx < 0 && root.rows[root.cursor] === "settings:back") {
           root.closeSettings()
         } else if (dx > 0 && root.rows[root.cursor].indexOf("pack:") === 0) {
@@ -620,17 +606,19 @@ Panel {
         }
 
         Item {
+          id: modeRow
           width: header.width
-          height: Math.max(tabRow.implicitHeight, enableRow.implicitHeight)
+          readonly property bool stacked: tabRow.implicitWidth + enableRow.implicitWidth + Style.space(10) > width
+          height: stacked ? tabRow.implicitHeight + enableRow.implicitHeight + Style.space(4) : Math.max(tabRow.implicitHeight, enableRow.implicitHeight)
 
           Row {
             id: tabRow
             anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
+            y: modeRow.stacked ? 0 : (modeRow.height - implicitHeight) / 2
             spacing: Style.space(8)
 
             Repeater {
-              model: [{ value: "screensaver", label: "Screensaver" }, { value: "about", label: "About" }]
+              model: [{ value: "screensaver", label: "Screensaver" }, { value: "overlay", label: "Overlay" }, { value: "about", label: "About" }]
               Button {
                 required property var modelData
                 text: modelData.label
@@ -649,7 +637,7 @@ Panel {
           CursorSurface {
             id: enableRow
             anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
+            y: modeRow.height - implicitHeight
             hasCursor: root.at("enable")
             foreground: root.foreground
             implicitWidth: enableLayout.implicitWidth + Style.space(16)
@@ -778,22 +766,20 @@ Panel {
         }
       }
 
-      // A pack's settings, in place of the list.
-      Flickable {
-        id: pageScroller
+      // Back and preview stay fixed while the pack's options scroll beneath them.
+      Item {
+        id: settingsView
         visible: root.tab === "screensaver" && root.settingsPath !== ""
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: header.bottom
         anchors.bottom: footer.top
-        contentWidth: width
-        contentHeight: settingsPage.implicitHeight
-        clip: true
-        boundsBehavior: Flickable.StopAtBounds
 
         Column {
-          id: settingsPage
-          width: parent.width
+          id: settingsHeader
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.top: parent.top
           spacing: Style.space(4)
 
           CursorSurface {
@@ -838,151 +824,302 @@ Panel {
             }
           }
 
-          // The pack as its settings now are: live, or a thumbnail drawn again as they change.
+          // Reserve useful option space on short screens instead of clipping the live surface.
           ThumbView {
             id: pageThumbBox
-            width: parent.width
-            height: Math.round(width / root.screenAspect)
+            width: Math.min(parent.width, Math.round(height * root.screenAspect))
+            anchors.horizontalCenter: parent.horizontalCenter
+            height: Math.max(0, Math.min(Math.round(parent.width / root.screenAspect),
+              settingsView.height - backRow.height - settingsHeader.spacing - colorDock.height - Style.space(root.pinnedColorDecl ? 100 : 144)))
+            visible: height >= Style.space(32)
             thumb: root.pageThumb
           }
+        }
 
-          CursorSurface {
-            id: liveRow
+        Flickable {
+          id: pageScroller
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.top: settingsHeader.bottom
+          anchors.topMargin: Style.space(4)
+          anchors.bottom: colorDock.top
+          anchors.bottomMargin: colorDock.visible ? Style.space(4) : 0
+          contentWidth: width
+          contentHeight: settingsPage.implicitHeight
+          onContentHeightChanged: contentY = Math.max(0, Math.min(contentY, contentHeight - height))
+          clip: true
+          boundsBehavior: Flickable.StopAtBounds
+
+          Column {
+            id: settingsPage
             width: parent.width
-            hasCursor: root.at("settings:live")
-            foreground: root.foreground
-            implicitHeight: liveLayout.implicitHeight + Style.spacing.rowPaddingX
-            onHasCursorChanged: if (hasCursor) root.revealInPage(liveRow)
+            spacing: Style.space(4)
 
-            MouseArea {
-              id: liveHover
-              anchors.fill: parent
-              hoverEnabled: true
-              onPositionChanged: function(mouse) { root.pointFrom(liveHover, mouse, "settings:live") }
-              onClicked: if (root.svc) root.svc.setLivePreviews(!root.liveOn)
-            }
+            CursorSurface {
+              id: liveRow
+              width: parent.width
+              hasCursor: root.at("settings:live")
+              foreground: root.foreground
+              implicitHeight: liveLayout.implicitHeight + Style.spacing.rowPaddingX
+              onHasCursorChanged: if (hasCursor) root.revealInPage(liveRow)
 
-            RowLayout {
-              id: liveLayout
-              anchors.left: parent.left
-              anchors.right: parent.right
-              anchors.verticalCenter: parent.verticalCenter
-              anchors.leftMargin: Style.space(10)
-              anchors.rightMargin: Style.space(10)
-              spacing: Style.space(10)
-
-              RowText {
-                Layout.fillWidth: true
-                title: "Live preview"
-                detail: root.liveOn ? "Changes show as you make them" : "Off: a still picture, and Preview below"
+              MouseArea {
+                id: liveHover
+                anchors.fill: parent
+                hoverEnabled: true
+                onPositionChanged: function(mouse) { root.pointFrom(liveHover, mouse, "settings:live") }
+                onClicked: if (root.svc) root.svc.setLivePreviews(!root.liveOn)
               }
 
-              ToggleSwitch {
-                checked: root.liveOn
-                foreground: root.foreground
-                Layout.alignment: Qt.AlignVCenter
-                onHovered: function(on) { if (on) root.hoverPoint("settings:live") }
-                onToggled: if (root.svc) root.svc.setLivePreviews(!root.liveOn)
+              RowLayout {
+                id: liveLayout
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.leftMargin: Style.space(10)
+                anchors.rightMargin: Style.space(10)
+                spacing: Style.space(10)
+
+                RowText {
+                  Layout.fillWidth: true
+                  title: "Live preview"
+                  detail: root.liveOn ? "Changes show as you make them" : "Off: a still picture, and Preview below"
+                }
+
+                ToggleSwitch {
+                  checked: root.liveOn
+                  foreground: root.foreground
+                  Layout.alignment: Qt.AlignVCenter
+                  onHovered: function(on) { if (on) root.hoverPoint("settings:live") }
+                  onToggled: if (root.svc) root.svc.setLivePreviews(!root.liveOn)
+                }
+              }
+            }
+
+            // For a pack that shows photos: where they come from, and a way to add some.
+            CursorSurface {
+              id: photosRow
+              visible: root.settingsPhotos >= 0
+              width: parent.width
+              hasCursor: root.at("settings:photos")
+              foreground: root.foreground
+              implicitHeight: visible ? photosLayout.implicitHeight + Style.spacing.rowPaddingX : 0
+              onHasCursorChanged: if (hasCursor) root.revealInPage(photosRow)
+
+              MouseArea {
+                id: photosHover
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onPositionChanged: function(mouse) { root.pointFrom(photosHover, mouse, "settings:photos") }
+                onClicked: root.openPhotos()
+              }
+
+              RowLayout {
+                id: photosLayout
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.leftMargin: Style.space(10)
+                anchors.rightMargin: Style.space(10)
+                spacing: Style.space(10)
+
+                RowText {
+                  Layout.fillWidth: true
+                  title: "Your photos"
+                  detail: root.settingsPhotos === 0 ? "None yet: add some to ~/Pictures/Screensaver"
+                    : root.settingsPhotos + (root.settingsPhotos === 1 ? " photo" : " photos") + " in ~/Pictures/Screensaver"
+                }
+
+                Text {
+                  text: "Open folder 󰏌"
+                  color: photosHover.containsMouse || photosRow.hasCursor ? root.foreground : root.dim
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                  Layout.alignment: Qt.AlignVCenter
+                }
+              }
+            }
+
+            // For a pack that shows videos: where they come from, and a way to add some.
+            CursorSurface {
+              id: videosRow
+              visible: root.settingsVideos >= 0
+              width: parent.width
+              hasCursor: root.at("settings:videos")
+              foreground: root.foreground
+              implicitHeight: visible ? videosLayout.implicitHeight + Style.spacing.rowPaddingX : 0
+              onHasCursorChanged: if (hasCursor) root.revealInPage(videosRow)
+
+              MouseArea {
+                id: videosHover
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onPositionChanged: function(mouse) { root.pointFrom(videosHover, mouse, "settings:videos") }
+                onClicked: root.openVideos()
+              }
+
+              RowLayout {
+                id: videosLayout
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.leftMargin: Style.space(10)
+                anchors.rightMargin: Style.space(10)
+                spacing: Style.space(10)
+
+                RowText {
+                  Layout.fillWidth: true
+                  title: "Your videos"
+                  detail: root.settingsVideos === 0 ? "None yet: import a clip into ~/Videos/Screensaver"
+                    : root.settingsVideos + (root.settingsVideos === 1 ? " video" : " videos") + " in ~/Videos/Screensaver"
+                }
+
+                Text {
+                  text: "Open folder 󰏌"
+                  color: videosHover.containsMouse || videosRow.hasCursor ? root.foreground : root.dim
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                  Layout.alignment: Qt.AlignVCenter
+                }
+              }
+            }
+
+            PanelSeparator { foreground: root.foreground }
+
+            Item { width: 1; height: Style.space(4) }
+
+            Repeater {
+              model: root.scrollingSettingsDecl
+              SettingRow { required property var modelData; decl: modelData; width: settingsPage.width }
+            }
+
+            PanelSeparator { foreground: root.foreground }
+
+            CursorSurface {
+              id: resetRow
+              width: parent.width
+              hasCursor: root.at("settings:reset")
+              foreground: root.foreground
+              implicitHeight: resetLayout.implicitHeight + Style.spacing.rowPaddingX
+              onHasCursorChanged: if (hasCursor) root.revealInPage(resetRow)
+
+              MouseArea {
+                id: resetHover
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onPositionChanged: function(mouse) { root.pointFrom(resetHover, mouse, "settings:reset") }
+                onClicked: if (root.svc) root.svc.resetSettings(root.settingsPath)
+              }
+
+              RowLayout {
+                id: resetLayout
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.leftMargin: Style.space(10)
+                anchors.rightMargin: Style.space(10)
+                spacing: Style.space(10)
+
+                Text {
+                  text: "󰑓"
+                  color: root.foreground
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.heading
+                  Layout.alignment: Qt.AlignVCenter
+                }
+
+                RowText {
+                  Layout.fillWidth: true
+                  title: "Reset to defaults"
+                  detail: "As the pack comes"
+                }
               }
             }
           }
-
-          // For a pack that shows photos: where they come from, and a way to add some.
-          CursorSurface {
-            id: photosRow
-            visible: root.settingsPhotos >= 0
+        }
+        Flickable {
+          id: colorDock
+          visible: root.pinnedColorDecl !== null
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+          height: visible ? Math.min(colorDockPage.implicitHeight, Math.max(0, settingsView.height - backRow.height - Style.space(80))) : 0
+          contentWidth: width
+          contentHeight: colorDockPage.implicitHeight
+          onContentHeightChanged: contentY = Math.max(0, Math.min(contentY, contentHeight - height))
+          onHeightChanged: contentY = Math.max(0, Math.min(contentY, contentHeight - height))
+          clip: true
+          boundsBehavior: Flickable.StopAtBounds
+          Column {
+            id: colorDockPage
             width: parent.width
-            hasCursor: root.at("settings:photos")
-            foreground: root.foreground
-            implicitHeight: visible ? photosLayout.implicitHeight + Style.spacing.rowPaddingX : 0
-            onHasCursorChanged: if (hasCursor) root.revealInPage(photosRow)
-
-            MouseArea {
-              id: photosHover
-              anchors.fill: parent
-              hoverEnabled: true
-              cursorShape: Qt.PointingHandCursor
-              onPositionChanged: function(mouse) { root.pointFrom(photosHover, mouse, "settings:photos") }
-              onClicked: root.openPhotos()
-            }
-
-            RowLayout {
-              id: photosLayout
-              anchors.left: parent.left
-              anchors.right: parent.right
-              anchors.verticalCenter: parent.verticalCenter
-              anchors.leftMargin: Style.space(10)
-              anchors.rightMargin: Style.space(10)
-              spacing: Style.space(10)
-
-              RowText {
-                Layout.fillWidth: true
-                title: "Your photos"
-                detail: root.settingsPhotos === 0 ? "None yet: add some to ~/Pictures/Screensaver"
-                  : root.settingsPhotos + (root.settingsPhotos === 1 ? " photo" : " photos") + " in ~/Pictures/Screensaver"
-              }
-
-              Text {
-                text: "Open folder 󰏌"
-                color: photosHover.containsMouse || photosRow.hasCursor ? root.foreground : root.dim
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
-                Layout.alignment: Qt.AlignVCenter
-              }
+            spacing: Style.space(4)
+            PanelSeparator { foreground: root.foreground }
+            Repeater {
+              model: root.pinnedColorDecl ? [root.pinnedColorDecl] : []
+              SettingRow { required property var modelData; decl: modelData; width: colorDockPage.width; compactColor: true }
             }
           }
+        }
+      }
 
-          PanelSeparator { foreground: root.foreground }
+      Column {
+        id: overlayPositionDock
+        visible: root.tab === "overlay" && root.overlayPositionDecl !== null
+        height: visible ? implicitHeight : 0
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: footer.top
+        spacing: Style.space(4)
+        PanelSeparator { foreground: root.foreground }
+        Repeater {
+          model: root.overlayPositionDecl ? [root.overlayPositionDecl] : []
+          SettingRow { required property var modelData; decl: modelData; width: overlayPositionDock.width }
+        }
+      }
 
-          Item { width: 1; height: Style.space(4) }
-
+      Flickable {
+        id: overlayScroller
+        visible: root.tab === "overlay"
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: header.bottom
+        anchors.bottom: overlayPositionDock.top
+        anchors.bottomMargin: Style.space(4)
+        contentWidth: width
+        contentHeight: overlayPage.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        Column {
+          id: overlayPage
+          width: parent.width
+          spacing: Style.space(8)
+          PanelSectionHeader { text: "OVERLAY"; foreground: root.foreground; fontFamily: root.fontFamily }
+          Text {
+            width: parent.width
+            text: "Show a clock and optional system readings over any screensaver."
+            textFormat: Text.PlainText
+            wrapMode: Text.Wrap
+            color: root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+          }
           Repeater {
-            model: root.settingsDecl
-            SettingRow { required property var modelData; decl: modelData; width: settingsPage.width }
+            model: root.overlayScrollingDecl
+            SettingRow { required property var modelData; width: overlayPage.width; decl: modelData }
           }
-
-          PanelSeparator { foreground: root.foreground }
-
           CursorSurface {
-            id: resetRow
+            id: overlayResetRow
             width: parent.width
-            hasCursor: root.at("settings:reset")
+            hasCursor: root.at("overlay:reset")
             foreground: root.foreground
-            implicitHeight: resetLayout.implicitHeight + Style.spacing.rowPaddingX
-            onHasCursorChanged: if (hasCursor) root.revealInPage(resetRow)
-
-            MouseArea {
-              id: resetHover
-              anchors.fill: parent
-              hoverEnabled: true
-              cursorShape: Qt.PointingHandCursor
-              onPositionChanged: function(mouse) { root.pointFrom(resetHover, mouse, "settings:reset") }
-              onClicked: if (root.svc) root.svc.resetSettings(root.settingsPath)
-            }
-
-            RowLayout {
-              id: resetLayout
-              anchors.left: parent.left
-              anchors.right: parent.right
-              anchors.verticalCenter: parent.verticalCenter
-              anchors.leftMargin: Style.space(10)
-              anchors.rightMargin: Style.space(10)
-              spacing: Style.space(10)
-
-              Text {
-                text: "󰑓"
-                color: root.foreground
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.heading
-                Layout.alignment: Qt.AlignVCenter
-              }
-
-              RowText {
-                Layout.fillWidth: true
-                title: "Reset to defaults"
-                detail: "As the pack comes"
-              }
-            }
+            implicitHeight: overlayReset.implicitHeight + Style.spacing.rowPaddingX
+            onHasCursorChanged: if (hasCursor) root.revealInPage(overlayResetRow)
+            RowText { id: overlayReset; anchors.centerIn: parent; width: parent.width - Style.space(20); title: "Reset overlay"; detail: "Turn off and restore defaults" }
+            MouseArea { id: overlayResetMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onPositionChanged: function(mouse) { root.pointFrom(overlayResetMouse, mouse, "overlay:reset") }; onClicked: if (root.svc) root.svc.resetOverlay() }
           }
         }
       }
@@ -1002,11 +1139,6 @@ Panel {
           // A list that got shorter while scrolled to its end stays scrolled to its end, not past it.
           else if (contentY > Math.max(0, contentHeight - height)) root.setScroll(Math.max(0, contentHeight - height))
         }
-        // Scrolled by the user (dragged, flicked or wheeled, not a correction of its own as rows resize): the
-        // cursor's row is anchored where it now is.
-        onContentYChanged: if (!root.adjusting && (moving || dragging || flicking) && root.revealTarget
-                               && root.revealTarget.hasCursor) root.anchor(root.revealTarget)
-        onMovementEnded: if (root.revealTarget && root.revealTarget.hasCursor) root.anchor(root.revealTarget)
         onHeightChanged: if (root.showChosen) root.scrollToChosen()
         clip: true
         boundsBehavior: Flickable.StopAtBounds
@@ -1099,7 +1231,7 @@ Panel {
       // Preview, pinned below the list.
       Column {
         id: footer
-        visible: root.tab === "screensaver" && !(root.settingsPath !== "" && root.liveOn)
+        visible: root.tab === "overlay" || (root.tab === "screensaver" && !(root.settingsPath !== "" && root.liveOn))
         height: visible ? implicitHeight : 0
         anchors.left: parent.left
         anchors.right: parent.right
@@ -1251,8 +1383,8 @@ Panel {
   }
 
   // One choice, ticked when it's the one chosen; a pack that can't be used is dimmed and can't be chosen. A pack
-  // can be starred, with its star or the "f" key, to list it first. The row the cursor rests on opens, to show a
-  // thumbnail of the pack beside its description; every row opens to the same height.
+  // can be starred, with its star or the "f" key, to list it first. Every card keeps its thumbnail
+  // and description visible at a stable height.
   component ChoiceRow: CursorSurface {
     id: choiceRow
     property string row
@@ -1264,28 +1396,35 @@ Panel {
     property string detail
     property string info
 
-    // Open while the cursor rests on it, and only then: the tick alone marks the chosen pack.
-    readonly property bool expanded: root.expandedRow === row
-    // How much taller the row is while the cursor holds it open, for the panel's height, which doesn't change with
-    // the cursor.
-    readonly property real openHeight: expanded ? expansion.implicitHeight + choiceColumn.spacing : 0
     // The thumbnail: the service's "pixels W H <base64 RGB>", "" while it's being drawn, or "none".
-    readonly property string thumb: !expanded ? "" : !usable ? "none"
+    readonly property string thumb: !usable ? "none"
       : root.svc ? root.svc.thumbnailOf(row.slice(5), root.thumbSize) : "none"
-    // Each time the row opens, the thumbnail is checked against the pack as it is now.
-    function askForThumb() { if (expanded && usable && root.svc) root.svc.requestThumbnail(row.slice(5), root.thumbSize) }
+    // Every card is expanded, but only nearby thumbnails need decoding. Scrolling doesn't resize cards.
+    readonly property bool thumbWanted: {
+      var top = packList.y + choiceRow.y - scroller.contentY
+      return root.opened && root.tab === "screensaver" && root.settingsPath === ""
+        && top + height >= -height && top <= scroller.height + height
+    }
+    // Check cached thumbnails when the panel opens; the service serializes and deduplicates work.
+    function askForThumb() { if (thumbWanted && usable && root.svc) root.svc.requestThumbnail(row.slice(5), root.thumbSize) }
     onThumbChanged: if (thumb === "") askForThumb()
+    onThumbWantedChanged: askForThumb()
 
     hasCursor: root.at(row)
     onHasCursorChanged: if (hasCursor) {
-      root.anchor(choiceRow)
       root.reveal(choiceRow)
     }
-    onExpandedChanged: askForThumb()
-    // Once it has grown open, the cursor's row is kept in view.
+    // Keep keyboard navigation in view when the card layout settles.
     onHeightChanged: if (hasCursor) root.reveal(choiceRow)
     // A row made anew where a starred or unstarred pack now sits may already have the cursor.
-    Component.onCompleted: if (hasCursor && root.keyMoved) Qt.callLater(function() { root.reveal(choiceRow) })
+    Component.onCompleted: {
+      askForThumb()
+      if (hasCursor && root.keyMoved) Qt.callLater(function() { root.reveal(choiceRow) })
+    }
+    Connections {
+      target: root
+      function onOpenedChanged() { if (root.opened) choiceRow.askForThumb() }
+    }
     current: chosen
     foreground: root.foreground
     opacity: usable ? 1.0 : 0.55
@@ -1297,7 +1436,11 @@ Panel {
       hoverEnabled: true
       cursorShape: choiceRow.usable ? Qt.PointingHandCursor : Qt.ArrowCursor
       onPositionChanged: function(mouse) { root.pointFrom(rowHover, mouse, choiceRow.row) }
-      onClicked: root.choose(choiceRow.row)
+      onClicked: {
+        root.point(choiceRow.row)
+        root.choose(choiceRow.row)
+        root.scrollTo(choiceRow)
+      }
     }
 
     ColumnLayout {
@@ -1392,14 +1535,12 @@ Panel {
         }
       }
 
-      // Open: the thumbnail on the left, the description on the right, cut to the thumbnail's height.
+      // A fixed preview on the left and description on the right.
       RowLayout {
         id: expansion
-        visible: choiceRow.expanded
         Layout.fillWidth: true
         spacing: Style.space(10)
-        // Opening a row adds a whole number of rows' height, so the rows below shift by whole rows and the panel's
-        // bottom edge still cuts through the middle of one.
+        // Fixed thumbnail dimensions keep every card stable while previews load.
         readonly property real pitch: choiceLayout.implicitHeight + Style.spacing.rowPaddingX + packList.spacing
         readonly property int rowsTall: Math.max(1, Math.round((choiceColumn.width * 0.5 / root.screenAspect + choiceColumn.spacing) / pitch))
         readonly property real thumbHeight: rowsTall * pitch - choiceColumn.spacing
@@ -1486,11 +1627,13 @@ Panel {
   component SettingRow: CursorSurface {
     id: settingRow
     property var decl
+    property bool compactColor: false
     readonly property string row: "set:" + decl.name
-    readonly property var value: root.settingsValues[decl.name]
+    readonly property var value: (root.tab === "overlay" && root.svc ? root.svc.overlayValues : root.settingsValues)[decl.name]
+    visible: root.tab === "overlay" || root.settingActive(decl)
     hasCursor: root.at(row)
     foreground: root.foreground
-    implicitHeight: settingLayout.implicitHeight + Style.spacing.rowPaddingX
+    implicitHeight: (decl.kind === "color" ? colorLayout.implicitHeight : settingLayout.implicitHeight) + Style.spacing.rowPaddingX
     onHasCursorChanged: if (hasCursor) root.revealInPage(settingRow)
 
     MouseArea {
@@ -1503,6 +1646,7 @@ Panel {
 
     RowLayout {
       id: settingLayout
+      visible: settingRow.decl.kind !== "color"
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
@@ -1556,15 +1700,39 @@ Panel {
               hoverEnabled: true
               cursorShape: Qt.PointingHandCursor
               onPositionChanged: function(mouse) { root.pointFrom(optionMouse, mouse, settingRow.row) }
-              onClicked: if (root.svc) root.svc.setSetting(root.settingsPath, settingRow.decl.name, settingRow.decl.values[index])
+              onClicked: root.setSettingValue(settingRow.decl.name, settingRow.decl.values[index])
             }
+          }
+        }
+      }
+
+      Grid {
+        visible: root.tab === "overlay" && settingRow.decl.name === "position"
+        columns: 3
+        spacing: Style.space(3)
+        Layout.alignment: Qt.AlignVCenter
+        Repeater {
+          model: parent.visible ? ["↖", "↑", "↗", "←", "·", "→", "↙", "↓", "↘"] : []
+          Button {
+            required property var modelData
+            required property int index
+            property bool pointerOn: false
+            text: modelData
+            selected: settingRow.value === index
+            hasCursor: root.at(settingRow.row) && selected
+            bordered: true
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            onClicked: root.setSettingValue("position", index)
+            onHovered: function(on) { pointerOn = on; if (on) root.hoverPoint(settingRow.row) }
+            PanelToolTip { visible: parent.pointerOn; text: OverlayModel.positions[parent.index]; fontFamily: root.fontFamily }
           }
         }
       }
 
       // A range: its value between steps down and up.
       RowLayout {
-        visible: settingRow.decl.kind === "range"
+        visible: settingRow.decl.kind === "range" && !(root.tab === "overlay" && settingRow.decl.name === "position")
         spacing: Style.space(8)
         Layout.alignment: Qt.AlignVCenter
 
@@ -1578,6 +1746,34 @@ Panel {
           Layout.alignment: Qt.AlignVCenter
         }
         SettingStep { glyph: "+"; row: settingRow.row; onStep: root.stepSetting(settingRow.decl.name, 1, false) }
+      }
+    }
+    Column {
+      id: colorLayout
+      visible: settingRow.decl.kind === "color"
+      anchors.left: parent.left; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+      anchors.leftMargin: Style.space(10); anchors.rightMargin: Style.space(10)
+      spacing: Style.space(8)
+      Text { text: settingRow.decl.label; textFormat: Text.PlainText; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body }
+      Loader {
+        active: settingRow.decl.kind === "color" && settingRow.visible
+        width: parent.width
+        height: item ? item.implicitHeight : 0
+        sourceComponent: Component {
+          ScreenColorPicker {
+            // A page change can clear its values before the old delegate is destroyed.
+            value: ColorModel.valid(settingRow.value) ? settingRow.value : 0
+            selected: settingRow.hasCursor
+            compact: settingRow.compactColor
+            swatches: root.svc ? root.svc.themeSwatches : []
+            foreground: root.foreground; fontFamily: root.fontFamily
+            cursorChannel: root.at("color:" + settingRow.decl.name + ":h") ? "h" : root.at("color:" + settingRow.decl.name + ":s") ? "s" : root.at("color:" + settingRow.decl.name + ":v") ? "v" : ""
+            onPicked: function(selection) { root.setSettingValue(settingRow.decl.name, selection) }
+            onPointing: function(area, mouse, channel) { root.pointFrom(area, mouse, channel === "" ? settingRow.row : "color:" + settingRow.decl.name + ":" + channel) }
+            onChannelActivated: function(channel) { root.point(channel === "" ? settingRow.row : "color:" + settingRow.decl.name + ":" + channel) }
+            onRevealRequested: function(item) { root.revealInPage(item) }
+          }
+        }
       }
     }
   }

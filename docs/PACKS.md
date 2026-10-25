@@ -55,7 +55,7 @@ Sizes and line widths are in the same units, so `size = 0.05` is a twentieth of 
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `format` | required | `1`. |
+| `format` | required | `1`, or `2` for a pack that uses what ScreenSafe 0.5 added: videos, `color` settings, `colorize`. An older ScreenSafe then refuses the pack with a clear message instead of failing on a field it doesn't know. |
 | `name` | required | Up to 60 characters. |
 | `author`, `license` | empty | Up to 60 and 40 characters. |
 | `description` | empty | Up to 300 characters. |
@@ -270,6 +270,25 @@ default = 400
 
 A value someone chose is always one the pack allows: a choice that isn't offered, or a number outside a range, gives the default, and a range's value is snapped to its steps. Settings are numbers and true/false values, worked out as the pack loads, so `count` and the like can't depend on them. Instead, give an element its largest `count` and hide the rest: `visible = "i < count"`. A setting can also choose a scene's `duration` or `hold`. Offer settings only where they change something people will care about. A pack that tells a timed story is usually best without any.
 
+ScreenSafe 0.5 reads pack formats 1 and 2. Existing packs can keep format 1; video sources, `color` settings and `colorize` require `format = 2` at the root. Older renderers reject format 2 clearly instead of ignoring a new feature.
+
+A `color` setting offers the current theme's swatches and a custom HSV picker. For whole-palette recoloring, set `colorize` at the root, before any tables, to that setting's name:
+
+```toml
+format = 2
+colorize = "tint_color"
+
+[[setting]]
+name = "tint_color"
+label = "Color"
+kind = "color"
+default = 0
+```
+
+Zero preserves the original palette. Values 1–27 select the theme palette names in their documented renderer order; `16777216 + 0xRRGGBB` selects a 24-bit custom RGB value. Other numbers, fractions and non-finite values give the default. The expression variable holds that numeric selection. Recoloring happens once at load: colored theme inks take the chosen hue with their original linear-light luminance, while canvas backgrounds and absolute black/white stay unchanged. This preserves light/dark relationships even for very dark or bright choices. Theme image filters and theme-quantized sprites use the same palette; Original/Greyscale/Sepia images and fixed-color artwork do not change.
+
+The panel pins the first active color control while other options scroll. A color control can depend on an earlier setting, for example `when = "tone"` and `when_value = 3`. It is shown and applied only when that earlier setting has that value. This is fixed data, not an expression executed by the shell. Color settings count toward the existing limit of eight and require ScreenSafe 0.5.0.
+
 To try a pack's settings without the panel: `screensafe render <pack> --time 12 --settings speed=2,glowing=false --out frame.png`.
 
 ## Pixel art
@@ -345,3 +364,7 @@ ScreenSafe refuses a pack that goes beyond these, rather than drawing it slowly:
 ## Sharing a pack with a theme
 
 Put the pack in a `screensafe` folder in the theme's repository, next to `colors.toml`. Omarchy copies it with the rest of the theme, and ScreenSafe's **Automatic** choice shows it while the theme is in use. A theme's pack can use `source = "theme-backgrounds"` to show the theme's own images, and its colors follow the theme's palette.
+
+Video packs also have `video_pixel`: one output pixel in stage units, set per display, including compositor scaling. It is geometry only. The global clock/system overlay is controlled by the user outside packs; CPU, battery and memory are not expression inputs.
+
+Video packs also receive `video_hd_mask`, an exact numeric bitset over their at-most-32 prepared clips. Bit `i` is 1 when clip `i` has at least 720 vertical pixels, otherwise 0; `mod(floor(video_hd_mask / pow(2, i)), 2)` reads it. This describes the prepared playback dimensions, including any importer downscale, and exposes no filenames or new I/O.

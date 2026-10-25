@@ -2,6 +2,9 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import Quickshell.Services.UPower
+import "OverlayModel.js" as OverlayModel
+import "ColorModel.js" as ColorModel
 
 // Shows a ScreenSafe pack when you're idle, in place of Omarchy's screensaver.
 //
@@ -44,6 +47,7 @@ Item {
   readonly property string badge: home + "/.config/omarchy/screensafe/badge"
   // Someone's own photos, for packs that show them.
   readonly property string photos: home + "/Pictures/Screensaver"
+  readonly property string videos: home + "/Videos/Screensaver"
   // The shell's time zone, if it has one set, so a pack's clock shows the same time as the bar's.
   readonly property string timeZone: Quickshell.env("TZ") || ""
 
@@ -188,10 +192,50 @@ Item {
 
   function toggleFavorite(path) { return setFavorite(path, !root.isFavorite(path)) }
 
+  // Global overlay data stays separate from pack settings and expressions. Off until opted in.
+  readonly property var overlayDeclarations: OverlayModel.declarations
+  readonly property var overlayValues: OverlayModel.values(root.entry.overlay)
+  readonly property string overlayArgument: OverlayModel.argument(root.entry.overlay)
+  property var systemReading: null
+  readonly property bool overlayActive: overlayValues.enabled === 1 && (rendererProc.running || livePreviewProc.running)
+  function setOverlay(name, value) {
+    if (!overlayDeclarations.some(function(d) { return d.name === name })) return "unknown setting"
+    saveSettings({ overlay: OverlayModel.changed(root.entry.overlay, name, value) })
+    return String(root.overlayValues[name])
+  }
+  function resetOverlay() { saveSettings({ overlay: OverlayModel.values({}) }) }
+  function pushOverlay() {
+    var line = "overlay " + root.overlayArgument + "\n"
+    if (rendererProc.running) rendererProc.write(line)
+    if (livePreviewProc.running) livePreviewProc.write(line)
+    root.pushMetrics()
+  }
+  onOverlayArgumentChanged: root.pushOverlay()
+  function pushMetrics() {
+    if (!root.overlayActive) return
+    var d = UPower.displayDevice
+    var battery = d && d.isPresent && isFinite(d.percentage) ? Math.max(0, Math.min(100, d.percentage * 100)) : -1
+    var reading = root.systemReading
+    var cpu = root.overlayValues.cpu === 1 && reading ? reading.cpu : -1
+    var memory = root.overlayValues.memory === 1 && reading ? reading.memory : -1
+    var line = "stats cpu=" + Math.round(cpu) + ",memory=" + Math.round(memory) + ",battery=" + (root.overlayValues.battery === 1 ? Math.round(battery) : -1) + "\n"
+    if (rendererProc.running) rendererProc.write(line)
+    if (livePreviewProc.running) livePreviewProc.write(line)
+  }
+  function requestSystem() {
+    if (root.overlayActive && (root.overlayValues.cpu === 1 || root.overlayValues.memory === 1))
+      runShort(systemProc, ["system-info"])
+    else root.systemReading = null
+    root.pushMetrics()
+  }
+  Timer { interval: 2000; repeat: true; running: root.overlayActive; onTriggered: root.requestSystem() }
+  onOverlayActiveChanged: if (root.overlayActive) Qt.callLater(root.requestSystem)
+
   // ---- pack settings: what a pack offers (from the catalog), and the values chosen, saved inline in shell.json by
   // pack path. Values are only ever ones the pack's own declaration allows; the renderer checks them again.
 
   readonly property int maxSettings: 8
+  property var themeSwatches: []
 
   // A pack's declared settings from the catalog, kept only if well formed.
   function validDeclarations(list) {
@@ -218,6 +262,12 @@ Item {
         item.min = Number(d.min); item.max = Number(d.max); item.step = Number(d.step)
         item.unit = typeof d.unit === "string" ? d.unit.slice(0, 8) : ""
         if (!isFinite(item.min) || !isFinite(item.max) || !(item.step > 0) || item.max <= item.min) continue
+      } else if (d.kind === "color") {
+        if (!ColorModel.valid(item.def)) continue
+        if (d.when !== undefined) {
+          if (typeof d.when !== "string" || !/^[a-z][a-z0-9_]{0,31}$/.test(d.when) || typeof d.whenValue !== "number" || !isFinite(d.whenValue)) continue
+          item.when = d.when; item.whenValue = d.whenValue
+        }
       } else {
         continue
       }
@@ -237,6 +287,7 @@ Item {
     if (!isFinite(v)) return d.def
     if (d.kind === "toggle") return v !== 0 ? 1 : 0
     if (d.kind === "choice") return d.values.indexOf(v) >= 0 ? v : d.def
+    if (d.kind === "color") return ColorModel.valid(v) ? v : d.def
     if (v < d.min || v > d.max) return d.def
     return Math.min(d.max, Math.max(d.min, d.min + Math.round((v - d.min) / d.step) * d.step))
   }
@@ -323,11 +374,12 @@ Item {
     }
     if (root.livePending && root.livePending.path === path) return
     var args = ["preview", "--pack", path, "--region", region, "--theme", root.themeDir, "--branding", root.branding,
-                "--logo", root.logo, "--badge", root.badge, "--photos", root.photos]
+                "--logo", root.logo, "--badge", root.badge, "--photos", root.photos, "--videos", root.videos]
     if (/^[A-Za-z0-9._-]{1,64}$/.test(String(output || ""))) args = args.concat(["--output", String(output)])
     if (livePreviewProc.running) {
       root.livePending = { path: path, args: args, region: region }
       root.liveStopping = true
+      livePreviewProc.write("quit\n")
       livePreviewProc.running = false
       return
     }
@@ -339,7 +391,7 @@ Item {
     if (settings !== "") args = args.concat(["--settings", settings])
     root.livePath = path
     root.liveRegion = region
-    livePreviewProc.command = [root.renderer].concat(args)
+    livePreviewProc.command = [root.renderer].concat(args, ["--overlay", root.overlayArgument])
     livePreviewProc.environment = root.environment(false)
     liveErr.reset()
     root.liveStopping = false
@@ -352,6 +404,7 @@ Item {
     root.liveFailed = ""
     if (livePreviewProc.running) {
       root.liveStopping = true
+      livePreviewProc.write("quit\n")
       livePreviewProc.running = false
     }
   }
@@ -366,12 +419,20 @@ Item {
     for (var i = 0; i < root.packs.length; i++) if (root.packs[i].path === path) return root.packs[i].photos
     return -1
   }
+  function videosOf(path) {
+    for (var i = 0; i < root.packs.length; i++) if (root.packs[i].path === path) return root.packs[i].videos
+    return -1
+  }
 
   // Opens the photos folder in the file manager, making it first if it isn't there. The renderer makes it, and says
   // where it is; only that exact folder is opened.
   function openPhotosFolder() {
-    if (!root.supported || photosFolderProc.running) return
+    if (!root.supported || photosFolderProc.running || videosFolderProc.running) return
     runShort(photosFolderProc, ["photos-folder"])
+  }
+  function openVideosFolder() {
+    if (!root.supported || videosFolderProc.running) return
+    runShort(videosFolderProc, ["videos-folder"])
   }
 
   function setPack(path) {
@@ -467,13 +528,17 @@ Item {
 
   function refresh() {
     if (root.supported && !catalogProc.running)
-      runShort(catalogProc, ["catalog", root.builtinPacks, root.userPacks, root.themeDir, "--theme", root.themeDir, "--branding", root.branding, "--logo", root.logo, "--badge", root.badge, "--photos", root.photos])
+      runShort(catalogProc, ["catalog", root.builtinPacks, root.userPacks, root.themeDir, "--theme", root.themeDir, "--branding", root.branding, "--logo", root.logo, "--badge", root.badge, "--photos", root.photos, "--videos", root.videos])
   }
 
   function catalogResult(out) {
     var list
     try { list = JSON.parse(String(out || "")) } catch (e) { return }
     if (!Array.isArray(list)) return
+    if (list.length > 0) {
+      var swatches = ColorModel.palette(list[0].palette)
+      if (swatches.length > 0) root.themeSwatches = swatches
+    }
     var packs = []
     for (var i = 0; i < list.length && packs.length < 64; i++) {
       var p = list[i]
@@ -488,6 +553,7 @@ Item {
         settings: root.validDeclarations(p.settings),
         // How many photos it has to show, or -1 for a pack that doesn't show any.
         photos: typeof p.photos === "number" && isFinite(p.photos) && p.photos >= -1 ? Math.floor(Math.min(p.photos, 100000)) : -1,
+        videos: typeof p.videos === "number" && isFinite(p.videos) && p.videos >= -1 ? Math.floor(Math.min(p.videos, 100000)) : -1,
         fingerprint: /^[0-9a-f]{16}$/.test(String(p.fingerprint || "")) ? String(p.fingerprint) : "",
         source: p.path === root.themePack ? "theme" : p.path.indexOf(root.builtinPacks + "/") === 0 ? "built-in" : "yours"
       })
@@ -509,7 +575,7 @@ Item {
 
   // ---- thumbnails: one frame of a pack, drawn small by the renderer and kept in memory (never on disk) with the
   // pack's fingerprint: a digest of its files, the theme's colors and backgrounds it uses, the art it shows, and the
-  // renderer. Each time a pack's row opens, its thumbnail is checked against the pack as it is now, which costs a
+  // renderer. When a card comes into view, its thumbnail is checked against the pack as it is now, which costs a
   // few milliseconds, and drawn again only if the pack has changed: someone working on a pack sees each change.
 
   // "path|size|settings" → { fingerprint, url }: url is "pixels W H <base64 RGB>", which the panel shows behind a
@@ -543,7 +609,8 @@ Item {
     var key = path + "|" + size + "|" + root.settingsArg(path)
     if (!root.supported || root.fingerprintOf(path) === "") return
     if (!/^[0-9]{2,3}x[0-9]{2,3}$/.test(String(size))) return
-    for (var i = 0; i < root.thumbQueue.length; i++) if (root.thumbQueue[i].key === key) return
+    // A drag can try many custom colors. Keep only the latest queued rendering per pack/size.
+    root.thumbQueue = root.thumbQueue.filter(function(job) { return job.path !== path || job.size !== String(size) })
     if (thumbProc.running && thumbProc.key === key) return
     root.thumbQueue = root.thumbQueue.concat([{ key: key, path: path, size: String(size), settings: root.settingsArg(path) }])
     Qt.callLater(root.nextThumbnail)
@@ -553,7 +620,7 @@ Item {
     if (thumbProc.running || root.thumbQueue.length === 0) return
     var job = root.thumbQueue[0]
     root.thumbQueue = root.thumbQueue.slice(1)
-    var args = ["thumbnail", job.path, "--size", job.size, "--theme", root.themeDir, "--branding", root.branding, "--logo", root.logo, "--badge", root.badge, "--photos", root.photos]
+    var args = ["thumbnail", job.path, "--size", job.size, "--theme", root.themeDir, "--branding", root.branding, "--logo", root.logo, "--badge", root.badge, "--photos", root.photos, "--videos", root.videos]
     if (job.settings !== "") args = args.concat(["--settings", job.settings])
     var entry = root.thumbnails[job.key]
     if (entry !== undefined && entry.fingerprint !== "") args = args.concat(["--unless", entry.fingerprint])
@@ -656,7 +723,7 @@ Item {
   function launch(packPath) {
     root.launching = packPath
     root.stoppedForLock = false
-    rendererProc.command = [root.renderer, "run", "--pack", packPath, "--theme", root.themeDir, "--branding", root.branding, "--logo", root.logo, "--badge", root.badge, "--photos", root.photos, "--settings", root.settingsArg(packPath), "--role", "org.omarchy.screensaver"]
+    rendererProc.command = [root.renderer, "run", "--pack", packPath, "--theme", root.themeDir, "--branding", root.branding, "--logo", root.logo, "--badge", root.badge, "--photos", root.photos, "--videos", root.videos, "--settings", root.settingsArg(packPath), "--role", "org.omarchy.screensaver", "--overlay", root.overlayArgument]
     rendererProc.environment = root.environment(false)
     rendererOut.reset()
     rendererErr.reset()
@@ -697,7 +764,7 @@ Item {
 
   // Short calls: one at a time each, each stopped if it runs for more than ten seconds.
   readonly property int deadlineMs: 10000
-  readonly property var shortProcs: [takeoverProc, catalogProc, statusProc, lockProc, thumbProc, photosFolderProc]
+  readonly property var shortProcs: [takeoverProc, catalogProc, statusProc, lockProc, thumbProc, photosFolderProc, videosFolderProc, systemProc]
 
   function runShort(proc, args) {
     if (proc.running) return
@@ -709,6 +776,7 @@ Item {
   function begin(proc) {
     proc.startedAt = Date.now()
     if (proc.stdout && typeof proc.stdout.reset === "function") proc.stdout.reset()
+    if (proc.stderr && typeof proc.stderr.reset === "function") proc.stderr.reset()
     proc.running = true
   }
 
@@ -716,8 +784,8 @@ Item {
     id: deadline
     interval: 1000
     repeat: true
-    running: takeoverProc.running || catalogProc.running || statusProc.running || lockProc.running || thumbProc.running
-      || photosFolderProc.running
+    running: takeoverProc.running || catalogProc.running || statusProc.running || lockProc.running || thumbProc.running || systemProc.running
+      || photosFolderProc.running || videosFolderProc.running
     onTriggered: {
       var now = Date.now()
       for (var i = 0; i < root.shortProcs.length; i++) {
@@ -767,6 +835,20 @@ Item {
   }
 
   Process {
+    id: systemProc
+    property real startedAt: 0
+    clearEnvironment: true
+    stdout: BoundedOutput { id: systemOut; limit: 512; process: systemProc }
+    stderr: BoundedOutput { id: systemErr; limit: 1024; process: systemProc }
+    onExited: function(code) {
+      var data = null
+      if (code === 0 && !systemOut.over) { try { data = JSON.parse(systemOut.text) } catch (e) {} }
+      root.systemReading = OverlayModel.reading(data, root.systemReading)
+      root.pushMetrics()
+    }
+  }
+
+  Process {
     id: thumbProc
     property real startedAt: 0
     property string key: ""
@@ -807,6 +889,17 @@ Item {
   }
 
   Process {
+    id: videosFolderProc
+    property real startedAt: 0
+    clearEnvironment: true
+    stdout: BoundedOutput { id: videosFolderOut; limit: 4096; process: videosFolderProc }
+    onExited: function(code) {
+      if (code === 0 && !videosFolderOut.over && lastLine(videosFolderOut.text) === root.videos)
+        Qt.openUrlExternally("file://" + encodeURI(root.videos))
+    }
+  }
+
+  Process {
     id: livePreviewProc
     clearEnvironment: true
     stdinEnabled: true
@@ -825,6 +918,7 @@ Item {
 
   Process {
     id: rendererProc
+    stdinEnabled: true
     clearEnvironment: true
     stdout: BoundedOutput { id: rendererOut; limit: 4096 }
     // Only its last line is shown, when it fails; a renderer that says more is cut off, but keeps running.
@@ -891,6 +985,8 @@ Item {
   // its own back.
   Component.onDestruction: {
     for (var i = 0; i < root.shortProcs.length; i++) root.shortProcs[i].running = false
+    if (rendererProc.running) rendererProc.write("quit\n")
+    if (livePreviewProc.running) livePreviewProc.write("quit\n")
     rendererProc.running = false
     livePreviewProc.running = false
     if (root.supported) Quickshell.execDetached({
@@ -931,6 +1027,8 @@ Item {
     }
     // Seconds idle before ScreenSafe shows, from 10 to 86400; or 0 or "omarchy" to follow Omarchy's.
     function delay(seconds: string): string { return root.setIdleSeconds(seconds) }
+    function overlaySettings(): string { return JSON.stringify({ offered: root.overlayDeclarations, chosen: root.overlayValues }) }
+    function overlaySetting(name: string, value: string): string { return root.setOverlay(name, Number(value)) }
     function status(): string { return root.statusJson() }
   }
 }

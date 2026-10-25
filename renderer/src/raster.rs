@@ -310,6 +310,8 @@ pub struct Raster {
     /// Sprite sheets, by pack image, decoded whole the first time they're drawn and kept; `None` for one that
     /// couldn't be decoded.
     sheets: HashMap<usize, Option<Arc<Pixmap>>>,
+    video_failed: Vec<usize>,
+    crt: crate::crt::Cache,
     /// The canvas that pixel art is drawn on before it's scaled up to the screen.
     canvas: Option<Pixmap>,
     /// Decode and resample images on other threads, holding an image back until it's ready, so that a large image
@@ -350,6 +352,8 @@ impl Raster {
             held_back: Vec::new(),
             arrivals: Vec::new(),
             sheets: HashMap::new(),
+            video_failed: Vec::new(),
+            crt: crate::crt::Cache::default(),
             canvas: None,
             background_decoding: false,
             images_arrived: false,
@@ -401,7 +405,68 @@ impl Raster {
         self.fonts.iter().map(font_metrics).collect()
     }
 
+    fn same_video(a: ImageRef, b: ImageRef) -> bool {
+        matches!((a.src, b.src), (ImageSrc::Video { video: i, .. }, ImageSrc::Video { video: j, .. }) if i == j)
+            && a.filter == b.filter
+            && a.crop == b.crop
+            && a.limit == b.limit
+    }
+
+    /// Queue an exact frame, sharing the two-job budget across streams and adjacent film cells.
+    fn queue_video(&mut self, pack: &Pack, source: ImageRef) {
+        let ImageSrc::Video { video, frame } = source.src else { return };
+        if self.images.iter().any(|(r, _)| *r == source)
+            || self.pending.iter().any(|(r, _)| *r == source)
+            || self.pending.iter().filter(|(r, _)| matches!(r.src, ImageSrc::Video { .. })).count() >= 2
+        {
+            return;
+        }
+        let clip = pack.videos[video as usize].clone();
+        let (send, receive) = mpsc::channel();
+        std::thread::spawn(move || {
+            let result = clip.read_frame(frame as u32).and_then(|bytes| decode_prepared(&bytes, clip.width, clip.height, source.crop, source.filter));
+            let _ = send.send(result);
+        });
+        self.pending.push((source, receive));
+    }
+
+    /// Six completed frames cover four adjacent film cells and two frames of bounded lookahead.
+    /// Missing frames retain the latest completion while their exact request decodes.
+    fn video_image(&mut self, pack: &Pack, source: ImageRef, video: usize, frame: u32) -> Option<usize> {
+        if self.video_failed.contains(&video) {
+            return None;
+        }
+        let exact = self.images.iter().position(|(r, _)| *r == source);
+        if !self.background_decoding && exact.is_none() {
+            let clip = &pack.videos[video];
+            match clip.read_frame(frame).and_then(|bytes| decode_prepared(&bytes, clip.width, clip.height, source.crop, source.filter)) {
+                Ok(pixels) => self.keep(source, pixels),
+                Err(e) => {
+                    self.video_failed.push(video);
+                    self.warnings.push(format!("video: {e}"));
+                    return None;
+                }
+            }
+        } else if self.background_decoding {
+            self.queue_video(pack, source);
+            for ahead in 1..=2 {
+                let next = (frame + ahead) % pack.videos[video].frame_count();
+                self.queue_video(pack, ImageRef { src: ImageSrc::Video { video: video as u16, frame: next as u16 }, ..source });
+            }
+        }
+        if let Some(index) = self.images.iter().position(|(r, _)| *r == source) {
+            let entry = self.images.remove(index);
+            self.images.push(entry);
+            Some(self.images.len() - 1)
+        } else {
+            self.images.iter().rposition(|(r, _)| Self::same_video(*r, source))
+        }
+    }
+
     fn image(&mut self, pack: &Pack, source: ImageRef) -> Option<usize> {
+        if let ImageSrc::Video { video, frame } = source.src {
+            return self.video_image(pack, source, video as usize, frame as u32);
+        }
         if let Some(i) = self.images.iter().position(|(r, _)| *r == source) {
             // Most recently used last, so the one evicted is the one unused longest.
             let entry = self.images.remove(i);
@@ -417,6 +482,7 @@ impl Raster {
             Photo(Arc<std::fs::File>, u64),
         }
         let (name, bytes) = match source.src {
+            ImageSrc::Video { .. } => unreachable!("video uses its bounded stream path"),
             ImageSrc::Pack(i) => match &pack.images[i] {
                 ImageSource::File { name, bytes } => (name.as_str(), Bytes::Held(bytes.as_slice())),
                 // Prepared images are only ever sprite sheets.
@@ -499,6 +565,12 @@ impl Raster {
     }
 
     fn keep(&mut self, source: ImageRef, pixmap: Pixmap) {
+        if matches!(source.src, ImageSrc::Video { .. }) {
+            while self.images.iter().filter(|(r, _)| matches!(r.src, ImageSrc::Video { .. })).count() >= 6 {
+                let i = self.images.iter().position(|(r, _)| matches!(r.src, ImageSrc::Video { .. })).unwrap();
+                self.images.remove(i);
+            }
+        }
         let bytes = |images: &[(ImageRef, Arc<Pixmap>)]| images.iter().map(|(_, p)| p.data().len()).sum::<usize>();
         while self.images.len() >= 2 && bytes(&self.images) + pixmap.data().len() > IMAGE_CACHE_BYTES {
             let (gone, _) = self.images.remove(0);
@@ -517,6 +589,9 @@ impl Raster {
         }
         for item in &frame.items {
             if let Item::Image { source, fit, frame, zoom, pan_x, pan_y, transform, .. } = item {
+                if matches!(source.src, ImageSrc::Video { .. }) {
+                    continue;
+                }
                 let source = self.keyed(*source, *frame);
                 let Some(index) = self.image(pack, source) else { continue };
                 let image = &self.images[index].1;
@@ -531,6 +606,31 @@ impl Raster {
         }
     }
 
+    /// A video's illustrated surround must be ready before its picture can play. Decode and
+    /// resize asynchronously, with the existing image limits; a failed surround stays closed.
+    pub fn video_surround_ready(&mut self, pack: &Pack, frame: &Frame, view: View) -> bool {
+        let mut ready = true;
+        for item in &frame.items {
+            if let Item::Image { source, fit, frame, zoom, pan_x, pan_y, transform, .. } = item {
+                if !matches!(source.src, ImageSrc::Pack(_)) {
+                    continue;
+                }
+                let source = self.keyed(*source, *frame);
+                let Some(index) = self.image(pack, source) else {
+                    ready = false;
+                    continue;
+                };
+                let image = &self.images[index].1;
+                let p = Placement::new((image.width(), image.height()), *fit, *frame, *zoom, *pan_x, *pan_y, transform, &view);
+                if let Some(size) = p.whole {
+                    self.request_scaled(index, size);
+                    ready &= self.scaled.iter().any(|(r, s, _, _)| *r == source && *s == size);
+                }
+            }
+        }
+        ready
+    }
+
     /// Takes in any images decoded or resampled on other threads, noting in `images_arrived` that some were.
     pub fn poll_images(&mut self) {
         let mut i = 0;
@@ -542,10 +642,18 @@ impl Raster {
                     match result {
                         Ok(Ok(pixmap)) => self.keep(source, pixmap),
                         Ok(Err(e)) => {
+                            if let ImageSrc::Video { video, .. } = source.src {
+                                self.video_failed.push(video as usize);
+                            }
                             self.warnings.push(e);
                             self.failed.push(source);
                         }
-                        Err(_) => self.failed.push(source),
+                        Err(_) => {
+                            if let ImageSrc::Video { video, .. } = source.src {
+                                self.video_failed.push(video as usize);
+                            }
+                            self.failed.push(source);
+                        }
                     }
                 }
             }
@@ -917,11 +1025,51 @@ impl Raster {
                     draw_sprite(target, mask, &sheet, *src, view.px(*x, *y), *pixel as f64 * view.scale, *flip, *alpha)
                 }
             }
-            Item::Image { source, fit, frame, zoom, pan_x, pan_y, alpha, transform } => {
+            Item::Image { source, fit, frame, zoom, pan_x, pan_y, alpha, transform, curve } => {
                 let source = &self.keyed(*source, *frame);
                 let Some(index) = self.image(pack, *source) else { return Bounds::EMPTY };
-                let image = &self.images[index].1;
+                if *curve > 0.0 {
+                    if let Some((bw, bh)) = frame {
+                        let input = Arc::clone(&self.images[index].1);
+                        let scale = transform.scale() * view.scale;
+                        let size = crate::video::render_size(((*bw as f64 * scale).round() as u32).max(1), ((*bh as f64 * scale).round() as u32).max(1));
+                        let Some(image) = self.crt.sample(&input, size, *fit, *curve, *zoom) else { return Bounds::EMPTY };
+                        let t = transform;
+                        let (left, top) = t.apply(-*bw as f64 / 2.0, -*bh as f64 / 2.0);
+                        let (x, y) = view.px(left as f32, top as f32);
+                        let (sx, sy) = (*bw as f64 * view.scale / size.0 as f64, *bh as f64 * view.scale / size.1 as f64);
+                        if t.b == 0.0 && t.c == 0.0 && (t.a * sx - 1.0).abs() < 0.005 && (t.d * sy - 1.0).abs() < 0.005 {
+                            blit(target, mask, &image, false, x.round() as i64, y.round() as i64, *alpha);
+                        } else {
+                            let matrix = Transform::from_row((t.a * sx) as f32, (t.b * sx) as f32, (t.c * sy) as f32, (t.d * sy) as f32, x, y);
+                            let paint = PixmapPaint { opacity: *alpha, quality: FilterQuality::Bilinear, ..PixmapPaint::default() };
+                            target.draw_pixmap(0, 0, image.as_ref().as_ref(), &paint, matrix, mask);
+                        }
+                        return Bounds::screen(view);
+                    }
+                }
+                let image: &Pixmap = &self.images[index].1;
                 let p = Placement::new((image.width(), image.height()), *fit, *frame, *zoom, *pan_x, *pan_y, transform, &view);
+                if matches!(source.src, ImageSrc::Video { .. }) {
+                    // Changing frames must not enter the static-photo resampling/arrival-fade caches.
+                    let t = transform;
+                    if p.scale == 1.0 && t.a == 1.0 && t.d == 1.0 && t.b == 0.0 && t.c == 0.0 && p.x.fract() == 0.0 && p.y.fract() == 0.0 {
+                        // Prepared frames are JPEG, hence opaque; crop and tone preserve their alpha.
+                        blit(target, mask, image, true, p.x as i64, p.y as i64, *alpha);
+                        return Bounds::screen(view);
+                    }
+                    let matrix = Transform::from_row(
+                        (t.a * p.scale) as f32,
+                        (t.b * p.scale) as f32,
+                        (t.c * p.scale) as f32,
+                        (t.d * p.scale) as f32,
+                        p.x as f32,
+                        p.y as f32,
+                    );
+                    let paint = PixmapPaint { opacity: *alpha, quality: FilterQuality::Bilinear, ..PixmapPaint::default() };
+                    target.draw_pixmap(0, 0, image.as_ref(), &paint, matrix, mask);
+                    return Bounds::screen(view);
+                }
                 // Unturned and uniformly scaled: show a copy resampled to its size at whole pixels, rather than
                 // filtering every pixel of every frame. The copy is made once its size has held for a few
                 // frames, or straight away for an image coming into view, which is held back until it's ready.
@@ -932,13 +1080,14 @@ impl Raster {
                     };
                     self.asked.retain(|(r, _, _)| *r != *source);
                     self.asked.push((*source, size, held));
+                    let surround = pack.uses_videos && matches!(source.src, ImageSrc::Pack(_));
                     let arriving = self.background_decoding && !self.drawn_recently(*source);
                     let resampling = |r: &Raster| r.resampling.iter().any(|(s, _, _)| *s == *source);
                     if held >= STEADY_FRAMES || (arriving && !resampling(self)) {
                         self.request_scaled(index, size);
                     }
                     if self.scaled.iter().any(|(r, s, _, _)| *r == *source && *s == size) {
-                        let fade_in = self.arrival(*source);
+                        let fade_in = if surround { 1.0 } else { self.arrival(*source) };
                         let Some((scaled, opaque)) = self.scaled_copy(*source, size) else { return Bounds::EMPTY };
                         blit(target, mask, scaled, opaque, p.x.round() as i64, p.y.round() as i64, *alpha * fade_in);
                         self.mark_drawn(*source);
@@ -957,7 +1106,7 @@ impl Raster {
                         }
                     }
                 }
-                let fade_in = self.arrival(*source);
+                let fade_in = if pack.uses_videos && matches!(source.src, ImageSrc::Pack(_)) { 1.0 } else { self.arrival(*source) };
                 let image: &Pixmap = &self.images[index].1;
                 let t = transform;
                 let matrix =
@@ -1302,6 +1451,107 @@ fn draw_sprite(target: &mut PixmapMut, mask: Option<&Mask>, sheet: &Pixmap, src:
 /// worked out once a column and once a row, in eighths of a pixel's 256ths, and wholly clear stretches are skipped.
 #[allow(clippy::too_many_arguments)]
 fn draw_sprite_smooth(target: &mut PixmapMut, mask: Option<&Mask>, sheet: &Pixmap, src: [u32; 4], at: (f32, f32), k: f64, flip: bool, alpha: f32) -> Bounds {
+    let [sx, sy, sw, sh] = src;
+    if k <= 0.0 || alpha <= 0.0 || sx + sw > sheet.width() || sy + sh > sheet.height() {
+        return Bounds::EMPTY;
+    }
+    let (ax, ay) = (at.0 as f64, at.1 as f64);
+    let (tw, th) = (target.width() as i64, target.height() as i64);
+    let (x0, x1) = ((ax.floor() as i64).max(0), ((ax + sw as f64 * k).ceil() as i64).min(tw));
+    let (y0, y1) = ((ay.floor() as i64).max(0), ((ay + sh as f64 * k).ceil() as i64).min(th));
+    if x0 >= x1 || y0 >= y1 {
+        return Bounds::EMPTY;
+    }
+    let a = (alpha.clamp(0.0, 1.0) * 255.0).round() as u32;
+    let mask_data = mask.map(|m| m.data());
+    let sheet_w = sheet.width() as usize;
+    let pixels = sheet.data();
+    // For each screen column, the byte offsets within a sheet row of the frame's two columns it falls between (or
+    // none, off the frame's edge), and the weight of the second, out of 256; the same for rows, once each.
+    let col_at = |c: i64| -> Option<usize> {
+        (0..sw as i64).contains(&c).then(|| {
+            let c = if flip { sw as i64 - 1 - c } else { c };
+            (sx as usize + c as usize) * 4
+        })
+    };
+    let row_at = |r: i64| -> Option<usize> { (0..sh as i64).contains(&r).then(|| (sy as usize + r as usize) * sheet_w * 4) };
+    let cols: Vec<(Option<usize>, Option<usize>, u32)> = (x0..x1)
+        .map(|x| {
+            let u = (x as f64 + 0.5 - ax) / k - 0.5;
+            let c0 = u.floor() as i64;
+            (col_at(c0), col_at(c0 + 1), ((u - u.floor()) * 256.0).round() as u32)
+        })
+        .collect();
+    let texel = |row: Option<usize>, col: Option<usize>| -> u32 {
+        match (row, col) {
+            (Some(r), Some(c)) => u32::from_le_bytes(pixels[r + c..r + c + 4].try_into().unwrap()),
+            _ => 0,
+        }
+    };
+    let data = target.data_mut();
+    for y in y0..y1 {
+        let v = (y as f64 + 0.5 - ay) / k - 0.5;
+        let r0 = v.floor() as i64;
+        let (row0, row1) = (row_at(r0), row_at(r0 + 1));
+        if row0.is_none() && row1.is_none() {
+            continue;
+        }
+        let wy = ((v - v.floor()) * 256.0).round() as u32;
+        let row_base = (y * tw) as usize;
+        for (n, &(c0, c1, wx)) in cols.iter().enumerate() {
+            let (p00, p10, p01, p11) = (texel(row0, c0), texel(row0, c1), texel(row1, c0), texel(row1, c1));
+            if (p00 | p10 | p01 | p11) >> 24 == 0 {
+                continue;
+            }
+            // Two channels occupy separate 32-bit lanes. Even the final sum plus rounding fits
+            // in 24 bits (255 * 65536 + 32768), so nothing carries between the lanes. This
+            // keeps exactly the separate-channel interpolation and its single rounding.
+            let pair = |p: u32| (p as u64 & 255) | ((p as u64 & 0xff0000) << 16);
+            let interpolate = |a: u64, b: u64, c: u64, d: u64| {
+                let top = a * (256 - wx) as u64 + b * wx as u64;
+                let bottom = c * (256 - wx) as u64 + d * wx as u64;
+                let value = top * (256 - wy) as u64 + bottom * wy as u64 + 0x0000_8000_0000_8000;
+                (value >> 16) & 0x0000_00ff_0000_00ff
+            };
+            let rb = interpolate(pair(p00), pair(p10), pair(p01), pair(p11));
+            let ga = interpolate(pair(p00 >> 8), pair(p10 >> 8), pair(p01 >> 8), pair(p11 >> 8));
+            let p = [rb as u32 & 255, ga as u32 & 255, (rb >> 32) as u32, (ga >> 32) as u32];
+            if p[3] == 0 {
+                continue;
+            }
+            let at = row_base + x0 as usize + n;
+            let mut cover = a;
+            if let Some(m) = mask_data {
+                cover = div255(cover * m[at] as u32);
+            }
+            if cover == 0 {
+                continue;
+            }
+            let sa = div255(p[3] * cover);
+            let keep = 255 - sa;
+            let px = &mut data[at * 4..at * 4 + 4];
+            for c in 0..3 {
+                px[c] = (div255(p[c] * cover) + div255(px[c] as u32 * keep)).min(255) as u8;
+            }
+            px[3] = (sa + div255(px[3] as u32 * keep)).min(255) as u8;
+        }
+    }
+    Bounds { x0, y0, x1, y1 }
+}
+
+// The original sampler stays independent of the packed arithmetic for exact regression comparisons.
+#[cfg(test)]
+#[allow(clippy::too_many_arguments)]
+fn draw_sprite_smooth_reference(
+    target: &mut PixmapMut,
+    mask: Option<&Mask>,
+    sheet: &Pixmap,
+    src: [u32; 4],
+    at: (f32, f32),
+    k: f64,
+    flip: bool,
+    alpha: f32,
+) -> Bounds {
     let [sx, sy, sw, sh] = src;
     if k <= 0.0 || alpha <= 0.0 || sx + sw > sheet.width() || sy + sh > sheet.height() {
         return Bounds::EMPTY;
@@ -2026,7 +2276,7 @@ pub(crate) mod tests {
     }
 
     fn render(body: &str, files: &[(&str, &[u8])], time: f64, w: u32, h: u32) -> Pixmap {
-        let dir = temp_pack(&format!("raster{}", body.len()), &format!("format = 1\nname = \"T\"\nfade = 0\n{body}"), files);
+        let dir = temp_pack(&format!("raster{}", body.len()), &format!("format = 2\nname = \"T\"\nfade = 0\n{body}"), files);
         let pack = load(&dir, &Environment::default()).unwrap_or_else(|e| panic!("{e}"));
         std::fs::remove_dir_all(&dir).unwrap();
         let mut raster = Raster::new();
@@ -2107,7 +2357,7 @@ pub(crate) mod tests {
     fn steady_images_use_the_resampled_copy() {
         let png = tiny_png();
         let body = "[[scene]]\nduration = 5\nbackground = \"#000000\"\n[[scene.draw]]\nkind = \"image\"\nfile = \"red.png\"\nfit = \"contain\"\n";
-        let dir = temp_pack("steady", &format!("format = 1\nname = \"T\"\nfade = 0\n{body}"), &[("red.png", &png)]);
+        let dir = temp_pack("steady", &format!("format = 2\nname = \"T\"\nfade = 0\n{body}"), &[("red.png", &png)]);
         let pack = load(&dir, &Environment::default()).unwrap();
         std::fs::remove_dir_all(&dir).unwrap();
         let mut raster = Raster::new();
@@ -2260,7 +2510,7 @@ pub(crate) mod tests {
     fn images_coming_into_view_wait_for_their_copy() {
         let png = tiny_png();
         let body = "[[scene]]\nduration = 5\nbackground = \"#000000\"\n[[scene.draw]]\nkind = \"image\"\nfile = \"red.png\"\nfit = \"contain\"\n";
-        let dir = temp_pack("waiting", &format!("format = 1\nname = \"T\"\nfade = 0\n{body}"), &[("red.png", &png)]);
+        let dir = temp_pack("waiting", &format!("format = 2\nname = \"T\"\nfade = 0\n{body}"), &[("red.png", &png)]);
         let pack = load(&dir, &Environment::default()).unwrap();
         std::fs::remove_dir_all(&dir).unwrap();
         let mut raster = Raster::new();
@@ -2303,6 +2553,207 @@ pub(crate) mod tests {
         assert_eq!(v.px(0.0, 0.0), (1152.0, 720.0));
     }
 
+    fn video_pack(name: &str) -> Pack {
+        let colors: Vec<_> = (0..24).map(|n| if n % 2 == 0 { [0; 3] } else { [255; 3] }).collect();
+        let archive = crate::video::tests::archive_colors(&colors);
+        let body = "format=2\nname=\"V\"\nfade=0\n[[scene]]\nduration=5\n[[scene.draw]]\nkind=\"image\"\nsource=\"videos\"\n";
+        let dir = temp_pack(name, body, &[("test.ssv", &archive)]);
+        let pack = load(&dir, &Environment { videos: Some(&dir), ..Default::default() }).unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+        pack
+    }
+
+    #[test]
+    fn video_surround_waits_for_decode_and_resize_then_draws_without_a_fade() {
+        let dir = temp_pack(
+            "video-surround-readiness",
+            "format=2\nname=\"V\"\nfade=0\n[[scene]]\nduration=5\n[[scene.draw]]\nkind=\"image\"\nfile=\"case.png\"\nw=1\nh=0.5\n[[scene.draw]]\nkind=\"image\"\nsource=\"videos\"\n",
+            &[("case.png", &tiny_png())],
+        );
+        let pack = load(&dir, &Environment::default()).unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert!(pack.uses_videos);
+        let mut raster = Raster::new();
+        raster.background_decoding = true;
+        raster.largest = (320, 180);
+        let mut eval = Evaluator::new(&pack, 1, raster.metrics());
+        let view = View::new(320, 180, pack.stage);
+        let frame = eval.frame(&pack, 0.0, view.aspect());
+        assert!(!raster.video_surround_ready(&pack, &frame, view), "not ready before decode");
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !raster.video_surround_ready(&pack, &frame, view) {
+            assert!(Instant::now() < deadline);
+            raster.poll_images();
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        let mut target = Pixmap::new(320, 180).unwrap();
+        raster.draw(&pack, &frame, &mut target.as_mut(), view);
+        assert_eq!(pixel(&target, 160, 90), [255, 0, 0, 255], "cabinet is fully visible on its first ready frame");
+        assert!(raster.arrivals.is_empty());
+        let Item::Image { source, frame: size, .. } = frame.items[0] else { panic!() };
+        let key = raster.keyed(source, size);
+        raster.images.clear();
+        raster.failed.push(key);
+        assert!(!raster.video_surround_ready(&pack, &frame, view), "failed art must not expose a naked picture");
+    }
+
+    #[test]
+    fn decoded_video_frames_reach_the_flash_guard() {
+        let pack = video_pack("video-flash-guard");
+        assert!(!pack.prefetches_images(), "video must not trigger the photo look-ahead evaluator");
+        let mut raster = Raster::new();
+        let mut eval = Evaluator::new(&pack, 1, raster.metrics());
+        let view = View::new(192, 108, pack.stage);
+        let mut pixels = Pixmap::new(192, 108).unwrap();
+        let mut guard = crate::flash::Guard::new();
+        let mut rejected = 0;
+        let mut distinct = std::collections::HashSet::new();
+        for n in 0..24 {
+            let time = (n as f64 + 0.1) / 24.0;
+            let frame = eval.frame(&pack, time, view.aspect());
+            raster.draw(&pack, &frame, &mut pixels.as_mut(), view);
+            distinct.insert(pixels.data().to_vec());
+            let cells = crate::flash::measure(pixels.data(), 192, 108, 192 * 4, false);
+            if !guard.admit(&cells, time) {
+                rejected += 1;
+            }
+        }
+        assert_eq!(distinct.len(), 2, "actual decoded black and white video frames");
+        assert!(rejected > 0, "a strobing video must be rejected by the same pre-display guard");
+        assert!(raster.warnings.is_empty(), "{:?}", raster.warnings);
+    }
+
+    #[test]
+    fn async_video_keeps_latest_frame_and_bounds_queues_and_cache() {
+        use std::time::{Duration, Instant};
+        let pack = video_pack("video-async-cache");
+        let mut raster = Raster::new();
+        raster.background_decoding = true;
+        raster.largest = (64, 64);
+        let reference = |n, filter| ImageRef { src: ImageSrc::Video { video: 0, frame: n }, crop: 0, limit: 0, filter };
+        assert!(raster.image(&pack, reference(0, Filter::None)).is_none());
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !raster.pending.is_empty() {
+            assert!(Instant::now() < deadline);
+            std::thread::sleep(Duration::from_millis(1));
+            raster.poll_images();
+        }
+        let previous = raster.image(&pack, reference(1, Filter::None)).expect("hold completed frame during decode");
+        assert!(Raster::same_video(raster.images[previous].0, reference(0, Filter::None)));
+        raster.image(&pack, reference(2, Filter::None));
+        assert_eq!(raster.pending.len(), 2, "two distinct adjacent frames can decode together");
+        raster.image(&pack, reference(2, Filter::Sepia));
+        raster.image(&pack, reference(2, Filter::Greyscale));
+        assert_eq!(raster.pending.len(), 2, "two video jobs globally");
+        let mut eval = Evaluator::new(&pack, 1, raster.metrics());
+        let view = View::new(64, 64, pack.stage);
+        let mut pixels = Pixmap::new(64, 64).unwrap();
+        for n in 0..24 {
+            let wanted = reference(n, Filter::None);
+            while !raster.images.iter().any(|(r, _)| *r == wanted) {
+                assert!(Instant::now() < deadline, "video decoding stalled");
+                raster.image(&pack, wanted);
+                std::thread::sleep(Duration::from_millis(1));
+                raster.poll_images();
+                assert!(raster.pending.len() <= 2);
+                assert!(raster.images.len() <= 6);
+            }
+            let frame = eval.frame(&pack, (n as f64 + 0.1) / 24.0, view.aspect());
+            raster.draw(&pack, &frame, &mut pixels.as_mut(), view);
+        }
+        assert!(
+            raster.asked.is_empty() && raster.held_back.is_empty() && raster.arrivals.is_empty() && raster.drawn.is_empty(),
+            "changing video frames must bypass static-photo metadata"
+        );
+        assert!(raster.warnings.is_empty(), "{:?}", raster.warnings);
+    }
+
+    #[test]
+    fn adjacent_video_cells_converge_to_four_exact_frames_with_bounded_lookahead() {
+        let pack = video_pack("film-adjacent-cache");
+        let mut raster = Raster::new();
+        raster.background_decoding = true;
+        let reference = |n| ImageRef { src: ImageSrc::Video { video: 0, frame: n }, crop: 0, limit: 0, filter: Filter::None };
+        for base in 0..20 {
+            let deadline = Instant::now() + Duration::from_secs(5);
+            loop {
+                raster.poll_images();
+                let exact = (0..4)
+                    .filter(|offset| {
+                        let wanted = reference(base + offset);
+                        raster.image(&pack, wanted).is_some_and(|i| raster.images[i].0 == wanted)
+                    })
+                    .count();
+                assert!(raster.pending.len() <= 2 && raster.images.len() <= 6);
+                if exact == 4 {
+                    break;
+                }
+                assert!(Instant::now() < deadline, "adjacent film cells did not converge");
+                std::thread::sleep(Duration::from_millis(1));
+            }
+        }
+        assert!(raster.warnings.is_empty());
+    }
+
+    #[test]
+    fn smooth_sprite_sampling_matches_reference() {
+        let mut state = 0x1649_beef_u32;
+        let mut next = || {
+            state = state.wrapping_mul(1664525).wrapping_add(1013904223);
+            state
+        };
+        // Premultiplied sheets and destinations, including empty, opaque and sparse sheets.
+        for kind in 0..4 {
+            let mut sheet = Pixmap::new(13, 11).unwrap();
+            for p in sheet.data_mut().chunks_exact_mut(4) {
+                let a = match kind {
+                    0 => 0,
+                    1 => 255,
+                    2 => (next() >> 24) as u8,
+                    _ => {
+                        if next() >> 30 == 0 {
+                            255
+                        } else {
+                            0
+                        }
+                    }
+                };
+                for c in &mut p[..3] {
+                    *c = ((next() >> 24) * a as u32 / 255) as u8;
+                }
+                p[3] = a;
+            }
+            let mut target = Pixmap::new(29, 23).unwrap();
+            for p in target.data_mut().chunks_exact_mut(4) {
+                let a = (next() >> 24) as u8;
+                for c in &mut p[..3] {
+                    *c = ((next() >> 24) * a as u32 / 255) as u8;
+                }
+                p[3] = a;
+            }
+            let mut mask = Mask::new(29, 23).unwrap();
+            for v in mask.data_mut() {
+                *v = (next() >> 24) as u8;
+            }
+            for case in 0..1200 {
+                let sx = next() % 13;
+                let sy = next() % 11;
+                let src = [sx, sy, 1 + next() % (13 - sx), 1 + next() % (11 - sy)];
+                let at = ((next() % 320) as f32 / 8.0 - 10.0, (next() % 280) as f32 / 8.0 - 10.0);
+                let k = [0.001, 0.12, 0.5, 0.73, 1.0, 1.25, 2.0, 5.3, 16.0][case % 9];
+                let flip = case % 2 != 0;
+                let a = [0.0, 0.001, 0.01, 0.3, 0.999, 1.0, 1.5][case % 7];
+                let m = if case % 3 == 0 { None } else { Some(&mask) };
+                let mut actual = target.clone();
+                let mut expected = target.clone();
+                let bounds = draw_sprite_smooth(&mut actual.as_mut(), m, &sheet, src, at, k, flip, a);
+                let reference = draw_sprite_smooth_reference(&mut expected.as_mut(), m, &sheet, src, at, k, flip, a);
+                assert_eq!(bounds, reference, "bounds: kind {kind}, case {case}");
+                assert_eq!(actual.data(), expected.data(), "pixels: kind {kind}, case {case}");
+            }
+        }
+    }
+
     #[test]
     fn smooth_sprites_blend_at_their_edges() {
         let mut sheet = Pixmap::new(4, 4).unwrap();
@@ -2341,7 +2792,7 @@ pub(crate) mod tests {
             image::RgbaImage::from_pixel(w, h, image::Rgba(c)).write_to(&mut std::io::Cursor::new(&mut out), image::ImageFormat::Png).unwrap();
             out
         };
-        let body = "format = 1\nname = \"T\"\nfade = 0\n[[scene]]\nduration = 5\n[[scene.draw]]\nkind = \"sprite\"\nfile = \"own.png\"\nsource = \"badge\"\n";
+        let body = "format = 2\nname = \"T\"\nfade = 0\n[[scene]]\nduration = 5\n[[scene.draw]]\nkind = \"sprite\"\nfile = \"own.png\"\nsource = \"badge\"\n";
         let own = png(8, 8, [0, 255, 0, 255]);
         let dir = temp_pack("badge", body, &[("own.png", &own)]);
         let theirs = std::env::temp_dir().join(format!("screensafe-badge-{}", std::process::id()));
@@ -2395,7 +2846,7 @@ pub(crate) mod tests {
     #[test]
     fn packs_can_tell_light_themes_from_dark() {
         use crate::palette::Palette;
-        let body = "format = 1\nname = \"T\"\nfade = 0\n[[scene]]\nduration = 5\nbackground = \"light ? #ffffff : #000000\"\n\
+        let body = "format = 2\nname = \"T\"\nfade = 0\n[[scene]]\nduration = 5\nbackground = \"light ? #ffffff : #000000\"\n\
                     [[scene.draw]]\nkind = \"rect\"\nw = 0.5\nh = 0.5\ncolor = \"light ? #ff0000 : #0000ff\"\n";
         let dir = temp_pack("lightdark", body, &[]);
         let draw = |theme: &str| {
@@ -2426,7 +2877,7 @@ pub(crate) mod tests {
                     [[scene.draw.draw]]\nkind = \"lines\"\nsamples = 64\npx = \"0.3 * sin(s * tau)\"\npy = \"0.3 * cos(s * tau)\"\n\
                     width = 0.01\ncolor = \"#40ff80\"\ndraw = \"min(1, t / 4)\"\n\
                     [[scene.draw]]\nkind = \"rect\"\nx = \"-0.5 + t * 0.01\"\nw = 0.1\nh = 0.1\ncolor = \"#ff0000\"\n";
-        let dir = temp_pack("glowcache", &format!("format = 1\nname = \"T\"\nfade = 0\n{body}"), &[]);
+        let dir = temp_pack("glowcache", &format!("format = 2\nname = \"T\"\nfade = 0\n{body}"), &[]);
         let pack = load(&dir, &Environment::default()).unwrap_or_else(|e| panic!("{e}"));
         std::fs::remove_dir_all(&dir).unwrap();
         let (w, h) = (320, 180);
@@ -2569,16 +3020,21 @@ mod fuzz {
             let Ok(manifest) = String::from_utf8(text) else { continue };
             let dir = temp_pack("fuzz", &manifest, &[]);
             let result = load(&dir, &Environment::default());
+            let reference = crate::expr::unoptimized(|| load(&dir, &Environment::default()));
             std::fs::remove_dir_all(&dir).unwrap();
+            assert_eq!(result.is_ok(), reference.is_ok(), "optimization preserves pack admission");
             let Ok(pack) = result else { continue };
+            let original = reference.unwrap();
             loaded += 1;
             let mut raster = Raster::new();
             raster.largest = (96, 54);
             let mut eval = Evaluator::new(&pack, round as u64, raster.metrics());
+            let mut before = Evaluator::new(&original, round as u64, raster.metrics());
             let view = View::new(96, 54, pack.stage);
             let mut pixmap = Pixmap::new(96, 54).unwrap();
             for time in [0.0, 0.5, 3.0, 17.0, 31.0, 1e6] {
                 let frame = eval.frame(&pack, time, view.aspect());
+                assert_eq!(frame, before.frame(&original, time, view.aspect()), "round={round}, time={time}");
                 raster.draw(&pack, &frame, &mut pixmap.as_mut(), view);
             }
         }

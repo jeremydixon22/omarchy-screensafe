@@ -1,5 +1,5 @@
 # Line art made from expressions: the Omarchy box turning in its orbits, and a slowly changing Lissajous figure.
-format = 1
+format = 2
 name = "Orbits"
 author = "ScreenSafe"
 license = "MIT"
@@ -9,6 +9,8 @@ fade = 1.2
 background = "background"
 
 # What can be changed in the panel: how quickly the box turns.
+colorize = "tint_color"
+
 [[setting]]
 name = "spin"
 label = "Spin"
@@ -16,6 +18,12 @@ kind = "choice"
 choices = ["Slow", "Normal", "Fast"]
 values = [0.25, 0.45, 0.8]
 default = 0.45
+
+[[setting]]
+name = "tint_color"
+label = "Color"
+kind = "color"
+default = 0
 
 [[scene]]
 name = "Orbits"

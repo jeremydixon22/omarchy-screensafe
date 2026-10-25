@@ -22,7 +22,7 @@ scripts/verify-release
 
 It rebuilds both executables in a temporary folder and compares each with the committed one, printing the SHA-256 of each that matches and failing if either doesn't.
 
-The same commit has been built twice on one machine, from different checkout folders with separate Cargo homes and target folders, and gave identical bytes. The two builds also draw identical pixels: frames rendered by the ARM build under emulation match the x86-64 build's exactly. The repository's CI runs `scripts/verify-release` on GitHub's runners for every change, runs the tests natively on GitHub's ARM runners, and attests the committed executables for each commit pushed to `main`. To check an attestation:
+Earlier released builds were checked from different checkout folders with separate Cargo homes and target folders and gave identical bytes; ARM frames under emulation also matched x86-64 frames. Those runtime checks do not cover this local 0.5.0 development build. The repository's CI runs `scripts/verify-release` on GitHub's runners for every change, runs the tests natively on GitHub's ARM runners, and attests the committed executables for each commit pushed to `main`. To check an attestation:
 
 ```sh
 gh attestation verify bin/screensafe-$(uname -m) --repo jeremydixon22/omarchy-screensafe
@@ -38,6 +38,10 @@ ScreenSafe's own code is in `renderer/src`, with no `unsafe` code (`#![forbid(un
 - `toml`;
 - `tz-rs` for time zones;
 - `rustix` for system calls;
-- `landlock` for confinement.
+- `landlock` for filesystem confinement; `seccompiler` for the trusted syscall policy denying new network sockets.
 
 Run `bin/screensafe-$(uname -m) version` to see its version, and the pack format and expression language it reads.
+
+## Local 0.5.0 development build
+
+The local development binaries have been rebuilt and compared for both architectures, but have not been published or attested by release CI. Reproducibility checks are not provenance attestations, and the local 0.5.0 ARM binary has not had native runtime validation here. The release commands above apply once the reviewed source and binaries are committed and the corresponding CI has passed.

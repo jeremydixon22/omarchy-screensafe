@@ -396,7 +396,7 @@ def build(out):
     os.makedirs(out, exist_ok=True)
     head = '''# Fibonacci: six views of the Fibonacci numbers, one after another, in the theme's colors. Written by
 # tools/fibonacci/build.py.
-format = 1
+format = 2
 name = "Fibonacci"
 author = "ScreenSafe"
 license = "MIT"
@@ -404,6 +404,13 @@ description = "The sequence in pictures: squares and their spiral, a sunflower, 
 preview = 52
 fps = 30
 fade = 0.5
+colorize = "tint_color"
+
+[[setting]]
+name = "tint_color"
+label = "Color"
+kind = "color"
+default = 0
 '''
     scenes = [squares(), sunflower(), rabbits(), pascal(), ratios(), word_fractal()]
     with open(os.path.join(out, "screensafe.toml"), "w") as f:

@@ -1,6 +1,6 @@
 # Two four-sided shapes whose corners bounce off the edges of the screen, each trailing echoes of where it's been,
 # slowly changing color. The corners' speeds are different each time ScreenSafe opens.
-format = 1
+format = 2
 name = "Echoes"
 author = "ScreenSafe"
 license = "MIT"
@@ -9,6 +9,8 @@ stage = "screen"
 fps = 30
 fade = 0
 background = "background"
+
+colorize = "tint_color"
 
 [params]
 # Seconds between one echo and the next.
@@ -31,6 +33,12 @@ choices = ["Few", "Many"]
 values = [4, 9]
 default = 9
 
+
+[[setting]]
+name = "tint_color"
+label = "Color"
+kind = "color"
+default = 0
 
 [[scene]]
 name = "Bounce"

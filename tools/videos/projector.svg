@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="670" height="1100" viewBox="0 0 670 1100">
+<!-- Original procedural artwork. MIT. Render: rsvg-convert tools/videos/projector.svg -o packs/videos/art/projector.png -->
+<defs>
+<filter id="soft" x="0" y="0" width="1" height="1" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="9"/></filter>
+<radialGradient id="lamp"><stop stop-color="#fff1cd" stop-opacity="0.45"/><stop offset="0.25" stop-color="#f4cf92" stop-opacity="0.15"/><stop offset="1" stop-color="#f4cf92" stop-opacity="0"/></radialGradient>
+</defs>
+<g fill="#f4cf92" fill-opacity="0.045" filter="url(#soft)">
+<path d="M670 680 L0 0 L0 1100 Z"/>
+<path d="M670 680 L0 25 L0 1075 Z"/>
+<path d="M670 680 L0 50 L0 1050 Z"/>
+<path d="M670 680 L0 75 L0 1025 Z"/>
+<path d="M670 680 L0 100 L0 1000 Z"/>
+<path d="M670 680 L0 125 L0 975 Z"/>
+</g>
+<ellipse cx="660" cy="680" rx="72" ry="105" fill="url(#lamp)"/>
+</svg>

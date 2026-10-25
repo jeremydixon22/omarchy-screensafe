@@ -1,6 +1,6 @@
 # A harmonograph: two pendulums swinging at nearly matching rates draw a figure that slowly winds inwards as they
 # lose their swing. Each figure draws itself in, glows for a while and fades, and the next uses new rates.
-format = 1
+format = 2
 name = "Harmonograph"
 author = "ScreenSafe"
 license = "MIT"
@@ -8,6 +8,8 @@ description = "Two pendulums slowly draw a glowing figure that winds inwards; ea
 stage = "16:9"
 fps = 30
 background = "background"
+
+colorize = "tint_color"
 
 [params]
 # How many swings each figure takes, and how fast the swing dies away.
@@ -28,6 +30,12 @@ name = "glowing"
 label = "Glow"
 kind = "toggle"
 default = true
+
+[[setting]]
+name = "tint_color"
+label = "Color"
+kind = "color"
+default = 0
 
 [[scene]]
 name = "Figure"

@@ -603,7 +603,8 @@ def build(out, font_source=None):
     here = os.path.dirname(os.path.abspath(__file__))
     make_previews(out, os.path.join(here, "..", "..", "packs"), os.path.join(here, "..", "..", "renderer", "target", "release", "screensafe"))
     head = '''# Tokyo Drip: a rainy Tokyo side street at night, in the theme's colors. Written by tools/tokyo-drip/build.py.
-format = 1
+format = 2
+colorize = "tint_color"
 name = "Tokyo Drip"
 author = "ScreenSafe"
 license = "MIT"
@@ -632,6 +633,12 @@ kind = "choice"
 choices = ["Patterns", "ScreenSafe", "Omarchy"]
 values = [0, 1, 2]
 default = 1
+
+[[setting]]
+name = "tint_color"
+label = "Color"
+kind = "color"
+default = 0
 
 [[scene]]
 name = "The street"

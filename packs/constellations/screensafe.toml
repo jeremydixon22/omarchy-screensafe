@@ -1,6 +1,6 @@
 # Stars drift about the screen, bouncing off its edges, and any two that pass near each other are joined by a line
 # that fades as they part, in the theme's colors.
-format = 1
+format = 2
 name = "Constellations"
 author = "ScreenSafe"
 license = "MIT"
@@ -11,6 +11,8 @@ fade = 0
 background = "background"
 
 # What can be changed in the panel: how far apart two stars can be and still be joined, and how quickly they drift.
+colorize = "tint_color"
+
 [[setting]]
 name = "near"
 label = "Links"
@@ -27,6 +29,12 @@ choices = ["Slow", "Normal", "Lively"]
 values = [0.6, 1, 1.8]
 default = 1
 
+
+[[setting]]
+name = "tint_color"
+label = "Color"
+kind = "color"
+default = 0
 
 [[scene]]
 name = "Drift"

@@ -1,9 +1,10 @@
 # Badge: ScreenSafe's shield or the Omarchy mark, or your own badge, bouncing, shattering, waving and in orbit. To show yours, put an image at ~/.config/omarchy/screensafe/badge.png. Written by tools/badge/build.py.
-format = 1
+format = 2
 name = "Badge"
 author = "ScreenSafe"
 license = "MIT"
 description = "ScreenSafe's shield or the Omarchy mark, or your own badge, bouncing, shattering, waving and in orbit. To show yours, put an image at ~/.config/omarchy/screensafe/badge.png."
+colorize = "tint_color"
 preview = 138
 fps = 30
 fade = 0
@@ -21,6 +22,14 @@ name = "pixelart"
 label = "Pixel art in theme colors"
 kind = "toggle"
 default = false
+
+[[setting]]
+name = "tint_color"
+label = "Theme color"
+kind = "color"
+default = 0
+when = "pixelart"
+when_value = 1
 
 [[scene]]
 name = "Bounce"

@@ -23,15 +23,18 @@ macro_rules! tell {
 }
 
 mod clock;
+mod crt;
 mod eval;
 mod expr;
 mod flash;
+mod overlay;
 mod pack;
 mod palette;
 mod raster;
 mod safefs;
 mod sandbox;
 mod takeover;
+mod video;
 mod wayland;
 
 use std::path::{Path, PathBuf};
@@ -43,14 +46,16 @@ use palette::Palette;
 use raster::{Raster, View};
 
 const USAGE: &str = "usage:
-  screensafe run --pack DIR [--theme DIR] [--branding FILE] [--logo FILE] [--badge PATH] [--photos DIR] [--settings NAME=VALUE,...] [--seed N] [--max-fps N] [--start SECONDS] [--exit-after SECONDS]
-  screensafe check DIR [--theme DIR] [--branding FILE] [--logo FILE] [--badge PATH] [--photos DIR] [--settings NAME=VALUE,...] [--seconds N] [--size WxH]
-  screensafe render DIR --time SECONDS --out FILE.png [--size WxH] [--theme DIR] [--branding FILE] [--logo FILE] [--badge PATH] [--photos DIR] [--settings NAME=VALUE,...]
-  screensafe catalog DIR... [--theme DIR] [--branding FILE] [--logo FILE] [--badge PATH] [--photos DIR]
-  screensafe preview --pack DIR --region X,Y,W,H [--output NAME] [--theme DIR] [--branding FILE] [--logo FILE] [--badge PATH] [--photos DIR] [--settings NAME=VALUE,...]
-  screensafe thumbnail DIR [--size WxH] [--time SECONDS] [--unless FINGERPRINT] [--theme DIR] [--branding FILE] [--logo FILE] [--badge PATH] [--photos DIR] [--settings NAME=VALUE,...]
+  screensafe run --pack DIR [--theme DIR] [--branding FILE] [--logo FILE] [--badge PATH] [--photos DIR] [--videos DIR] [--settings NAME=VALUE,...] [--overlay NAME=VALUE,...] [--seed N] [--max-fps N] [--start SECONDS] [--exit-after SECONDS]
+  screensafe check DIR [--theme DIR] [--branding FILE] [--logo FILE] [--badge PATH] [--photos DIR] [--videos DIR] [--settings NAME=VALUE,...] [--overlay NAME=VALUE,...] [--seconds N] [--size WxH]
+  screensafe render DIR --time SECONDS --out FILE.png [--size WxH] [--theme DIR] [--branding FILE] [--logo FILE] [--badge PATH] [--photos DIR] [--videos DIR] [--settings NAME=VALUE,...] [--overlay NAME=VALUE,...]
+  screensafe catalog DIR... [--theme DIR] [--branding FILE] [--logo FILE] [--badge PATH] [--photos DIR] [--videos DIR]
+  screensafe preview --pack DIR --region X,Y,W,H [--output NAME] [--theme DIR] [--branding FILE] [--logo FILE] [--badge PATH] [--photos DIR] [--videos DIR] [--settings NAME=VALUE,...] [--overlay NAME=VALUE,...]
+  screensafe thumbnail DIR [--size WxH] [--time SECONDS] [--unless FINGERPRINT] [--theme DIR] [--branding FILE] [--logo FILE] [--badge PATH] [--photos DIR] [--videos DIR] [--settings NAME=VALUE,...]
   screensafe takeover claim TOKEN | release [TOKEN] | status
   screensafe photos-folder
+  screensafe videos-folder
+  screensafe system-info
   screensafe sandbox-test
   screensafe version";
 
@@ -118,6 +123,10 @@ fn settings_json(settings: &[pack::Setting]) -> String {
                 pack::SettingKind::Range { min, max, step, unit } => {
                     format!("\"kind\":\"range\",\"min\":{min},\"max\":{max},\"step\":{step},\"unit\":{}", json(unit))
                 }
+                pack::SettingKind::Color { when } => {
+                    let condition = when.as_ref().map(|(name, value)| format!(",\"when\":{},\"whenValue\":{value}", json(name))).unwrap_or_default();
+                    format!("\"kind\":\"color\"{condition}")
+                }
             };
             format!("{{\"name\":{},\"label\":{},{kind},\"default\":{}}}", json(&s.name), json(&s.label), s.default)
         })
@@ -154,13 +163,18 @@ fn theme_palette(theme: Option<&Path>) -> Result<Option<Palette>, String> {
 }
 
 /// Confines the renderer to reading `dirs` and the theme and art it was given, before it parses anything.
+fn video_folder(args: &Args) -> Option<PathBuf> {
+    args.path("videos").or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(video::FOLDER)))
+}
+
 fn confine_reading(args: &Args, dirs: &[PathBuf]) -> Result<&'static str, String> {
     let mut paths: Vec<PathBuf> = dirs.to_vec();
-    paths.extend(["theme", "branding", "logo", "photos"].iter().filter_map(|k| args.path(k)));
+    paths.extend(["theme", "branding", "logo", "photos", "videos"].iter().filter_map(|k| args.path(k)));
     // Someone's badge: only the few files it may be, not the folder they're in.
     if let Some(badge) = args.path("badge") {
         paths.extend(pack::BADGE_EXTENSIONS.iter().map(|ext| badge.with_extension(ext)));
     }
+    paths.extend(video_folder(args));
     let refs: Vec<&Path> = paths.iter().map(PathBuf::as_path).collect();
     sandbox::confine_reading(&refs)
 }
@@ -206,6 +220,7 @@ fn load_with(dir: &Path, args: &Args, chosen: &[(String, f64)], photo_seed: Opti
     let logo = args.path("logo");
     let badge = args.path("badge");
     let photos = args.path("photos");
+    let videos = video_folder(args);
     let palette = theme_palette(theme.as_deref())?;
     let env = Environment {
         palette: palette.as_ref(),
@@ -215,6 +230,7 @@ fn load_with(dir: &Path, args: &Args, chosen: &[(String, f64)], photo_seed: Opti
         badge: badge.as_deref(),
         settings: chosen,
         photos: photos.as_deref(),
+        videos: videos.as_deref(),
         photo_seed,
     };
     pack::load(dir, &env).map_err(|e| e.0)
@@ -224,7 +240,7 @@ fn load_with(dir: &Path, args: &Args, chosen: &[(String, f64)], photo_seed: Opti
 const PACK_UNUSABLE: u8 = 3;
 
 fn run(args: &Args) -> Result<Result<(), String>, String> {
-    args.only(&["pack", "theme", "branding", "logo", "badge", "photos", "settings", "seed", "max-fps", "exit-after", "start", "role"])?;
+    args.only(&["overlay", "pack", "theme", "branding", "logo", "badge", "photos", "videos", "settings", "seed", "max-fps", "exit-after", "start", "role"])?;
     let dir = args.path("pack").ok_or(USAGE)?;
     let seed = match args.number("seed")? {
         Some(s) => s as u64,
@@ -240,6 +256,7 @@ fn run(args: &Args) -> Result<Result<(), String>, String> {
         max_fps: args.number("max-fps")?.unwrap_or(pack::MAX_FPS).clamp(1.0, pack::MAX_FPS),
         start,
         clock: Some(clock),
+        overlay: overlay::Config::parse(args.get("overlay").unwrap_or(""))?,
     };
     confine_reading(args, std::slice::from_ref(&dir))?;
     let pack = match load_with(&dir, args, &settings(args)?, Some(seed)) {
@@ -272,7 +289,7 @@ fn run(args: &Args) -> Result<Result<(), String>, String> {
 /// its pack's folder and the theme and art it was given, but not past that: a change of settings reads the pack again.
 /// It still can't write anything, run anything or reach the network, and it ends with the panel that started it.
 fn live_preview(args: &Args) -> Result<(), String> {
-    args.only(&["pack", "theme", "branding", "logo", "badge", "photos", "settings", "region", "output", "seed"])?;
+    args.only(&["overlay", "pack", "theme", "branding", "logo", "badge", "photos", "videos", "settings", "region", "output", "seed"])?;
     let dir = args.path("pack").ok_or(USAGE)?;
     let output = args.get("output").map(|o| o.chars().take(64).collect());
     let region = wayland::Region::parse(args.get("region").ok_or(USAGE)?, output)?;
@@ -286,6 +303,7 @@ fn live_preview(args: &Args) -> Result<(), String> {
         max_fps: pack::MAX_FPS,
         start: 0.0,
         clock: Some(clock),
+        overlay: overlay::Config::parse(args.get("overlay").unwrap_or(""))?,
     };
     let mut raster = Raster::new();
     raster.background_decoding = true;
@@ -299,7 +317,7 @@ fn live_preview(args: &Args) -> Result<(), String> {
 }
 
 /// Renders the whole loop small, checking every frame for flashes.
-fn flash_report(pack: &Pack, seconds: f64, (w, h): (u32, u32)) -> (String, bool) {
+fn flash_report(pack: &Pack, seconds: f64, (w, h): (u32, u32), config: overlay::Config) -> (String, bool) {
     let mut raster = Raster::new();
     raster.largest = (w, h);
     raster.load_fonts(pack);
@@ -307,6 +325,7 @@ fn flash_report(pack: &Pack, seconds: f64, (w, h): (u32, u32)) -> (String, bool)
     let mut eval = eval::Evaluator::new(pack, 1, raster.metrics());
     let mut guard = flash::Guard::new();
     let mut pixmap = tiny_skia::Pixmap::new(w, h).expect("a small pixmap");
+    let overlay = overlay::Overlay::new(config, clock::Clock::fixed());
     let end = pack.length().min(seconds);
     let mut time = 0.0;
     let mut frames = 0u64;
@@ -316,7 +335,9 @@ fn flash_report(pack: &Pack, seconds: f64, (w, h): (u32, u32)) -> (String, bool)
     let mut slowest = Duration::ZERO;
     while time < end {
         let started = std::time::Instant::now();
-        let frame = eval.frame(pack, time, view.aspect());
+        eval.set_pixel_scale(view.scale);
+        let mut frame = eval.frame(pack, time, view.aspect());
+        overlay.append(&mut frame, time, view, view.scale, pack.foreground, raster.metrics()[0]);
         raster.draw(pack, &frame, &mut pixmap.as_mut(), view);
         let took = started.elapsed();
         drawing += took;
@@ -346,7 +367,7 @@ fn flash_report(pack: &Pack, seconds: f64, (w, h): (u32, u32)) -> (String, bool)
 }
 
 fn check(args: &Args) -> Result<bool, String> {
-    args.only(&["theme", "branding", "logo", "badge", "photos", "settings", "seconds", "size"])?;
+    args.only(&["overlay", "theme", "branding", "logo", "badge", "photos", "videos", "settings", "seconds", "size"])?;
     let dir = args.positional.get(1).map(PathBuf::from).ok_or(USAGE)?;
     let size = parse_size(args.get("size"), (960, 540))?;
     confine_reading(args, std::slice::from_ref(&dir))?;
@@ -358,7 +379,7 @@ fn check(args: &Args) -> Result<bool, String> {
         }
     };
     let seconds = args.number("seconds")?.unwrap_or(600.0).clamp(0.0, 3600.0);
-    let (flash, flash_ok) = flash_report(&pack, seconds, size);
+    let (flash, flash_ok) = flash_report(&pack, seconds, size, overlay::Config::parse(args.get("overlay").unwrap_or(""))?);
     let scenes: Vec<String> = pack
         .scenes
         .iter()
@@ -400,7 +421,7 @@ fn parse_size(value: Option<&str>, default: (u32, u32)) -> Result<(u32, u32), St
 }
 
 fn render(args: &Args) -> Result<(), String> {
-    args.only(&["theme", "branding", "logo", "badge", "photos", "settings", "time", "out", "size"])?;
+    args.only(&["overlay", "theme", "branding", "logo", "badge", "photos", "videos", "settings", "time", "out", "size"])?;
     let dir = args.positional.get(1).map(PathBuf::from).ok_or(USAGE)?;
     let out = args.path("out").ok_or(USAGE)?;
     let time = args.number("time")?.unwrap_or(0.0).max(0.0);
@@ -414,7 +435,16 @@ fn render(args: &Args) -> Result<(), String> {
     raster.load_fonts(&pack);
     let view = View::new(w, h, pack.stage);
     let mut eval = eval::Evaluator::new(&pack, 1, raster.metrics());
-    let frame = eval.frame(&pack, time, view.aspect());
+    eval.set_pixel_scale(view.scale);
+    let mut frame = eval.frame(&pack, time, view.aspect());
+    overlay::Overlay::new(overlay::Config::parse(args.get("overlay").unwrap_or(""))?, clock::Clock::fixed()).append(
+        &mut frame,
+        time,
+        view,
+        view.scale,
+        pack.foreground,
+        raster.metrics()[0],
+    );
     let mut pixmap = tiny_skia::Pixmap::new(w, h).ok_or("can't allocate the image")?;
     raster.draw(&pack, &frame, &mut pixmap.as_mut(), view);
     let img = image::RgbaImage::from_raw(w, h, pixmap.data().to_vec()).ok_or("can't encode the image")?;
@@ -430,7 +460,7 @@ fn render(args: &Args) -> Result<(), String> {
 /// a pack whose fingerprint is that one isn't drawn again: the second line is `unchanged`. Nothing is written to
 /// disk, and the renderer is confined before it draws.
 fn thumbnail(args: &Args) -> Result<(), String> {
-    args.only(&["theme", "branding", "logo", "badge", "photos", "settings", "time", "size", "unless"])?;
+    args.only(&["theme", "branding", "logo", "badge", "photos", "videos", "settings", "time", "size", "unless"])?;
     let dir = args.positional.get(1).map(PathBuf::from).ok_or(USAGE)?;
     let (w, h) = parse_size(args.get("size"), (320, 200))?;
     if w > THUMBNAIL_SIDE || h > THUMBNAIL_SIDE {
@@ -455,6 +485,7 @@ fn thumbnail(args: &Args) -> Result<(), String> {
     raster.load_fonts(&pack);
     let view = View::new(w, h, pack.stage);
     let mut eval = eval::Evaluator::new(&pack, 1, raster.metrics());
+    eval.set_pixel_scale(view.scale);
     let frame = eval.frame(&pack, time, view.aspect());
     let mut pixmap = tiny_skia::Pixmap::new(w, h).ok_or("can't allocate the image")?;
     raster.draw(&pack, &frame, &mut pixmap.as_mut(), view);
@@ -488,9 +519,20 @@ fn base64(bytes: &[u8]) -> String {
 
 /// Lists the packs in each directory, one per subdirectory holding a screensafe.toml, as JSON for the plugin.
 fn catalog(args: &Args) -> Result<(), String> {
-    args.only(&["theme", "branding", "logo", "badge", "photos"])?;
+    args.only(&["theme", "branding", "logo", "badge", "photos", "videos"])?;
     let roots: Vec<PathBuf> = args.positional.iter().skip(1).map(PathBuf::from).collect();
     confine_reading(args, &roots)?;
+    let palette = theme_palette(args.path("theme").as_deref())?.unwrap_or_else(Palette::default_theme);
+    let swatches = palette
+        .colors
+        .iter()
+        .enumerate()
+        .map(|(i, (name, c))| {
+            let hex = format!("#{:02x}{:02x}{:02x}", (c[0] * 255.0).round() as u8, (c[1] * 255.0).round() as u8, (c[2] * 255.0).round() as u8);
+            format!("{{\"value\":{},\"name\":{},\"color\":{}}}", i + 1, json(name), json(&hex))
+        })
+        .collect::<Vec<_>>()
+        .join(",");
     let mut entries = Vec::new();
     let mut size = 0;
     for root in args.positional.iter().skip(1) {
@@ -513,9 +555,9 @@ fn catalog(args: &Args) -> Result<(), String> {
             if !path.join(pack::MANIFEST).is_file() {
                 continue;
             }
-            let entry = match load(&path, args) {
+            let mut entry = match load(&path, args) {
                 Ok(p) => format!(
-                    "{{\"path\":{},\"ok\":true,\"name\":{},\"author\":{},\"license\":{},\"description\":{},\"fingerprint\":\"{:016x}\",\"warnings\":{},\"settings\":{},\"photos\":{}}}",
+                    "{{\"path\":{},\"ok\":true,\"name\":{},\"author\":{},\"license\":{},\"description\":{},\"fingerprint\":\"{:016x}\",\"warnings\":{},\"settings\":{},\"photos\":{},\"videos\":{}}}",
                     json(&path.display().to_string()),
                     json(&p.meta.name),
                     json(&p.meta.author),
@@ -525,13 +567,19 @@ fn catalog(args: &Args) -> Result<(), String> {
                     p.warnings.len(),
                     settings_json(&p.meta.settings),
                     // How many photos it has to show, or -1 for a pack that doesn't show any.
-                    if p.uses_photos { p.photos.len() as i64 } else { -1 }
+                    if p.uses_photos { p.photos.len() as i64 } else { -1 },
+                    if p.uses_videos { p.videos.len() as i64 } else { -1 }
                 ),
                 Err(e) => {
                     let short: String = e.lines().next().unwrap_or("").chars().take(300).collect();
                     format!("{{\"path\":{},\"ok\":false,\"name\":{},\"error\":{}}}", json(&path.display().to_string()), json(&name), json(&short))
                 }
             };
+            // Theme data once, not once per color setting or pack. Keep the catalog's 64 KiB bound.
+            if entries.is_empty() {
+                entry.pop();
+                entry.push_str(&format!(",\"palette\":[{swatches}]}}"));
+            }
             size += entry.len() + 1;
             if size > OUTPUT_LIMIT - 64 {
                 break;
@@ -545,7 +593,7 @@ fn catalog(args: &Args) -> Result<(), String> {
 
 /// Makes the photos folder, `~/Pictures/Screensaver`, if it isn't there, and prints its path, so the panel can open it
 /// for someone to add photos. Each folder is made, or opened, without following a link.
-fn photos_folder(args: &Args) -> Result<(), String> {
+fn media_folder(args: &Args, relative: &str) -> Result<(), String> {
     use rustix::fs::{Mode, OFlags};
     args.only(&[])?;
     let home = std::env::var_os("HOME").filter(|h| !h.is_empty()).ok_or("HOME isn't set")?;
@@ -554,14 +602,14 @@ fn photos_folder(args: &Args) -> Result<(), String> {
     };
     let mut dir = rustix::fs::open(Path::new(&home), OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC, Mode::empty())
         .map_err(|e| format!("can't open {}: {e}", Path::new(&home).display()))?;
-    for name in pack::PHOTOS_FOLDER.split('/') {
+    for name in relative.split('/') {
         match rustix::fs::mkdirat(&dir, name, Mode::from_raw_mode(0o755)) {
             Ok(()) | Err(rustix::io::Errno::EXIST) => {}
             Err(e) => return Err(format!("can't make {name}: {e}")),
         }
         dir = open(&dir, name).map_err(|e| format!("can't open {name}: {e}"))?;
     }
-    say!("{}", Path::new(&home).join(pack::PHOTOS_FOLDER).display());
+    say!("{}", Path::new(&home).join(relative).display());
     Ok(())
 }
 
@@ -591,9 +639,13 @@ fn sandbox_test() -> Result<bool, String> {
     let read = std::fs::read("/etc/hostname").is_err();
     let list = std::fs::read_dir("/").is_err();
     let exec = std::process::Command::new("/bin/true").status().is_err();
-    let net = std::net::TcpStream::connect_timeout(&"127.0.0.1:9".parse().expect("an address"), Duration::from_millis(500))
+    let tcp = std::net::TcpStream::connect_timeout(&"127.0.0.1:9".parse().expect("an address"), Duration::from_millis(500))
         .err()
         .is_some_and(|e| e.kind() == std::io::ErrorKind::PermissionDenied);
+    let net = tcp
+        && ["127.0.0.1:0", "[::1]:0"]
+            .iter()
+            .all(|address| std::net::UdpSocket::bind(address).err().is_some_and(|e| e.kind() == std::io::ErrorKind::PermissionDenied));
     say!(
         "{{\"confinement\":{},\"firstLayerReadsOwnFolder\":{reads_own},\"firstLayerOtherReadBlocked\":{reads_other},\"firstLayerWriteBlocked\":{writes},\"readBlocked\":{read},\"listBlocked\":{list},\"execBlocked\":{exec},\"networkBlocked\":{net}}}",
         json(confinement)
@@ -606,21 +658,42 @@ const QUICK_LIMIT: Duration = Duration::from_secs(20);
 
 /// Guards against a shell that stops answering or goes away: the renderer never outlives the process that started
 /// it, and a quick command never waits indefinitely, even on a full pipe its reader has stopped draining.
+fn start_watchdog(work: fn(), confined: bool) {
+    let (ready, wait) = std::sync::mpsc::sync_channel(0);
+    std::thread::spawn(move || {
+        let result = if confined { sandbox::confine_watchdog().map(|_| ()) } else { Ok(()) };
+        let proceed = result.is_ok();
+        if ready.send(result).is_ok() && proceed {
+            work();
+        }
+    });
+    match wait.recv_timeout(Duration::from_secs(3)) {
+        Ok(Ok(())) => {}
+        result => {
+            tell!("screensafe: can't start confined watchdog: {result:?}");
+            std::process::exit(1);
+        }
+    }
+}
+
 fn failsafes(command: Option<&str>) {
     // Linux ends this process when the one that started it exits. Started from a terminal, that's the terminal. Not
     // for takeover, whose release runs detached as the plugin unloads and must finish after the shell has gone.
     if command != Some("takeover") {
         let _ = rustix::process::set_parent_process_death_signal(Some(rustix::process::Signal::TERM));
     }
-    if matches!(command, Some("catalog" | "thumbnail" | "takeover" | "photos-folder" | "version" | "sandbox-test")) {
-        std::thread::spawn(|| {
-            std::thread::sleep(QUICK_LIMIT);
-            tell!("screensafe: gave up after {} seconds", QUICK_LIMIT.as_secs());
-            std::process::exit(TIMED_OUT);
-        });
+    if matches!(command, Some("catalog" | "thumbnail" | "takeover" | "photos-folder" | "videos-folder" | "version" | "sandbox-test" | "system-info")) {
+        start_watchdog(
+            || {
+                std::thread::sleep(QUICK_LIMIT);
+                tell!("screensafe: gave up after {} seconds", QUICK_LIMIT.as_secs());
+                std::process::exit(TIMED_OUT);
+            },
+            matches!(command, Some("catalog" | "thumbnail" | "system-info")),
+        );
     }
     if matches!(command, Some("run" | "preview")) {
-        std::thread::spawn(watch_draws);
+        start_watchdog(watch_draws, true);
     }
 }
 
@@ -670,8 +743,17 @@ fn main() -> ExitCode {
         Some("thumbnail") => thumbnail(&args).map(|_| true),
         Some("preview") => live_preview(&args).map(|_| true),
         Some("takeover") => takeover_command(&args).map(|_| true),
-        Some("photos-folder") => photos_folder(&args).map(|_| true),
+        Some("photos-folder") => media_folder(&args, pack::PHOTOS_FOLDER).map(|_| true),
         Some("sandbox-test") => sandbox_test(),
+        Some("system-info") => args.only(&[]).and_then(|_| {
+            if args.positional.len() != 1 {
+                return Err("system-info takes no arguments".into());
+            }
+            let data = overlay::system_info()?;
+            say!("{data}");
+            Ok(true)
+        }),
+        Some("videos-folder") => media_folder(&args, video::FOLDER).map(|_| true),
         Some("version") => {
             say!("screensafe {} (pack format {}, expressions 1)", env!("CARGO_PKG_VERSION"), pack::FORMAT);
             Ok(true)

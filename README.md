@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/jeremydixon22/omarchy-screensafe/actions/workflows/ci.yml"><img src="https://github.com/jeremydixon22/omarchy-screensafe/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://img.shields.io/badge/version-0.4.8-9ece6a" alt="Version 0.4.8">
+  <img src="https://img.shields.io/badge/version-0.5.0-9ece6a" alt="Version 0.5.0">
   <img src="https://img.shields.io/badge/Omarchy-4-9ece6a" alt="Omarchy 4">
   <img src="https://img.shields.io/badge/license-MIT-9ece6a" alt="MIT license">
 </p>
@@ -20,11 +20,13 @@
 
 A screensaver in ScreenSafe is a **pack**: a folder with a `screensafe.toml` and its art. A pack describes what to draw and how it moves, with small formulas like `sin(t * 2)` in a language that can't loop, read files or reach the network. ScreenSafe draws the pack itself, and nothing in a pack ever runs as a program, **so a pack from someone else can only describe pictures.**
 
-- **Fifteen packs built in**, from a harmonograph's glowing figures to a rainy Tokyo side street, and your own photos.
+- **Sixteen packs built in**, from a harmonograph's glowing figures to a rainy Tokyo side street, your own photos, and local videos.
 - **Your theme, everywhere.** Packs draw in the current theme's palette, and a theme can bring a pack of its own.
-- **Sharp at any size.** Drawn on Wayland's overlay layer at your screen's full resolution, on every screen.
+- **Sharp on every screen.** Native Wayland drawing; video uses a bounded canvas scaled by the compositor.
 - **Settings without code.** Packs can offer a speed, a density or a picture; change them in the panel and watch the pack update live.
 - **Made to be safe.** A sandboxed renderer, a checked format, and a flash limit no pack can get past.
+
+**0.5.0 development build:** this local version adds the trusted overlay and bounded Videos playback. Videos import is described in [the prototype notes](docs/VIDEO-PROTOTYPE.md). These local development binaries have not yet received CI provenance attestations.
 
 ## The packs
 
@@ -55,9 +57,11 @@ Click the shield in the bar.
 
 | | |
 |---|---|
+| **Overlay tab** | Optional clock, date, battery, CPU and memory over any pack. The position grid stays pinned while other options scroll. Choose one of nine positions, size, opacity and colors; slow drift is on by default. System readings are off until selected. Use Preview to try the result. |
 | **Enable** | Show ScreenSafe instead of Omarchy's screensaver when you're idle. Right-clicking the shield does the same. |
 | **After … idle** | How long you're idle before it shows. It follows Omarchy's screensaver time until you choose your own with **−** and **+** (or the arrow keys), from 1 minute to an hour; step back below 1 minute to follow Omarchy's again. Point at it to see whose time it is and when Omarchy locks. |
-| **Pack** | Which screensaver to show. **Automatic** shows the current theme's pack if it has one, and the Omarchy pack otherwise. Rest on a pack and its row opens with a thumbnail in your theme's colors. Press `f` or click ☆ to make it a favorite, listed first. |
+| **Pack** | Which screensaver to show. **Automatic** shows the current theme's pack if it has one, and the Omarchy pack otherwise. Every entry shows its thumbnail and description in a stable card. Press `f` or click ☆ to make it a favorite, listed first. |
+| **Color** | Theme-based packs offer theme swatches and a custom HSV picker, pinned below the scrolling options. Original theme colors remain the default. Tinting preserves light/dark detail; Photos and Videos show this control when **Tone → Theme** is selected. |
 | **⚙ Settings** | For a pack that has them: click ⚙, or press → or `s` on its row. The page shows the pack running live as you change them; turn **Live preview** off for a still thumbnail and the usual Preview. |
 | **Preview** | Show the chosen pack now. Any key, click, touch or mouse movement closes it. |
 | **About** | Links to this page, to the [catalog of packs others have made](https://github.com/jeremydixon22/omarchy-screensafe-packs), and to guides for making and sharing your own. |
@@ -126,7 +130,7 @@ To share it, see [Community packs](docs/COMMUNITY.md).
 - **The renderer confines itself.** Before reading a pack it can only read the packs, theme, art and photos folder it was given; after loading it, it gives up new file access. Photo files opened while loading remain readable. It can never reach the network or start programs. This uses Linux's Landlock, and the renderer refuses to read a pack if the kernel can't confine it.
 - **Flashing is limited.** The renderer measures every frame and won't show more than three large-area flashes a second, the WCAG 2.2 limit for photosensitivity, whatever a pack asks for.
 - **Stalled frames are stopped.** If drawing a frame stalls for about five seconds, the renderer exits and ScreenSafe falls back to the built-in pack.
-- **The binaries are checkable.** Both renderers are built reproducibly from [`renderer/`](renderer), and CI attests each one; see [how to rebuild and compare them](docs/BINARY-PROVENANCE.md).
+- **The binaries are checkable.** Both renderers are built reproducibly from [`renderer/`](renderer), and release CI attests each one; see [how to rebuild and compare them](docs/BINARY-PROVENANCE.md).
 
 [SECURITY.md](SECURITY.md) has the details and how to report a problem; [Notes for reviewers](docs/REVIEW-NOTES.md) lists everything ScreenSafe runs and writes.
 
@@ -152,3 +156,5 @@ The expression language borrows ideas and a few function names from MilkDrop's p
 ## License
 
 MIT; see [LICENSE](LICENSE).
+
+Local development: [Videos prototype and import instructions](docs/VIDEO-PROTOTYPE.md).

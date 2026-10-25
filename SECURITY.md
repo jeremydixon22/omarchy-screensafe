@@ -53,8 +53,14 @@ It applies the first layer to its own folder, checks that it can read there but 
   - Omarchy's `~/.local/state/omarchy/toggles/screensaver-off`: created only while you have **Enable** on, and only if it wasn't already there; removed only if ScreenSafe created it.
   - Its own record of that, in `~/.local/state/screensafe/` (folder mode 0700, files 0600, written without following links).
   - `~/Pictures/Screensaver`, made only when you choose **Your photos** on a photo pack's settings page, if it isn't there (mode 0755, without following links). That folder is then opened in your file manager, the way About opens its links in your browser.
-  - Its settings (whether it's on, the pack, its own idle time, the favorite packs, the values chosen for packs' settings, and whether settings pages show a live preview) in its own entry in `~/.config/omarchy/shell.json`, through Omarchy's plugin interface. It reads Omarchy's idle and lock times there but never changes them.
+  - Its settings (whether it's on, the pack, its own idle time, the favorite packs, the values chosen for packs' settings, whether settings pages show a live preview, and optional overlay display preferences) in its own entry in `~/.config/omarchy/shell.json`, through Omarchy's plugin interface. It reads Omarchy's idle and lock times there but never changes them.
 - **No network.** No downloads, installers, package managers or services, and nothing needs elevated privileges.
+
+## Videos development prototype
+
+The local Videos prototype normalizes MP4s through an isolated importer, then passes checked, bounded JPEG frames through the renderer's image and flash paths. The shell does not decode video. [VIDEO-PROTOTYPE.md](docs/VIDEO-PROTOTYPE.md) documents its limits, optional import dependencies and remaining release work.
+
+The development renderer supplements Landlock with a seccomp filter: non-Unix socket creation (including UDP) and io_uring setup are denied across threads; after Wayland connects, all new socket creation and connection attempts are denied. Existing Wayland communication remains available. Watchdog threads in media-reading commands acknowledge startup only after giving up new filesystem access themselves, since Landlock is per-thread.
 
 ## Flashing
 
@@ -76,3 +82,17 @@ This is an automated approximation of WCAG's test, not a certification. It measu
 ## Limits of all this
 
 These measures make a pack's reach small and checkable. They don't make bugs impossible. The renderer depends on Rust libraries for TOML, fonts, images and Wayland, listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). A bug in one of them could still crash the renderer or make it draw the wrong thing, though not reach beyond the renderer's confinement. Please report anything you find.
+
+## Optional trusted information overlay (0.5.0)
+
+The global overlay is off by default. Its clock/date and optional battery, CPU and memory readings are rendered by ScreenSafe after evaluating the pack and before the existing combined-frame flash guard. None of these system readings is inserted into pack expressions, pack settings, thumbnails, files or network messages. The overlay accepts only bounded, finite numeric controls from the service; unknown fields, duplicate keys and out-of-range values are rejected. Notification text, hostnames, window titles, network addresses and arbitrary strings are not accepted.
+
+The service uses the shell's existing UPower module for a battery percentage. CPU/memory polling runs only while selected and a full-screen or live preview renderer is active, at most once every two seconds. The fixed `system-info` command takes no arguments. It opens only `/proc/stat` and `/proc/meminfo` with read-only, no-follow descriptors, applies the final Landlock/seccomp confinement, and then reads at most 4 KiB and 16 KiB through those descriptors. It returns three anonymous numeric aggregates (total/idle CPU counters and memory usage), bounded to 512 bytes in the service with a ten-second process deadline. The service computes CPU percentage from successive samples. Missing or expired readings show as unavailable. Rendering processes receive only selected numeric percentages over their bounded stdin control channel and gain no new filesystem, network or device access.
+
+Only overlay display preferences are saved, in the plugin's own `shell.json` entry under `overlay`; readings are held in memory. Controls cover clock/date, three optional system readings, nine-position placement, size, opacity, colors and slow drift. Existing pack settings and their limits are unchanged.
+
+## Theme/custom color controls (0.5.0)
+
+Color controls use numeric theme IDs or an exact 24-bit RGB encoding; arbitrary strings, non-finite values and out-of-range codes are rejected. The palette's 27 validated names and hex swatches are included once in the existing bounded catalog response. The shared QML picker uses swatches, HSV geometry/sliders and a read-only hex label, with no text/clipboard input or external dialog. Drag changes are coalesced to at most one commit per 150 ms plus the final release; queued stale thumbnails for the same pack/size are replaced. Existing one-thumbnail-per-pack/size storage and native preview/decode limits remain.
+
+Recoloring is prepared at pack load, preserves each colored palette ink's relative luminance and alpha, and leaves backgrounds and black/white fixed. The existing theme image filter uses that palette; Original images are unaffected. This adds no filesystem paths, processes, network access, runtime dependencies or change to the combined-frame flash guard.
