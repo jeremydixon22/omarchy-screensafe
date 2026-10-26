@@ -5,14 +5,16 @@ import json
 import math
 import os
 from pathlib import Path
-import resource
 import selectors
-import shutil
 import stat
 import struct
 import subprocess
 import tempfile
 import time
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from screensafe_runtime import ParentLifetime, media_process_filter, sandbox_binary, media_launcher
 
 MAGIC = b"SSVID001"
 HEADER = struct.Struct("<8s6I")
@@ -21,26 +23,25 @@ FPS, MAX_FRAMES, MAX_FRAME, MAX_ARCHIVE = 24, 7200, 2 << 20, 512 << 20
 MAX_INPUT = 2 << 30
 
 
-def limits():
-    resource.setrlimit(resource.RLIMIT_AS, (2 << 30, 2 << 30))
-    resource.setrlimit(resource.RLIMIT_CPU, (180, 180))
-    resource.setrlimit(resource.RLIMIT_NOFILE, (64, 64))
-
-
-def sandbox(fd, command):
-    args = ["bwrap", "--unshare-user", "--unshare-all", "--disable-userns", "--die-with-parent", "--new-session", "--cap-drop", "ALL", "--clearenv"]
+def sandbox(fd, command, policy):
+    args = [sandbox_binary(), "--unshare-user", "--unshare-all", "--disable-userns", "--die-with-parent", "--new-session", "--cap-drop", "ALL", "--clearenv"]
     for key, value in (("PATH", "/usr/bin"), ("LANG", "C"), ("OPENBLAS_NUM_THREADS", "1"), ("OMP_NUM_THREADS", "1")):
         args += ["--setenv", key, value]
     for source in ("/usr", "/lib", "/lib64", "/etc/alternatives", "/etc/ld.so.cache"):
         if Path(source).exists():
             args += ["--ro-bind", source, source]
-    return args + ["--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp", "--ro-bind-fd", str(fd), "/input.mp4", "--chdir", "/tmp"] + command
+    return args + ["--proc", "/proc", "--dev", "/dev", "--size", str(64 << 20), "--tmpfs", "/tmp",
+                   "--ro-bind-fd", str(fd), "/input.mp4", "--chdir", "/tmp", "--seccomp", str(policy)] + command
 
 
 def output_chunks(fd, command, seconds):
     """Bound stderr and wall time while streaming stdout; never accumulate an entire clip."""
-    proc = subprocess.Popen(sandbox(fd, command), pass_fds=(fd,), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                            preexec_fn=limits, start_new_session=True)
+    with media_process_filter() as policy:
+        # Set limits in a trusted native launcher, avoiding preexec_fn in a
+        # controller with the parent-lifetime watcher thread already running.
+        proc = subprocess.Popen([media_launcher()] + sandbox(fd, command, policy),
+                                pass_fds=(fd, policy), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                start_new_session=True)
     selector = selectors.DefaultSelector()
     selector.register(proc.stdout, selectors.EVENT_READ, "out")
     selector.register(proc.stderr, selectors.EVENT_READ, "err")
@@ -101,8 +102,9 @@ def jpeg_size(data):
 
 
 def import_video(source, destination):
-    if shutil.which("bwrap") is None or not Path("/usr/bin/ffmpeg").is_file() or not Path("/usr/bin/ffprobe").is_file():
-        raise ValueError("import needs bubblewrap, ffmpeg and ffprobe")
+    sandbox_binary()
+    if not Path("/usr/bin/ffmpeg").is_file() or not Path("/usr/bin/ffprobe").is_file():
+        raise ValueError("import needs Omarchy's ffmpeg and ffprobe")
     if os.path.lexists(destination):
         raise FileExistsError("destination already exists")
     source_fd = os.open(source, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
@@ -182,4 +184,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import signal
+    def interrupted(*unused):
+        raise InterruptedError('video import interrupted')
+    signal.signal(signal.SIGTERM, interrupted)
+    with ParentLifetime():
+        main()

@@ -1,6 +1,6 @@
-# Local Videos prototype
+# Videos (0.5.0)
 
-This development build contains the retained compiler, prefetch and sprite optimizations, plus a Photos-like Videos pack. It is a local prototype, not a published release.
+This release candidate contains the retained compiler, prefetch and sprite optimizations, plus a Photos-like Videos pack. It is not covered by the earlier 0.4.8 marketplace approval.
 
 Videos has Full screen, Whole, Film, CRT Fit, CRT Box and Flatscreen styles; Original, Greyscale, Sepia and Theme tones; shuffle/in-order selection; and a display interval or Full length. Loop is on by default and repeats the playlist. With Loop off, the playlist plays once, then holds the final video's frame at the end of the chosen interval (or the clip's end, if earlier). Full length uses the longest imported clip as a common interval; shorter clips hold their final frame until the next selection.
 
@@ -18,9 +18,9 @@ The prototype imports ordinary MP4 files once, then plays the prepared result. D
 python3 tools/videos/import.py INPUT.mp4 "$HOME/Videos/Screensaver/clip.ssv"
 ```
 
-Import needs Python 3, bubblewrap, ffmpeg and ffprobe. Playback uses the bundled renderer and needs none of those tools. The source is read only. Import refuses an existing output, including symlinks, and publishes the finished file atomically. Keep the original MP4 if you want to reimport it.
+Import uses Omarchy's Python 3, FFmpeg/ffprobe, and ScreenSafe's included sandbox/resource-limit launchers. No compiler, additional package install or system Bubblewrap is needed. Playback uses the static bundled renderer. The source is read only. Import refuses an existing output, including symlinks, and publishes the finished file atomically. Keep the original MP4 if you want to reimport it.
 
-The importer runs media tools with a private network/PID/mount namespace, no capabilities, no home or graphics devices, one selected read-only input descriptor and public system runtime files. It has fixed commands, no author-supplied player/filter arguments, bounded output, CPU/address-space limits and deadlines. Failure to establish isolation is an error; there is no unconfined fallback.
+The importer runs media tools with a private network/PID/mount namespace, no capabilities, no home or graphics devices, one selected read-only input descriptor and public system runtime files. It has fixed commands, no author-supplied player/filter arguments, bounded output, CPU/address-space/file/descriptor limits and deadlines. Scratch tmpfs is limited to 64 MiB. A pre-exec seccomp filter permits codec threads but denies new processes, namespace changes, ptrace, cross-process memory access, execveat and io_uring. The initial execve remains allowed to enter FFmpeg/ffprobe; replacing that same confined process grants no additional mounts, descendants or resource budget. Failure to establish isolation is an error; there is no unconfined fallback.
 
 Current limits: MP4 up to 2 GiB and five minutes; normalized JPEG frames up to 1280×720 at 24 FPS without enlarging a smaller source; prepared file up to 512 MiB, 7,200 frames and 2 MiB per frame. At most 32 prepared videos are opened from `~/Videos/Screensaver`, without following file symlinks. Invalid files are skipped with a warning. The user-provided example is not included in the repository.
 
@@ -36,7 +36,7 @@ When Wayland viewports are available, a pack showing video uses an internal canv
 
 The prototype also adds a seccomp policy denying non-Unix socket creation, including UDP, and io_uring creation; after connecting to Wayland it denies all new sockets and connections. It applies across existing threads. Watchdogs in media-reading commands give up all new filesystem access before startup is acknowledged; later image workers inherit their caller's restrictions. The existing Wayland socket and approved media descriptors remain usable.
 
-Before publication: review the new data format, import workflow, dependency/provenance notices and confinement; test on real ARM hardware and supported kernels; decide how ordinary-video import should appear in the UI. No CI counterpart or public submission is part of this prototype.
+The current import flow is the explicit command above; dropping an MP4 in the folder does not execute or convert it automatically. Native ARM CI checks the importer/reader/runtime policies; GPU hardware qualification remains conditional on local profile verification. Release publication requires fresh exact-commit CI/attestation and maintainer review. This adds ordinary runtime regression CI, not the deferred author-facing compiler-suggestion workflow.
 
 Video image elements may use a numeric `frame_offset` (rounded and bounded to ±4 frames), boolean `wrap` for neighboring frames, and a constant `curve` from 0 to 0.08. Curvature requires a `w`/`h` box. Other image sources reject these fields. Defaults preserve existing packs.
 

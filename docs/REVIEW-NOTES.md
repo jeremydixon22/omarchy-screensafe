@@ -4,7 +4,7 @@ A summary of what ScreenSafe does on a user's machine, for marketplace and other
 
 ## Expected baseline result
 
-The released plugin's baseline is `review-required`, with no findings and one capability: `bundled-executable-binary`, for `bin/screensafe-x86_64` and `bin/screensafe-aarch64`. They're the renderer for each architecture, built reproducibly from `renderer/` at the same commit; see [BINARY-PROVENANCE.md](BINARY-PROVENANCE.md). Nothing is automatically installed, downloaded, built, or run with privileges. The optional prepared-playback development changes described below require a fresh baseline and human review before submission.
+The 0.4.8 release's baseline was `review-required`, with no findings and one capability: `bundled-executable-binary`. The 0.5.0 candidate adds six native helper executables to the two static Rust renderers, so a fresh exact-commit scan and human review are required. All eight binaries are included and have rebuild/attestation recipes; see [BINARY-PROVENANCE.md](BINARY-PROVENANCE.md) and [native packaging](NATIVE-PACKAGE.md). Installation never downloads dependencies, builds source or runs privileged setup. Omarchy supplies the existing media/graphics libraries.
 
 To reproduce the result, `tests/marketplace-baseline.mjs` runs the marketplace's own `runSecurityBaseline` on a commit of this repository, serving the files from the local Git store:
 
@@ -13,6 +13,8 @@ node tests/marketplace-baseline.mjs --marketplace=path/to/omarchy-plugin-marketp
 ```
 
 ## What runs
+
+For this update, distinguish three paths: ordinary guarded Rust rendering (including `.ssv` Videos), explicit MP4 import, and opt-in prepared procedural playback. The MP4 importer uses Omarchy's FFmpeg/ffprobe through the bundled resource-limit launcher and bundled Bubblewrap. Prepared playback uses the trusted controller, Waylandless GPU worker and Rust-only Wayland presenter. Both Python controllers follow parent pidfds; shell-managed playback also ends on control EOF. No component receives author-supplied commands, native shaders or approvals.
 
 | Program | Started by | When | Arguments | Environment | Ends |
 |---|---|---|---|---|---|
@@ -96,7 +98,7 @@ The service uses the shell's existing UPower module for a battery percentage. CP
 
 Only overlay display preferences are saved, in the plugin's own `shell.json` entry under `overlay`; readings are held in memory. Controls cover clock/date, three optional system readings, nine-position placement, size, opacity, colors and slow drift. Existing pack settings and their limits are unchanged.
 
-## Videos in this development build
+## Videos (0.5.0)
 
 The fixed videos folder holds prepared `.ssv` files. Video is normalized by a separate, isolated importer; the shell never invokes a video decoder on a contributed pack or plays arbitrary URLs. The retained-descriptor reader, decode/cache limits, device art, CRT sampling and unchanged combined-frame flash guard are described in [VIDEO-PROTOTYPE.md](VIDEO-PROTOTYPE.md). Videos metadata and its fixed folder join the existing photo inputs; neither introduces system readings into pack expressions.
 
@@ -114,4 +116,14 @@ When used, the service invokes the trusted `cache/manager.py` through absolute `
 
 Preparation uses the confined Rust evaluator to supply bounded raw pixels to a namespace-isolated FFmpeg encoder. A separate, Waylandless libmpv/GBM worker verifies the exact encoded snapshot over two loops; the Rust flash checker consumes the final GPU pixels directly. Playback uses that worker and the confined Rust renderer's three-buffer DMA-BUF presenter, with private fixed-size IPC. Only the Rust presenter connects to the compositor. Source, settings, theme, display, binaries, decoder/driver dependencies and kernel identify a local approval; encoded bytes must match its SHA-256. The snapshot is sealed against modification before decode. The codec worker has no home, network or compositor socket and applies its execution restrictions to all threads before media parsing. See [SECURITY.md](../SECURITY.md) for the profile, timing rules, fallback and decoder-fidelity assumptions.
 
-Live playback remains the default and fallback, including clock-dependent packs, Photos, Videos, overlays, unsupported displays, missing approvals and worker failures. Live previews continue through the ordinary guarded renderer. This development tree does not bundle the optional native helper or claim release attestations for it. Users must explicitly build it and install the optional dependencies; release packaging and architecture validation remain separate work.
+Live playback remains the default and fallback, including clock-dependent packs, Photos, Videos, overlays, unsupported displays, missing approvals and worker failures. Live previews continue through the ordinary guarded renderer. Both architecture helper sets are included; users do not compile or install a native component separately. Native ARM/x86 CI checks the worker API/seccomp and the controller/importer/settings tests, while actual GPU fidelity/eligibility is verified locally during preparation. A passing CI run is not a claim of universal GPU support.
+
+## 0.4.8 to 0.5.0 review focus
+
+- Compiler/color/panel changes keep pack admission costs and data-only authoring. Generated expression branches only go forward. No contributed native code or shell command path was added.
+- Overlay reads only optional anonymous CPU/memory/battery aggregates outside pack expressions and remains before the runtime combined-frame flash guard.
+- `.ssv` Videos uses retained descriptors, bounded indexes and confined JPEG decoding. The final composed picture, including surrounds/tone/overlay, still passes the runtime flash guard.
+- The external-media import cage now has a 64 MiB tmpfs, 2 GiB address-space limit, 180 CPU-second limit, 64 descriptors, bounded file writes and a fixed pre-exec seccomp policy restricting process creation to threads. The initial execve is required to enter FFmpeg; replacing that same confined process does not expand its authority or resource budget. No home, network access or graphics device is exposed.
+- **Prepared playback changes the safety model.** It omits runtime pixel readback/admission and instead requires final-GPU-output approval of the exact sealed media and playback profile, including loop/timing/entry/exit checks. It assumes the fixed decoder/presenter/driver reproduces the approved pixels; a media hash cannot constrain a compromised worker's fabricated output. This requires explicit review, separately from ordinary Videos.
+- The Python controller cannot silently outlive its shell/terminal: pidfd lifetime propagation and managed EOF are regression-tested, including a helper stuck during shutdown. The cache-status job independently activates its ten-second service deadline.
+- Native build inputs and upstream source are pinned and checksum-verified. CI rebuilds all helper bytes and covers the new Python/JavaScript/C paths; provenance subjects include all eight executables and the native manifest. Use evidence from the exact candidate SHA, not the 0.4.8 approval or earlier local experiments.

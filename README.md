@@ -26,7 +26,7 @@ A screensaver in ScreenSafe is a **pack**: a folder with a `screensafe.toml` and
 - **Settings without code.** Packs can offer a speed, a density or a picture; change them in the panel and watch the pack update live.
 - **Made to be safe.** A sandboxed renderer, a checked format, and a flash limit no pack can get past.
 
-**0.5.0 development build:** this local version adds the trusted overlay, bounded Videos playback, and opt-in prepared playback. Videos import is described in [the prototype notes](docs/VIDEO-PROTOTYPE.md). These local development binaries have not yet received CI provenance attestations.
+**0.5.0 release candidate:** adds the trusted overlay, bounded Videos playback, and opt-in prepared playback. All application helpers are included for x86-64 and ARM64; installation builds and downloads nothing else. Videos import is described in [the Videos guide](docs/VIDEO-PROTOTYPE.md). Marketplace approval of 0.4.8 does not cover this newer candidate; verify the exact commit and binary attestations as described below.
 
 ## The packs
 
@@ -129,9 +129,9 @@ To share it, see [Community packs](docs/COMMUNITY.md).
 
 - **Packs are data.** The format has no way to run a program, open a file outside its own folder, reach the network or loop without end. Everything a pack asks for is checked and compiled before it's shown, and every per-frame cost is bounded.
 - **The renderer confines itself.** Before reading a pack it can only read the packs, theme, art and photos folder it was given; after loading it, it gives up new file access. Photo files opened while loading remain readable. It can never reach the network or start programs. This uses Linux's Landlock, and the renderer refuses to read a pack if the kernel can't confine it.
-- **Flashing is limited.** Normal playback measures every combined frame. Prepared playback checks the final GPU output, repeat seam and black entry/exit before issuing a local approval bound to the video's SHA-256 and exact playback profile. A missing, changed or incompatible approval uses normal playback. See [the limits and trust assumptions](SECURITY.md#prepared-playback-05-development).
+- **Flashing is limited.** Normal playback measures every combined frame. Prepared playback checks the final GPU output, repeat seam and black entry/exit before issuing a local approval bound to the video's SHA-256 and exact playback profile. A missing, changed or incompatible approval uses normal playback. See [the limits and trust assumptions](SECURITY.md#prepared-playback-050).
 - **Stalled frames are stopped.** If drawing a frame stalls for about five seconds, the renderer exits and ScreenSafe falls back to the built-in pack.
-- **The binaries are checkable.** Both renderers are built reproducibly from [`renderer/`](renderer), and release CI attests each one; see [how to rebuild and compare them](docs/BINARY-PROVENANCE.md).
+- **The binaries are checkable.** Both renderers and all six native helpers have pinned rebuild recipes. CI checks the bytes, runs native checks on both architectures, and attests the executables on main/release branch pushes; see [how to rebuild and compare them](docs/BINARY-PROVENANCE.md).
 
 [SECURITY.md](SECURITY.md) has the details and how to report a problem; [Notes for reviewers](docs/REVIEW-NOTES.md) lists everything ScreenSafe runs and writes.
 
@@ -147,32 +147,34 @@ Removing the plugin switches Omarchy's screensaver back on if ScreenSafe had swi
 
 - `Service.qml`, `Panel.qml` and `ShieldMark.qml`: the plugin. Normal playback starts ScreenSafe's renderer and Omarchy's `omarchy-shell`. Optional prepared playback also uses the trusted local controller and a confined codec/GPU worker.
 - `bin/screensafe-x86_64` and `bin/screensafe-aarch64`: the renderer, static Linux executables built reproducibly from [`renderer/`](renderer). The plugin runs the one for your machine.
+- `bin/screensafe-cache-*`, `screensafe-sandbox-*` and `screensafe-media-*`: the included GPU worker, sandbox launcher and media resource-limit launcher for each architecture. Their sources and pinned rebuild inputs are included.
 - `packs/`: the built-in packs, and `tools/`: the generators for the larger ones.
 - `skills/screensafe-packs/`: instructions for coding agents that make packs. The plugin doesn't install or read them.
 
-The renderer embeds [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) (SIL Open Font License 1.1) and uses the Rust libraries listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Normal playback needs nothing else at run time. Optional prepared playback also needs Python 3, Bubblewrap, FFmpeg, libmpv, EGL/OpenGL, GBM and libseccomp. The worker connects to one render node; it has no compositor socket, home directory or network access.
+The renderer embeds [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) (SIL Open Font License 1.1) and uses the Rust libraries listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Normal playback uses the static renderer. Videos import and optional prepared playback use Python, FFmpeg/ffprobe, MPV and graphics/runtime libraries already supplied by standard Omarchy. Bubblewrap and ScreenSafe's own helpers are bundled. There is no installer, package installation, compiler requirement or download at run time. The controller uses a read-only package-version query for cache identity. The GPU worker connects to one render node; it has no compositor socket, home directory or network access.
 
 The expression language borrows ideas and a few function names from MilkDrop's preset equations, but no code; [Expressions](docs/EXPRESSIONS.md#compared-with-milkdrop) describes how they differ.
 
 ## License
 
-MIT; see [LICENSE](LICENSE).
+ScreenSafe's own source is MIT; see [LICENSE](LICENSE). The bundled GPU worker is distributed under GPL-2.0-or-later, Bubblewrap under LGPL-2.1-or-later, and the static media launcher includes MIT-licensed musl. See [native component notices](docs/NATIVE-PACKAGE.md) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-Local development: [Videos prototype and import instructions](docs/VIDEO-PROTOTYPE.md).
+Videos: [format and import instructions](docs/VIDEO-PROTOTYPE.md).
 
 <details>
-<summary>Prepared playback development build</summary>
+<summary>Prepared playback requirements and rebuilding</summary>
 
-The native worker is optional and built for the target system's libraries. Build the Rust renderers with `scripts/build-release`, then build the worker on that system (C compiler, pkg-config and the corresponding development headers required):
+Prepared playback is optional; its executable is already included. Maintainers can reproduce all six native helpers with the pinned cross-build (Python 3.12+, `dpkg-deb`, and network access for checksum-verified build inputs; no system package installation by the script):
 
 ```sh
-scripts/build-cache-worker "bin/screensafe-cache-$(uname -m)"
+python3 scripts/build-native.py /tmp/screensafe-native
+scripts/verify-native
 ```
 
-This development path supports a single, unrotated display up to 4096 × 2160 and 64 Hz when its driver exports linear XRGB buffers. Preparation checks both software and hardware-copy decoding and uses a passing profile; direct hardware interop is excluded. Updates to relevant binaries, graphics/codec libraries, kernel, theme, settings or display invalidate reuse. Previews stay live.
+Prepared playback supports a single, unrotated display up to 4096 × 2160 and 64 Hz when its driver exports linear XRGB buffers. Preparation checks both software and hardware-copy decoding and uses a passing profile; direct hardware interop is excluded. Updates to relevant binaries, graphics/codec libraries, kernel, theme, settings or display invalidate reuse. Previews stay live. Unsupported setups automatically use normal playback.
 
 Prepared playback can reduce power for demanding effects. Simple screensavers may cost less to draw live than to decode and present as video; preparation is manual so you can choose which packs use this path. The prepared segment repeats, while live playback can continue generating new variations.
 
-The worker links system libraries. [mpv defaults to GPLv2+ and can be built in an LGPL configuration](https://github.com/mpv-player/mpv/blob/v0.41.0/Copyright); linked libraries also affect the resulting binary's license. Worker binary distribution must include its applicable notices and corresponding source. The project's own source remains MIT. Native-worker release packaging/provenance is separate from the static Rust renderer's build; these development artifacts are not release-attested.
+The worker links stable system-library ABIs and leaves media libraries and hardware drivers with Omarchy, so distribution security updates continue to apply. Full helper source, upstream Bubblewrap source, license texts, build-input checksums and the binary manifest are included; [native packaging](docs/NATIVE-PACKAGE.md) explains the dependency and license boundaries. Reproduction and a matching GitHub attestation are separate checks.
 
 </details>

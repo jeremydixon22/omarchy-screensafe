@@ -1,0 +1,206 @@
+{
+  "zig": {
+    "x86_64-linux": {
+      "tarball": "https://ziglang.org/download/0.15.2/zig-x86_64-linux-0.15.2.tar.xz",
+      "shasum": "02aa270f183da276e5b5920b1dac44a63f1a49e55050ebde3aecc9eb82f93239",
+      "size": "53733924"
+    },
+    "aarch64-linux": {
+      "tarball": "https://ziglang.org/download/0.15.2/zig-aarch64-linux-0.15.2.tar.xz",
+      "shasum": "958ed7d1e00d0ea76590d27666efbf7a932281b3d7ba0c6b01b0ff26498f667f",
+      "size": "49471996"
+    }
+  },
+  "packages": {
+    "amd64": [
+      {
+        "package": "libmpv-dev",
+        "version": "0.37.0-1ubuntu4",
+        "url": "https://archive.ubuntu.com/ubuntu/pool/universe/m/mpv/libmpv-dev_0.37.0-1ubuntu4_amd64.deb",
+        "sha256": "c9cfd0b2f60e6377f0d339ef298a0772753ce7dc7310d250573a3ea9c0b9701e"
+      },
+      {
+        "package": "libmpv2",
+        "version": "0.37.0-1ubuntu4",
+        "url": "https://archive.ubuntu.com/ubuntu/pool/universe/m/mpv/libmpv2_0.37.0-1ubuntu4_amd64.deb",
+        "sha256": "12ea9d67e291a90cea5b7497f3f9d196643bf2e85ad17cb683e9c7ad18981c00"
+      },
+      {
+        "package": "libgbm-dev",
+        "version": "24.0.5-1ubuntu1",
+        "url": "https://archive.ubuntu.com/ubuntu/pool/main/m/mesa/libgbm-dev_24.0.5-1ubuntu1_amd64.deb",
+        "sha256": "3bdfc6027bdc374ec475b91b93f7743519a2a7deb5e4a24259f41ef10189ed53"
+      },
+      {
+        "package": "libgbm1",
+        "version": "24.0.5-1ubuntu1",
+        "url": "https://archive.ubuntu.com/ubuntu/pool/main/m/mesa/libgbm1_24.0.5-1ubuntu1_amd64.deb",
+        "sha256": "bffad21d2383429d6dbec8395ba8d8476a0ed69e7e0b1c3ef2f27da99211b200"
+      },
+      {
+        "package": "libseccomp-dev",
+        "version": "2.5.5-1ubuntu3",
+        "url": "https://archive.ubuntu.com/ubuntu/pool/main/libs/libseccomp/libseccomp-dev_2.5.5-1ubuntu3_amd64.deb",
+        "sha256": "18f8c955577e2336783042c6a2128c8a3ef2844ffd105f27d48c16b977725508"
+      },
+      {
+        "package": "libseccomp2",
+        "version": "2.5.5-1ubuntu3",
+        "url": "https://archive.ubuntu.com/ubuntu/pool/main/libs/libseccomp/libseccomp2_2.5.5-1ubuntu3_amd64.deb",
+        "sha256": "f605ffe10e679b156d1a849703f0a715bb6a0018b44a0c8eff4ae65d34d97f2a"
+      },
+      {
+        "package": "libcap-dev",
+        "version": "1:2.66-5ubuntu2",
+        "url": "https://archive.ubuntu.com/ubuntu/pool/main/libc/libcap2/libcap-dev_2.66-5ubuntu2_amd64.deb",
+        "sha256": "f1b40ba16418d447018c86199ac1f34bd14bb6a0be269d1849e969b290eb85da"
+      },
+      {
+        "package": "libcap2",
+        "version": "1:2.66-5ubuntu2",
+        "url": "https://archive.ubuntu.com/ubuntu/pool/main/libc/libcap2/libcap2_2.66-5ubuntu2_amd64.deb",
+        "sha256": "a6cce0b5f149707a6359e4f03a05fb7417c5e1d3fde9e12c651e804b4c479bbb"
+      },
+      {
+        "package": "libegl-dev",
+        "version": "1.7.0-1build1",
+        "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libglvnd/libegl-dev_1.7.0-1build1_amd64.deb",
+        "sha256": "3a0315216bb0d6fc4bbe7f689cf0168c2ffa3e62ac69bff06bbbe49679259990"
+      },
+      {
+        "package": "libegl1",
+        "version": "1.7.0-1build1",
+        "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libglvnd/libegl1_1.7.0-1build1_amd64.deb",
+        "sha256": "e549f7776216f7bd3b1c216729fb40a97a562e2eb7c563cde632b4931f9a4e57"
+      },
+      {
+        "package": "libgl-dev",
+        "version": "1.7.0-1build1",
+        "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libglvnd/libgl-dev_1.7.0-1build1_amd64.deb",
+        "sha256": "b7145fd8f8abe20d5cb436d2eae9b3235bd91be6fbddac581620d16763bd9250"
+      },
+      {
+        "package": "libgl1",
+        "version": "1.7.0-1build1",
+        "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libglvnd/libgl1_1.7.0-1build1_amd64.deb",
+        "sha256": "e2b2fadeb883f073b566ad1d7874f6702397514d258473e96152a89d4d502a09"
+      },
+      {
+        "package": "libgles-dev",
+        "version": "1.7.0-1build1",
+        "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libglvnd/libgles-dev_1.7.0-1build1_amd64.deb",
+        "sha256": "ee2ea529c20e28031230c5910281e5bbd7f2c2ca06a2e306ca15e985d4875eb2"
+      },
+      {
+        "package": "libgles2",
+        "version": "1.7.0-1build1",
+        "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libglvnd/libgles2_1.7.0-1build1_amd64.deb",
+        "sha256": "9dec2d79a2eebb80522f7cce77995f7a8ded22f0e3916f13353d066c62f97fac"
+      }
+    ],
+    "arm64": [
+      {
+        "package": "libcap-dev",
+        "version": "1:2.66-5ubuntu2",
+        "url": "https://ports.ubuntu.com/ubuntu-ports/pool/main/libc/libcap2/libcap-dev_2.66-5ubuntu2_arm64.deb",
+        "sha256": "547250ab05386ad1d65ee3dfe95f13f55d64b75ac45a5bd6b3e56ada787a600e"
+      },
+      {
+        "package": "libcap2",
+        "version": "1:2.66-5ubuntu2",
+        "url": "https://ports.ubuntu.com/ubuntu-ports/pool/main/libc/libcap2/libcap2_2.66-5ubuntu2_arm64.deb",
+        "sha256": "88c75467ee09a14981661782bf62f4a0029458922245d7f22225c2ca4441eeee"
+      },
+      {
+        "package": "libegl-dev",
+        "version": "1.7.0-1build1",
+        "url": "https://ports.ubuntu.com/ubuntu-ports/pool/main/libg/libglvnd/libegl-dev_1.7.0-1build1_arm64.deb",
+        "sha256": "99e364f5b5d5847feeb57bf4bd866331da93f16ba767c25286dd7f65e4b828ec"
+      },
+      {
+        "package": "libegl1",
+        "version": "1.7.0-1build1",
+        "url": "https://ports.ubuntu.com/ubuntu-ports/pool/main/libg/libglvnd/libegl1_1.7.0-1build1_arm64.deb",
+        "sha256": "8813f4435c06abab54272e929cf8682b5b01a763abe29cb26b328922e4b081f9"
+      },
+      {
+        "package": "libgbm-dev",
+        "version": "24.0.5-1ubuntu1",
+        "url": "https://ports.ubuntu.com/ubuntu-ports/pool/main/m/mesa/libgbm-dev_24.0.5-1ubuntu1_arm64.deb",
+        "sha256": "b82562bf39cabca4c106dff73261accf40c0d933d2863a95b63ae3b749130b1b"
+      },
+      {
+        "package": "libgbm1",
+        "version": "24.0.5-1ubuntu1",
+        "url": "https://ports.ubuntu.com/ubuntu-ports/pool/main/m/mesa/libgbm1_24.0.5-1ubuntu1_arm64.deb",
+        "sha256": "8589f317e7dacff6b958b9a2395fda3c9d62304b3da1390a53adbdb3afb33436"
+      },
+      {
+        "package": "libgl-dev",
+        "version": "1.7.0-1build1",
+        "url": "https://ports.ubuntu.com/ubuntu-ports/pool/main/libg/libglvnd/libgl-dev_1.7.0-1build1_arm64.deb",
+        "sha256": "9bc28c1265bb82ff2498c234893cbb891529e43fa6b100c007ba677c0a77bbc1"
+      },
+      {
+        "package": "libgl1",
+        "version": "1.7.0-1build1",
+        "url": "https://ports.ubuntu.com/ubuntu-ports/pool/main/libg/libglvnd/libgl1_1.7.0-1build1_arm64.deb",
+        "sha256": "8b2478bdeaf7a13d3c3b993f0238ac74640ab5a623b9d2645ebf6f1336c9881b"
+      },
+      {
+        "package": "libgles-dev",
+        "version": "1.7.0-1build1",
+        "url": "https://ports.ubuntu.com/ubuntu-ports/pool/main/libg/libglvnd/libgles-dev_1.7.0-1build1_arm64.deb",
+        "sha256": "df742afc0b66f24d80920b419723e072ab59d70726519d5994f50cf09e1f3961"
+      },
+      {
+        "package": "libgles2",
+        "version": "1.7.0-1build1",
+        "url": "https://ports.ubuntu.com/ubuntu-ports/pool/main/libg/libglvnd/libgles2_1.7.0-1build1_arm64.deb",
+        "sha256": "b4be5859b727d181e6d4d8360f4864a4c4cadcfef3af794b837245800deff714"
+      },
+      {
+        "package": "libseccomp-dev",
+        "version": "2.5.5-1ubuntu3",
+        "url": "https://ports.ubuntu.com/ubuntu-ports/pool/main/libs/libseccomp/libseccomp-dev_2.5.5-1ubuntu3_arm64.deb",
+        "sha256": "a3fb3e8557c633a2e327e224633cbb13a8aa78f53a46779acd686e2187b5fb55"
+      },
+      {
+        "package": "libseccomp2",
+        "version": "2.5.5-1ubuntu3",
+        "url": "https://ports.ubuntu.com/ubuntu-ports/pool/main/libs/libseccomp/libseccomp2_2.5.5-1ubuntu3_arm64.deb",
+        "sha256": "938632f5c41bee14ba2eed9b8c79eae1979653b720d7ec56c67f96475c84fd05"
+      },
+      {
+        "package": "libmpv-dev",
+        "version": "0.37.0-1ubuntu4",
+        "url": "https://ports.ubuntu.com/ubuntu-ports/pool/universe/m/mpv/libmpv-dev_0.37.0-1ubuntu4_arm64.deb",
+        "sha256": "7919bdb8d5908b23453b8f9eb9cbfb393aa0540d521c614cbc3016d0878fe3c4"
+      },
+      {
+        "package": "libmpv2",
+        "version": "0.37.0-1ubuntu4",
+        "url": "https://ports.ubuntu.com/ubuntu-ports/pool/universe/m/mpv/libmpv2_0.37.0-1ubuntu4_arm64.deb",
+        "sha256": "e1ef60f012966ce5ecb5747181176a85e9c26fd5c8f4a715fe8384fe65f1ed05"
+      }
+    ]
+  },
+  "zig_version": "0.15.2",
+  "bubblewrap": {
+    "version": "0.13.1",
+    "url": "https://github.com/containers/bubblewrap/releases/download/v0.13.1/bubblewrap-0.13.1.tar.xz",
+    "sha256": "0e85c8702248b8dd64144f594147553650cdd0e4c951690345faace79c217c4d"
+  },
+  "runtime_abi": {
+    "glibc_minimum": "2.34",
+    "graphics": "Omarchy system EGL/OpenGL/GBM drivers",
+    "libraries": [
+      "libmpv.so.2",
+      "libEGL.so.1",
+      "libGL.so.1",
+      "libgbm.so.1",
+      "libseccomp.so.2",
+      "libcap.so.2"
+    ]
+  }
+}

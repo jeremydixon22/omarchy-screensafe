@@ -26,6 +26,9 @@
 #include <sched.h>
 #include <seccomp.h>
 #include <sys/syscall.h>
+#include <sys/prctl.h>
+#include <signal.h>
+#include <sys/wait.h>
 
 #define MAGIC 0x31435053u /* SPC1, little endian; Linux targets are LE. */
 #define XR24 0x34325258u
@@ -157,10 +160,10 @@ static void restrict_execution(void) {
     const char *blocked[]={"execve","execveat","fork","vfork","unshare","setns","ptrace","process_vm_readv","process_vm_writev","io_uring_setup"};
     for(unsigned i=0;i<sizeof blocked/sizeof blocked[0];i++) {
         int nr=seccomp_syscall_resolve_name(blocked[i]);
-        if(nr!=__NR_SCMP_ERROR && seccomp_rule_add(filter,SCMP_ACT_ERRNO(EPERM),nr,0)<0)fail("cannot build worker filter");
+        if(nr>=0 && seccomp_rule_add(filter,SCMP_ACT_ERRNO(EPERM),nr,0)<0)fail("cannot build worker filter");
     }
     int clone3_nr=seccomp_syscall_resolve_name("clone3");
-    if(clone3_nr!=__NR_SCMP_ERROR && seccomp_rule_add(filter,SCMP_ACT_ERRNO(ENOSYS),clone3_nr,0)<0)fail("cannot restrict clone3");
+    if(clone3_nr>=0 && seccomp_rule_add(filter,SCMP_ACT_ERRNO(ENOSYS),clone3_nr,0)<0)fail("cannot restrict clone3");
     if(seccomp_rule_add(filter,SCMP_ACT_ERRNO(EPERM),SCMP_SYS(clone),1,
         SCMP_A0(SCMP_CMP_MASKED_EQ,CLONE_THREAD,0))<0 || seccomp_load(filter)<0)fail("cannot restrict worker execution");
     seccomp_release(filter);
@@ -168,6 +171,20 @@ static void restrict_execution(void) {
     if(syscall(SYS_execve,NULL,NULL,NULL)!=-1 || errno!=EPERM)fail("worker execution restriction ineffective");
 }
 int main(int argc,char **argv) {
+    if(argc==2 && !strcmp(argv[1],"--self-test")) {
+        if(prctl(PR_SET_NO_NEW_PRIVS,1,0,0,0))fail("cannot set no_new_privs");
+        restrict_execution();
+        errno=0;long child=syscall(SYS_clone,(unsigned long)SIGCHLD,0,0,0,0);
+        if(child>=0) {
+            if(child==0)_exit(2);
+            waitpid((pid_t)child,NULL,0);fail("worker process creation restriction ineffective");
+        }
+        if(errno!=EPERM)fail("worker process creation restriction not enforced");
+        unsigned long api=mpv_client_api_version();
+        if((api>>16)!=(MPV_CLIENT_API_VERSION>>16) || api<MPV_CLIENT_API_VERSION)fail("incompatible libmpv API");
+        printf("{\"worker\":1,\"libmpvApi\":%lu,\"seccomp\":true}\n",api);
+        return 0;
+    }
     if(argc!=7 || (strcmp(argv[1],"capture") && strcmp(argv[1],"verify") && strcmp(argv[1],"serve")))fail("usage: worker capture|verify|serve WIDTH HEIGHT FRAMES FPS copy|software");
     if(!strcmp(argv[6],"copy"))decoder="vaapi-copy";
     else if(!strcmp(argv[6],"software"))decoder="no";

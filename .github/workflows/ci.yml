@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'release/**']
   pull_request:
 
 permissions:
@@ -54,10 +54,36 @@ jobs:
         run: for pack in packs/*/; do bin/screensafe-aarch64 check "$pack" --seconds 120 >/dev/null; done
       - name: Confinement
         run: bin/screensafe-aarch64 sandbox-test
+      - name: System runtime for native helper checks
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y ffmpeg bubblewrap libmpv2
+      - name: Native ARM worker API and execution policy
+        run: bin/screensafe-cache-aarch64 --self-test
+      - name: Controller, importer and settings regressions
+        run: scripts/test-runtime
+
+  native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Rebuild and compare every native helper for both architectures
+        run: scripts/verify-native
+      - name: System runtime for native helper checks
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y ffmpeg bubblewrap libmpv2
+      - name: Native x86 worker API and execution policy
+        run: bin/screensafe-cache-x86_64 --self-test
+      - name: Controller, importer and settings regressions
+        run: scripts/test-runtime
 
   provenance:
     if: github.event_name == 'push'
-    needs: [test, arm]
+    needs: [test, arm, native]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -69,10 +95,19 @@ jobs:
         with:
           persist-credentials: false
       - name: Rebuild and compare
-        run: scripts/verify-release
-      - name: Attest the committed renderer
+        run: |
+          scripts/verify-release
+          scripts/verify-native
+      - name: Attest every committed executable and the native build manifest
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
             bin/screensafe-x86_64
             bin/screensafe-aarch64
+            bin/screensafe-cache-x86_64
+            bin/screensafe-cache-aarch64
+            bin/screensafe-sandbox-x86_64
+            bin/screensafe-sandbox-aarch64
+            bin/screensafe-media-x86_64
+            bin/screensafe-media-aarch64
+            bin/native-build.json

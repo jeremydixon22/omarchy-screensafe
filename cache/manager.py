@@ -26,6 +26,9 @@ import tempfile
 import threading
 import time
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from screensafe_runtime import ParentLifetime, sandbox_binary, media_launcher, media_process_filter
+
 MAGIC = 0x31435053
 VERSION = 1
 MAX_VIDEO = 128 << 20
@@ -88,7 +91,13 @@ def small_output(command, timeout=10):
     with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
         p = subprocess.Popen(command, stdout=out, stderr=err, stdin=subprocess.DEVNULL, start_new_session=True)
         try:
-            p.wait(timeout=timeout)
+            deadline = time.monotonic()+timeout
+            while p.poll() is None:
+                if STOP:
+                    raise InterruptedError('ScreenSafe helper interrupted')
+                if time.monotonic() >= deadline:
+                    raise subprocess.TimeoutExpired(command, timeout)
+                time.sleep(.05)
             out.seek(0); data = out.read(65537)
             if p.returncode or len(data) > 65536:
                 raise ValueError('bounded helper failed')
@@ -126,12 +135,15 @@ def devices():
 
 
 def profile(args, size):
-    paths = {str(Path(args.renderer).resolve()), str(Path(args.worker).resolve()), str(Path(__file__).resolve())}
+    paths = {str(Path(args.renderer).resolve()), str(Path(args.worker).resolve()), str(Path(__file__).resolve()),
+             str(Path(__file__).resolve().parents[1]/'screensafe_runtime.py'), sandbox_binary(), media_launcher(),
+             str(Path(sys.executable).resolve()), '/usr/bin/ffmpeg', '/usr/bin/ffprobe'}
     # Include actual dynamically loaded graphics/codec code, beyond package names.
-    dependencies = small_output(['/usr/bin/ldd', str(args.worker)]).decode()
-    for word in dependencies.split():
-        if word.startswith('/') and Path(word).is_file():
-            paths.add(str(Path(word).resolve()))
+    for executable in [str(args.worker), sandbox_binary()]:
+        dependencies = small_output(['/usr/bin/ldd', executable]).decode()
+        for word in dependencies.split():
+            if word.startswith('/') and Path(word).is_file():
+                paths.add(str(Path(word).resolve()))
     drivers = set()
     for directory in ['/usr/lib/dri', '/usr/lib/gbm']:
         for p in Path(directory).glob('*.so'):
@@ -143,7 +155,7 @@ def profile(args, size):
         for word in small_output(['/usr/bin/ldd', p]).decode().split():
             if word.startswith('/') and Path(word).is_file():
                 paths.add(str(Path(word).resolve()))
-    packages = small_output(['/usr/bin/pacman', '-Q', 'mpv', 'ffmpeg', 'mesa', 'libva', 'wayland', 'bubblewrap']).decode()
+    packages = small_output(['/usr/bin/pacman', '-Q', 'mpv', 'ffmpeg', 'mesa', 'libva', 'wayland', 'libseccomp', 'libcap', 'python']).decode()
     return {'version': VERSION, 'files': {p: sha(p) for p in sorted(paths)},
             'packages': packages, 'kernel': os.uname().release, 'size': size,
             'cadence': 'ordered/no-catch-up/24fps/64Hz-approval', 'composition': 'opaque/fixed/no-overlay'}
@@ -225,8 +237,8 @@ def read_record(directory, key):
     return record
 
 
-def sandbox(args, command, *, media=None, device=None, output=None):
-    a = ['/usr/bin/bwrap', '--unshare-user', '--unshare-all', '--disable-userns',
+def sandbox(args, command, *, media=None, device=None, output=None, policy=None):
+    a = [sandbox_binary(), '--unshare-user', '--unshare-all', '--disable-userns',
          '--die-with-parent', '--new-session', '--cap-drop', 'ALL', '--clearenv',
          '--setenv', 'PATH', '/usr/bin', '--setenv', 'HOME', '/tmp', '--setenv', 'LANG', 'C',
          '--setenv', 'OMP_NUM_THREADS', '1']
@@ -242,6 +254,8 @@ def sandbox(args, command, *, media=None, device=None, output=None):
               '--ro-bind', str(args.worker), '/worker']
     if output is not None:
         a += ['--bind', str(output), '/output']
+    if policy is not None:
+        a += ['--seccomp', str(policy)]
     return a + command
 
 
@@ -281,12 +295,18 @@ def encode(args, directory, size, seconds, source_digest):
         '-fs', str(MAX_VIDEO), '-f', 'mp4', '/output/video.mp4']
     with (directory/'source.log').open('wb') as e1, (directory/'encoder.log').open('wb') as e2:
         a = subprocess.Popen(source, stdout=subprocess.PIPE, stderr=e1, stdin=subprocess.DEVNULL, start_new_session=True)
-        b = subprocess.Popen(sandbox(args, ff, output=directory), stdin=a.stdout, stdout=subprocess.DEVNULL, stderr=e2, start_new_session=True)
-        a.stdout.close()
+        b = None
         try:
+            with media_process_filter() as policy:
+                b = subprocess.Popen([media_launcher()] + sandbox(args, ff, output=directory, policy=policy),
+                    pass_fds=(policy,), stdin=a.stdout, stdout=subprocess.DEVNULL, stderr=e2, start_new_session=True)
+            a.stdout.close()
             wait_preparation([a, b], time.monotonic()+300)
         finally:
-            terminate(a); terminate(b)
+            a.stdout.close()
+            terminate(a)
+            if b is not None:
+                terminate(b)
     with (directory/'source.log').open('rb') as log:
         metadata = log.read(4097)
     if len(metadata) > 4096 or json.loads(metadata.splitlines()[-1]).get('sourceDigest') != source_digest:
@@ -341,8 +361,12 @@ def capture(args, fd, device, decoder, size, frames, directory, label):
 
 
 def available(args):
+    try:
+        sandbox_binary()
+    except (OSError, ValueError):
+        return False
     return (args.worker.is_file() and os.access(args.worker, os.X_OK) and
-            all(Path(p).is_file() for p in ['/usr/bin/bwrap', '/usr/bin/ffmpeg', '/usr/bin/hyprctl']) and bool(devices()))
+            all(Path(p).is_file() for p in ['/usr/bin/ffmpeg', '/usr/bin/hyprctl']) and bool(devices()))
 
 
 def lookup(args, p, base, directory):
@@ -533,7 +557,10 @@ def run(args):
                     for _, _ in selector.select(0.1):
                         chunk = os.read(0, 1024)
                         if not chunk:
-                            selector.unregister(sys.stdin); continue
+                            selector.unregister(sys.stdin)
+                            if args.managed:
+                                return 0
+                            continue
                         pending.extend(chunk)
                         if len(pending) > 8192:
                             raise ValueError('control input exceeded limit')
@@ -572,10 +599,13 @@ def main():
     parser.add_argument('--limit', type=int, choices=[256, 512, 1024, 2048], default=512)
     parser.add_argument('--battery-only', type=int, choices=[0, 1], default=1)
     parser.add_argument('--exit-after', type=float)
+    parser.add_argument('--managed', action='store_true', help='end playback when the shell control pipe closes')
     args = parser.parse_args()
     def stop(*unused):
         global STOP
         STOP = True
+        if args.action not in ('run', 'prepare'):
+            raise InterruptedError('ScreenSafe short command interrupted')
     signal.signal(signal.SIGTERM, stop); signal.signal(signal.SIGINT, stop)
     try:
         if args.action == 'run':
@@ -599,5 +629,18 @@ def main():
         return 2
 
 
+def cli():
+    # Install the lifetime guard before parsing or starting any stage. Its
+    # signal requests graceful cleanup; a bounded emergency exit also ends
+    # the parent-bound renderer and sandbox if cleanup itself stops responding.
+    def parent_stopped(*unused):
+        global STOP
+        STOP = True
+    signal.signal(signal.SIGTERM, parent_stopped)
+    signal.signal(signal.SIGINT, parent_stopped)
+    with ParentLifetime():
+        return main()
+
+
 if __name__ == '__main__':
-    sys.exit(main())
+    sys.exit(cli())

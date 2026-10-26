@@ -22,7 +22,7 @@ scripts/verify-release
 
 It rebuilds both executables in a temporary folder and compares each with the committed one, printing the SHA-256 of each that matches and failing if either doesn't.
 
-Earlier released builds were checked from different checkout folders with separate Cargo homes and target folders and gave identical bytes; ARM frames under emulation also matched x86-64 frames. Those runtime checks do not cover this local 0.5.0 development build. The repository's CI runs `scripts/verify-release` on GitHub's runners for every change, runs the tests natively on GitHub's ARM runners, and attests the committed executables for each commit pushed to `main`. To check an attestation:
+Earlier released builds were checked from different checkout folders with separate Cargo homes and target folders and gave identical bytes; ARM frames under emulation also matched x86-64 frames. That historical evidence does not establish the behavior of a newer candidate. CI runs the Rust tests natively on both architectures, checks both renderer builds and every native helper, and attests main/release branch pushes after all checks pass. To check an attestation:
 
 ```sh
 gh attestation verify bin/screensafe-$(uname -m) --repo jeremydixon22/omarchy-screensafe
@@ -42,8 +42,8 @@ ScreenSafe's own code is in `renderer/src`, with no `unsafe` code (`#![forbid(un
 
 Run `bin/screensafe-$(uname -m) version` to see its version, and the pack format and expression language it reads.
 
-## Local 0.5.0 development build
+## 0.5.0 candidate
 
-The local development binaries have been rebuilt and compared for both architectures, but have not been published or attested by release CI. Reproducibility checks are not provenance attestations, and the local 0.5.0 ARM binary has not had native runtime validation here. The release commands above apply once the reviewed source and binaries are committed and the corresponding CI has passed.
+Local reproduction and release attestations are separate evidence. CI must pass and attest the exact pushed commit before any candidate is described as attested. Native ARM CI runs the Rust tests and helper API/seccomp checks; it does not establish that every ARM GPU supports prepared playback. GPU eligibility and final decoded output are checked on the user's system before an approval is issued.
 
-Optional prepared playback has a separate native helper, built locally with `scripts/build-cache-worker`. It links system codec and graphics libraries; it is not part of either static Rust executable or the renderer's release-attestation workflow. The helper source and local-build instructions are included, but no native helper binary is bundled in this development tree. Distribution of that helper needs its own architecture builds, dependency/license accounting and provenance before a release can advertise it as included.
+All native helpers are now bundled for both architectures, rebuilt with checksum-pinned inputs, compared by `scripts/verify-native`, and included in the same post-test attestation job. [Native packaging](NATIVE-PACKAGE.md) documents their separate licenses, complete source, system ABI dependencies and build receipt. There is no user-side native build or separate native installation.

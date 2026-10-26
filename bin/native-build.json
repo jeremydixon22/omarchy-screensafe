@@ -1,0 +1,35 @@
+{
+  "binaries": {
+    "screensafe-cache-aarch64": {
+      "bytes": 21984,
+      "sha256": "599ecbac7b67c17aaea636139ded596ecc8bd552c1047f7dbdf176d3b4d3939b"
+    },
+    "screensafe-cache-x86_64": {
+      "bytes": 22336,
+      "sha256": "9e08a436fbaada6fd4a2365c33552ddd84fd7be2390e747be9c61dfaa928acc2"
+    },
+    "screensafe-media-aarch64": {
+      "bytes": 12328,
+      "sha256": "6f1cbcbe955a214c2b7b69a897a6f54d8629c5d48734f97800f15153328cf6d1"
+    },
+    "screensafe-media-x86_64": {
+      "bytes": 11312,
+      "sha256": "ecca33e78d0b7e3d222ef1a0ab82d6f1975961fad20d651b37ae87c9e32ce087"
+    },
+    "screensafe-sandbox-aarch64": {
+      "bytes": 71768,
+      "sha256": "b1c4c79da7fbf49316f40e0caf401a982a388bf2ad5185c1f141612eefcd9287"
+    },
+    "screensafe-sandbox-x86_64": {
+      "bytes": 74144,
+      "sha256": "98358cc6d04f5b97f7044735a93f38dfb41068fefd377f138e187a7f7272c86e"
+    }
+  },
+  "bubblewrap_archive_sha256": "0e85c8702248b8dd64144f594147553650cdd0e4c951690345faace79c217c4d",
+  "build_script_sha256": "8325f32083ade4d6c5160f00fe37d8b64c4db67e77c7dca5452dd63dbb7d91a4",
+  "glibc_minimum": "2.34",
+  "inputs_sha256": "e3186f50482a885a7c7a96acee7b3e6437881438e4963d63f365f5d537251e2d",
+  "media_launcher_source_sha256": "aca37c915aab3ed525b02bc14c77a6b16baf6834cbbab154b5c85c28899e758e",
+  "worker_source_sha256": "cc589f13a6d4d7d32772601ac8adeb2af972cb04f630f2cc1c13d6e87a175efa",
+  "zig_version": "0.15.2"
+}

@@ -63,4 +63,24 @@ class ImportTests(unittest.TestCase):
         self.assertNotEqual(network,os.readlink('/proc/self/ns/net'))
         self.assertTrue(source)
 
+    def test_media_cage_bounds_scratch_and_blocks_processes_but_allows_threads(self):
+        fd=os.open(self.source,os.O_RDONLY)
+        code='''import os,json,resource,threading,subprocess,errno
+v=os.statvfs('/tmp');result={'scratch':v.f_blocks*v.f_frsize,'as':resource.getrlimit(resource.RLIMIT_AS)[0], 'file':resource.getrlimit(resource.RLIMIT_FSIZE)[0]}
+try:os.fork();result['fork']='allowed'
+except OSError as e:result['fork']=e.errno
+try:subprocess.run(['/usr/bin/true']);result['spawn']='allowed'
+except OSError as e:result['spawn']=e.errno
+values=[];t=threading.Thread(target=lambda:values.append(1));t.start();t.join();result['thread']=values==[1]
+print(json.dumps(result))
+'''
+        try: result=json.loads(b''.join(media.output_chunks(fd,['/usr/bin/python3','-c',code],10)))
+        finally: os.close(fd)
+        self.assertLessEqual(result['scratch'],64<<20)
+        self.assertEqual(result['as'],2<<30)
+        self.assertEqual(result['file'],128<<20)
+        self.assertEqual(result['fork'],1)
+        self.assertEqual(result['spawn'],1)
+        self.assertTrue(result['thread'])
+
 if __name__=='__main__':unittest.main()

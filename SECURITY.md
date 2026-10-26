@@ -56,9 +56,9 @@ It applies the first layer to its own folder, checks that it can read there but 
   - Its settings (whether it's on, the pack, its own idle time, the favorite packs, the values chosen for packs' settings, whether settings pages show a live preview, and optional overlay display preferences) in its own entry in `~/.config/omarchy/shell.json`, through Omarchy's plugin interface. It reads Omarchy's idle and lock times there but never changes them.
 - **No network.** No downloads, installers, package managers or services, and nothing needs elevated privileges.
 
-## Videos development prototype
+## Videos (0.5.0)
 
-The local Videos prototype normalizes MP4s through an isolated importer, then passes checked, bounded JPEG frames through the renderer's image and flash paths. The shell does not decode video. [VIDEO-PROTOTYPE.md](docs/VIDEO-PROTOTYPE.md) documents its limits, optional import dependencies and remaining release work.
+Videos normalizes MP4s through an isolated importer, then passes checked, bounded JPEG frames through the renderer's image and flash paths. The shell does not decode video. [VIDEO-PROTOTYPE.md](docs/VIDEO-PROTOTYPE.md) documents its bounds and explicit import workflow; all application helpers are included.
 
 The development renderer supplements Landlock with a seccomp filter: non-Unix socket creation (including UDP) and io_uring setup are denied across threads; after Wayland connects, all new socket creation and connection attempts are denied. Existing Wayland communication remains available. Watchdog threads in media-reading commands acknowledge startup only after giving up new filesystem access themselves, since Landlock is per-thread.
 
@@ -98,11 +98,15 @@ Color controls use numeric theme IDs or an exact 24-bit RGB encoding; arbitrary 
 Recoloring is prepared at pack load, preserves each colored palette ink's relative luminance and alpha, and leaves backgrounds and black/white fixed. The existing theme image filter uses that palette; Original images are unaffected. This adds no filesystem paths, processes, network access, runtime dependencies or change to the combined-frame flash guard.
 
 
-## Prepared playback (0.5 development)
+## Prepared playback (0.5.0)
 
 Prepared playback is opt-in, with live playback remaining the default and fallback. A trusted Python controller creates a local loop from the same confined Rust pack evaluator/rasterizer. It does not accept pack-provided videos, commands, shaders, approvals or checksums. Live clock dependencies are detected in compiled expressions, including bindings and visibility predicates, and in implicit clock text. Photos and Videos remain live. The overlay also selects normal combined-frame guarding.
 
 Preparation runs only on known external power and is cancellable. Source dimensions, frame count, work time, storage and process outputs are bounded. The producer reports the SHA-256 identity of its actual loaded source snapshot; the controller compares that with the requested plan and checks the source/display again before publishing. Strong source hashing runs during preparation and approval lookups. Ordinary live playback, catalog and thumbnail loads retain their separate lightweight fingerprints.
+
+All native helpers are included for both supported architectures; none is built, downloaded or installed separately at runtime. Omarchy supplies the media/graphics libraries. The trusted Python controllers watch their exact parent's pidfd without polling; parent death requests cleanup and enforces an emergency exit within three seconds if cleanup is stuck. Shell-managed playback also exits on control-pipe EOF, while standalone CLI playback may have a closed stdin. The renderer and namespace workers independently bind their own parent lifetime. Every short service process, including cache status, independently activates its deadline timer.
+
+The separate arbitrary-MP4 importer and raw-frame preparation encoder have a 64 MiB private tmpfs, 2 GiB address-space limit, 180 CPU-second limit, 64-file-descriptor limit, 128 MiB per-file limit and no core dumps. A sealed, fixed seccomp policy is installed before FFmpeg/ffprobe starts. It allows threads but denies new processes, namespace changes, ptrace, cross-process memory access, execveat and io_uring. execve remains allowed for the initial program launch; replacing that same already-confined process cannot add mounts, descendants or CPU budget. No media bytes or author-provided options choose these policies. Neither media cage has a graphics device or compositor connection; the encoder alone receives its bounded output staging directory. GPU playback retains its additional all-thread post-startup exec prohibition.
 
 The encoder sees only fixed-size raw pixels inside a private Bubblewrap namespace. Its H.264 output has fixed timing, no B frames, a single video stream and explicit SDR color handling. For verification and playback, the controller copies the encoded bytes to a sealed memfd (write/grow/shrink/seal seals), hashes that snapshot with SHA-256, and gives the worker a private read-only copy of those exact bytes. A pathname change cannot change the admitted input. Cache/approval directories are user-owned mode 0700 and files mode 0600. Pack data and codec workers cannot write the approval store. The worker applies its all-thread execution restrictions before opening the media, after loading its trusted libraries and GPU context.
 

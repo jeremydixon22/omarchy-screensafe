@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+root=$(cd -- "$(dirname -- "$0")/.." && pwd)
+cd -- "$root"
+export PYTHONDONTWRITEBYTECODE=1
+python3 -m unittest discover -s cache -v
+python3 -m unittest discover -s tests -p 'test_*.py' -v
+for test in tests/*-model.mjs tests/service-deadline.mjs; do node "$test"; done
+# Ubuntu's AppArmor policy permits the distro Bubblewrap to create user
+# namespaces. Inherit that permitted test context without changing host policy.
+# Target Omarchy does not require this outer harness; the importer always
+# executes and tests the plugin's bundled Bubblewrap inside it.
+/usr/bin/bwrap --unshare-user --ro-bind / / --dev-bind /dev /dev --proc /proc --tmpfs /tmp -- \
+  /usr/bin/env PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s "$root/tools/videos" -p test_import.py -v

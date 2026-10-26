@@ -16,7 +16,7 @@ import "PerformanceModel.js" as PerformanceModel
 // renderer's command line names Omarchy's screensaver class, so Omarchy treats it as the screensaver that's running:
 // locking closes it and the menu's Screensaver entry won't open a second one.
 //
-// Every program here is the plugin's own renderer or Omarchy's own shell command, started by absolute path with a
+// Every program here is a trusted bundled plugin program or Omarchy's own shell command, started by absolute path with a
 // cleared environment holding only what it needs. Each short call has a deadline, and the renderer's output is
 // bounded where it's produced.
 Item {
@@ -217,17 +217,20 @@ Item {
   }
   function cacheEnvironment() {
     var env = root.environment(false)
+    env.SCREENSAFE_PARENT_PID = String(Quickshell.processId)
     var signature = Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE") || ""
     if (/^[A-Za-z0-9_\-]{1,200}$/.test(signature)) env.HYPRLAND_INSTANCE_SIGNATURE = signature
     return env
   }
   function cacheCommand(action, path) {
-    return ["/usr/bin/python3", root.pluginDir + "/cache/manager.py", action,
+    var command = ["/usr/bin/python3", root.pluginDir + "/cache/manager.py", action,
       "--renderer", root.renderer, "--worker", root.cacheWorker, "--root", root.cacheRoot,
       "--limit", String(root.performanceValues.maxMiB), "--battery-only", String(root.performanceValues.batteryOnly),
       "--pack", path, "--theme", root.themeDir, "--branding", root.branding, "--logo", root.logo,
       "--badge", root.badge, "--photos", root.photos, "--videos", root.videos,
       "--settings", root.settingsArg(path), "--overlay", root.overlayArgument]
+    if (action === "run") command.push("--managed")
+    return command
   }
   function refreshPerformance() {
     if (cacheStatusProc.running || root.preparing) return
@@ -845,8 +848,7 @@ Item {
     id: deadline
     interval: 1000
     repeat: true
-    running: takeoverProc.running || catalogProc.running || statusProc.running || lockProc.running || thumbProc.running || systemProc.running
-      || photosFolderProc.running || videosFolderProc.running
+    running: root.shortProcs.some(function(proc) { return proc.running })
     onTriggered: {
       var now = Date.now()
       for (var i = 0; i < root.shortProcs.length; i++) {
