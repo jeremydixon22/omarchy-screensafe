@@ -117,6 +117,7 @@ static void init_gpu(void) {
 static void draw(unsigned index,unsigned slot) {
     double until=seconds()+5.0;
     for(;;) {
+        if(seconds()>until)fail("frame deadline exceeded");
         while(1) { mpv_event *e=mpv_wait_event(player,0);if(e->event_id==MPV_EVENT_NONE)break;
             if(e->event_id==MPV_EVENT_SHUTDOWN || e->event_id==MPV_EVENT_END_FILE)fail("video ended early");
             if(e->event_id==MPV_EVENT_COMMAND_REPLY && e->error<0)fail("video command failed"); }
@@ -141,7 +142,6 @@ static void draw(unsigned index,unsigned slot) {
                 return;
             }
         }
-        if(seconds()>until)fail("frame deadline exceeded");
         struct pollfd p={wake_fd,POLLIN,0};poll(&p,1,20);uint64_t v;while(read(wake_fd,&v,sizeof v)>0){}
     }
 }

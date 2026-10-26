@@ -42,6 +42,8 @@ Use `--cache PATH` to choose the reproducible download cache and `TMPDIR` to cho
 
 CI compares all six binaries and their build manifest, tests the controller/importer/settings, checks worker API/seccomp on both native architectures, and rebuilds both static Rust renderers. Main and `release/**` pushes attest all eight executables plus the native manifest after those checks pass. Release branches provide candidate evidence without moving the marketplace's current upstream branch.
 
+Ubuntu CI runners additionally load a narrow AppArmor permission for the distro `/usr/bin/bwrap` test harness to create user namespaces. Importer tests run the bundled sandbox inside that context; their mount, network, process and resource checks remain enabled. This is test-machine setup only, not an installation step or a host-wide sysctl change.
+
 ```sh
 gh attestation verify bin/screensafe-cache-$(uname -m) --repo jeremydixon22/omarchy-screensafe
 ```

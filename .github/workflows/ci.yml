@@ -61,7 +61,11 @@ jobs:
       - name: Native ARM worker API and execution policy
         run: bin/screensafe-cache-aarch64 --self-test
       - name: Controller, importer and settings regressions
-        run: scripts/test-runtime
+        # The Ubuntu runner needs permission for the distro test harness only.
+        # Omarchy runs the bundled sandbox directly without this CI policy.
+        run: |
+          sudo apparmor_parser -r .github/ci-bwrap.apparmor
+          scripts/test-runtime
 
   native:
     runs-on: ubuntu-24.04
@@ -79,7 +83,9 @@ jobs:
       - name: Native x86 worker API and execution policy
         run: bin/screensafe-cache-x86_64 --self-test
       - name: Controller, importer and settings regressions
-        run: scripts/test-runtime
+        run: |
+          sudo apparmor_parser -r .github/ci-bwrap.apparmor
+          scripts/test-runtime
 
   provenance:
     if: github.event_name == 'push'

@@ -1,0 +1,9 @@
+# Test harness only: Ubuntu restricts unprivileged user namespaces by default.
+# Allow the distro harness to create them; nested tests still execute the
+# bundled sandbox and its complete mount/network/seccomp/resource policy.
+# No runner-wide sysctl change, and no policy is installed by the plugin.
+abi <abi/4.0>,
+include <tunables/global>
+/usr/bin/bwrap flags=(unconfined) {
+  userns,
+}
