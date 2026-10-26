@@ -37,6 +37,9 @@ out = ["# Third-party notices\n\n",
        "The Tokyo Drip pack's sign lettering, `packs/tokyo-drip/fonts/sign.otf`, is a renamed subset of "
        "[Noto Sans Mono CJK JP](https://github.com/notofonts/noto-cjk) Bold 2.004, Copyright 2014-2021 Adobe, under the SIL Open "
        "Font License 1.1 ([packs/tokyo-drip/fonts/OFL.txt](packs/tokyo-drip/fonts/OFL.txt)).\n\n",
+       "Optional prepared playback uses separately installed FFmpeg/Bubblewrap and an optional native worker linked to system libmpv, EGL/OpenGL, GBM and libseccomp. "
+       "Those libraries are not embedded in the static Rust renderers. Their distribution licenses and source obligations apply to worker binaries; "
+       "see [mpv's copyright information](https://github.com/mpv-player/mpv/blob/v0.41.0/Copyright) and the system packages' notices.\n\n",
        "They are built from the same Rust crates on both architectures, each used under the license shown (where a crate offers a choice, "
        "under any one of them). Their license files follow.\n\n",
        "| Crate | Version | License |\n|---|---|---|\n"]

@@ -30,6 +30,7 @@ mod flash;
 mod overlay;
 mod pack;
 mod palette;
+mod prepared;
 mod raster;
 mod safefs;
 mod sandbox;
@@ -56,6 +57,10 @@ const USAGE: &str = "usage:
   screensafe photos-folder
   screensafe videos-folder
   screensafe system-info
+  screensafe cache-plan --pack DIR [--theme DIR] [--settings NAME=VALUE,...]
+  screensafe prepare-frames --pack DIR --size WxH --fps N --seconds N
+  screensafe approve-frames --size WxH --frames N
+  screensafe run-prepared --size WxH --frames N --fps N
   screensafe sandbox-test
   screensafe version";
 
@@ -223,6 +228,7 @@ fn load_with(dir: &Path, args: &Args, chosen: &[(String, f64)], photo_seed: Opti
     let videos = video_folder(args);
     let palette = theme_palette(theme.as_deref())?;
     let env = Environment {
+        cache_identity: matches!(args.positional.first().map(String::as_str), Some("cache-plan" | "prepare-frames")),
         palette: palette.as_ref(),
         theme: theme.as_deref(),
         branding: branding.as_deref(),
@@ -682,17 +688,20 @@ fn failsafes(command: Option<&str>) {
     if command != Some("takeover") {
         let _ = rustix::process::set_parent_process_death_signal(Some(rustix::process::Signal::TERM));
     }
-    if matches!(command, Some("catalog" | "thumbnail" | "takeover" | "photos-folder" | "videos-folder" | "version" | "sandbox-test" | "system-info")) {
+    if matches!(
+        command,
+        Some("cache-plan" | "catalog" | "thumbnail" | "takeover" | "photos-folder" | "videos-folder" | "version" | "sandbox-test" | "system-info")
+    ) {
         start_watchdog(
             || {
                 std::thread::sleep(QUICK_LIMIT);
                 tell!("screensafe: gave up after {} seconds", QUICK_LIMIT.as_secs());
                 std::process::exit(TIMED_OUT);
             },
-            matches!(command, Some("catalog" | "thumbnail" | "system-info")),
+            matches!(command, Some("cache-plan" | "catalog" | "thumbnail" | "system-info")),
         );
     }
-    if matches!(command, Some("run" | "preview")) {
+    if matches!(command, Some("run" | "preview" | "prepare-frames")) {
         start_watchdog(watch_draws, true);
     }
 }
@@ -730,6 +739,10 @@ fn main() -> ExitCode {
     };
     failsafes(args.positional.first().map(String::as_str));
     let result = match args.positional.first().map(String::as_str) {
+        Some("cache-plan") => prepared::plan(&args).map(|_| true),
+        Some("run-prepared") => prepared::run(&args).map(|_| true),
+        Some("prepare-frames") => prepared::record(&args).map(|_| true),
+        Some("approve-frames") => prepared::certify(&args).map(|_| true),
         Some("run") => match run(&args) {
             Ok(Err(e)) => {
                 tell!("screensafe: {e}");

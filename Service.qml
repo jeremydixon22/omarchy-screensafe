@@ -5,6 +5,7 @@ import Quickshell.Wayland
 import Quickshell.Services.UPower
 import "OverlayModel.js" as OverlayModel
 import "ColorModel.js" as ColorModel
+import "PerformanceModel.js" as PerformanceModel
 
 // Shows a ScreenSafe pack when you're idle, in place of Omarchy's screensaver.
 //
@@ -193,6 +194,65 @@ Item {
   function toggleFavorite(path) { return setFavorite(path, !root.isFavorite(path)) }
 
   // Global overlay data stays separate from pack settings and expressions. Off until opted in.
+  readonly property var performanceValues: PerformanceModel.values(root.entry.performance)
+  readonly property string cacheWorker: root.pluginDir + "/bin/screensafe-cache-" + root.arch
+  readonly property string cacheRoot: root.home + "/.cache/omarchy/screensafe/prepared"
+  property string performanceState: "unknown"
+  readonly property bool preparing: cacheWorkProc.running && cacheWorkProc.action === "prepare"
+  readonly property string performanceDetail: {
+    if (root.preparing) return "Preparing and checking a local loop. You can cancel at any time."
+    if (root.overlayValues.enabled === 1) return "Overlay is on. Normal playback is used so the combined picture remains guarded."
+    if (root.performanceState === "ready") return "A prepared loop is ready for this screensaver, theme and display."
+    if (root.performanceState === "empty") return "No matching loop is prepared. Normal playback is used."
+    if (root.performanceState === "ineligible") return "This screensaver needs live playback."
+    if (root.performanceState === "cancelled") return "Preparation cancelled. Normal playback is available."
+    if (root.performanceState === "unavailable") return "Prepared playback is unavailable for this setup. Normal playback is available."
+    return "Prepare a loop on external power to make it available later."
+  }
+  function setPerformance(name, value) {
+    if (!PerformanceModel.declarations.some(function(d) { return d.name === name })) return
+    saveSettings({ performance: PerformanceModel.changed(root.entry.performance, name, value) })
+    if (name === "maxMiB") root.trimPrepared()
+    else root.refreshPerformance()
+  }
+  function cacheEnvironment() {
+    var env = root.environment(false)
+    var signature = Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE") || ""
+    if (/^[A-Za-z0-9_\-]{1,200}$/.test(signature)) env.HYPRLAND_INSTANCE_SIGNATURE = signature
+    return env
+  }
+  function cacheCommand(action, path) {
+    return ["/usr/bin/python3", root.pluginDir + "/cache/manager.py", action,
+      "--renderer", root.renderer, "--worker", root.cacheWorker, "--root", root.cacheRoot,
+      "--limit", String(root.performanceValues.maxMiB), "--battery-only", String(root.performanceValues.batteryOnly),
+      "--pack", path, "--theme", root.themeDir, "--branding", root.branding, "--logo", root.logo,
+      "--badge", root.badge, "--photos", root.photos, "--videos", root.videos,
+      "--settings", root.settingsArg(path), "--overlay", root.overlayArgument]
+  }
+  function refreshPerformance() {
+    if (cacheStatusProc.running || root.preparing) return
+    cacheStatusProc.command = root.cacheCommand("status", root.resolvedPack())
+    cacheStatusProc.environment = root.cacheEnvironment()
+    root.begin(cacheStatusProc)
+  }
+  function prepareSelected() {
+    if (cacheWorkProc.running) { cacheWorkProc.cancelled = true; cacheWorkProc.running = false; root.performanceState = "cancelled"; return }
+    cacheWorkProc.action = "prepare"
+    cacheWorkProc.command = root.cacheCommand("prepare", root.resolvedPack())
+    cacheWorkProc.environment = root.cacheEnvironment()
+    root.begin(cacheWorkProc)
+  }
+  property string pendingCacheAction: ""
+  function clearPrepared() { root.cacheMaintenance("clear") }
+  function trimPrepared() { root.cacheMaintenance("trim") }
+  function cacheMaintenance(action) {
+    if (cacheWorkProc.running) { root.pendingCacheAction = action; cacheWorkProc.cancelled = true; cacheWorkProc.running = false; return }
+    cacheWorkProc.action = action
+    cacheWorkProc.command = root.cacheCommand(action, root.resolvedPack())
+    cacheWorkProc.environment = root.cacheEnvironment()
+    root.begin(cacheWorkProc)
+  }
+
   readonly property var overlayDeclarations: OverlayModel.declarations
   readonly property var overlayValues: OverlayModel.values(root.entry.overlay)
   readonly property string overlayArgument: OverlayModel.argument(root.entry.overlay)
@@ -724,7 +784,8 @@ Item {
     root.launching = packPath
     root.stoppedForLock = false
     rendererProc.command = [root.renderer, "run", "--pack", packPath, "--theme", root.themeDir, "--branding", root.branding, "--logo", root.logo, "--badge", root.badge, "--photos", root.photos, "--videos", root.videos, "--settings", root.settingsArg(packPath), "--role", "org.omarchy.screensaver", "--overlay", root.overlayArgument]
-    rendererProc.environment = root.environment(false)
+    if (root.performanceValues.enabled === 1) rendererProc.command = root.cacheCommand("run", packPath)
+    rendererProc.environment = root.performanceValues.enabled === 1 ? root.cacheEnvironment() : root.environment(false)
     rendererOut.reset()
     rendererErr.reset()
     rendererProc.running = true
@@ -764,7 +825,7 @@ Item {
 
   // Short calls: one at a time each, each stopped if it runs for more than ten seconds.
   readonly property int deadlineMs: 10000
-  readonly property var shortProcs: [takeoverProc, catalogProc, statusProc, lockProc, thumbProc, photosFolderProc, videosFolderProc, systemProc]
+  readonly property var shortProcs: [takeoverProc, catalogProc, statusProc, lockProc, thumbProc, photosFolderProc, videosFolderProc, systemProc, cacheStatusProc]
 
   function runShort(proc, args) {
     if (proc.running) return
@@ -926,6 +987,42 @@ Item {
     onExited: function(code) { root.rendererExited(code, rendererErr.text) }
   }
 
+  Process {
+    id: cacheStatusProc
+    property real startedAt: 0
+    clearEnvironment: true
+    stdout: BoundedOutput { id: cacheStatusOut; limit: 2048; process: cacheStatusProc }
+    stderr: BoundedOutput { id: cacheStatusErr; limit: 2048; process: cacheStatusProc }
+    onExited: function(code) {
+      var data = null
+      if (code === 0 && !cacheStatusOut.over) { try { data = JSON.parse(cacheStatusOut.text) } catch (e) {} }
+      root.performanceState = data && ["ready", "empty", "ineligible", "unavailable"].indexOf(data.state) >= 0 ? data.state : "unavailable"
+    }
+  }
+  Process {
+    id: cacheWorkProc
+    property real startedAt: 0
+    property string action: ""
+    property bool cancelled: false
+    clearEnvironment: true
+    stdout: BoundedOutput { id: cacheWorkOut; limit: 2048; process: cacheWorkProc }
+    stderr: BoundedOutput { id: cacheWorkErr; limit: 8192; process: cacheWorkProc }
+    onExited: function(code) {
+      var data = null
+      if (!cacheWorkOut.over) { try { data = JSON.parse(cacheWorkOut.text) } catch (e) {} }
+      root.performanceState = cacheWorkProc.cancelled ? "cancelled" : data && ["ready", "empty", "ineligible", "cancelled", "unavailable"].indexOf(data.state) >= 0 ? data.state : "unavailable"
+      cacheWorkProc.cancelled = false
+      if (root.pendingCacheAction !== "") { var pending = root.pendingCacheAction; root.pendingCacheAction = ""; Qt.callLater(function() { root.cacheMaintenance(pending) }) }
+      else if (cacheWorkProc.action === "trim") Qt.callLater(root.refreshPerformance)
+    }
+  }
+  Timer {
+    interval: 1000
+    repeat: true
+    running: cacheWorkProc.running
+    onTriggered: if (Date.now() - cacheWorkProc.startedAt > 1200000) { cacheWorkProc.cancelled = true; cacheWorkProc.running = false }
+  }
+
   // While the screensaver is up, close it if the session locks some other way than Omarchy's own lock command.
   Timer {
     interval: 5000
@@ -984,6 +1081,8 @@ Item {
   // Unloading the plugin (disabling or removing it, or the shell exiting) closes the screensaver and gives Omarchy
   // its own back.
   Component.onDestruction: {
+    cacheWorkProc.running = false
+    cacheStatusProc.running = false
     for (var i = 0; i < root.shortProcs.length; i++) root.shortProcs[i].running = false
     if (rendererProc.running) rendererProc.write("quit\n")
     if (livePreviewProc.running) livePreviewProc.write("quit\n")

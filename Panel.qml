@@ -5,6 +5,7 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 import "OverlayModel.js" as OverlayModel
+import "PerformanceModel.js" as PerformanceModel
 import "ColorModel.js" as ColorModel
 
 // The bar icon and its panel: whether ScreenSafe is the screensaver, which pack it shows, and a preview. The
@@ -37,13 +38,23 @@ Panel {
   readonly property color dim: Qt.darker(foreground, 1.55)
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
 
-  // Screensaver, Overlay and About tabs. The panel reopens on the one it was left on, so someone
+  // Screensaver, Settings and About tabs. The panel reopens on the one it was left on, so someone
   // following About's links comes back to them.
   property string tab: "screensaver"
+  property string settingsTab: "overlay"
+  readonly property bool overlayPageActive: root.tab === "settings" && root.settingsTab === "overlay"
+  readonly property bool performancePageActive: root.tab === "settings" && root.settingsTab === "performance"
+  function setSettingsTab(value) {
+    root.settingsTab = value
+    if (value === "performance" && root.svc) root.svc.refreshPerformance()
+    overlayScroller.contentY = 0
+    performanceScroller.contentY = 0
+  }
   function setTab(t) {
     if (t === root.tab) return
     root.settingsPath = ""
     root.tab = t
+    if (t === "settings" && root.settingsTab === "performance" && root.svc) root.svc.refreshPerformance()
     root.setScroll(0)
   }
 
@@ -76,12 +87,13 @@ Panel {
   // The keyboard cursor walks these rows top to bottom.
   readonly property var rows: {
     // In the order they appear: the time at the top, then the tabs and Enable, then the list.
-    if (root.tab === "overlay") {
-      var overlayRows = ["delay", "tabs", "enable"]
+    if (root.overlayPageActive) {
+      var overlayRows = ["delay", "tabs", "enable", "settings:tabs"]
       var declared = root.overlayScrollingDecl
       for (var o = 0; o < declared.length; o++) overlayRows.push("set:" + declared[o].name)
       return overlayRows.concat(["overlay:reset"]).concat(root.overlayPositionDecl ? ["set:position", "preview"] : ["preview"])
     }
+    if (root.performancePageActive) return ["delay", "tabs", "enable", "settings:tabs"].concat(PerformanceModel.declarations.map(function(d) { return "set:" + d.name })).concat(["performance:prepare", "performance:clear"])
     if (root.tab === "about") return ["delay", "tabs", "enable", "about:project", "about:find", "about:make", "about:share"]
     if (root.settingsPath !== "") {
       var page = ["delay", "tabs", "enable", "settings:back", "settings:live"]
@@ -203,9 +215,9 @@ Panel {
   }
   // Scroll only the control's own region; pinned rows never move the options.
   function revealInPage(item) {
-    if ((root.tab !== "overlay" && item === backRow) || root.inside(item, overlayPositionDock)) return
-    var page = root.tab === "overlay" ? overlayPage : settingsPage
-    var scroller = root.tab === "overlay" ? overlayScroller : pageScroller
+    if ((!root.overlayPageActive && item === backRow) || root.inside(item, overlayPositionDock)) return
+    var page = root.overlayPageActive ? overlayPage : root.performancePageActive ? performancePage : settingsPage
+    var scroller = root.overlayPageActive ? overlayScroller : root.performancePageActive ? performanceScroller : pageScroller
     if (root.inside(item, colorDockPage)) { page = colorDockPage; scroller = colorDock }
     var top = item.mapToItem(page, 0, 0).y
     var bottom = top + item.height
@@ -357,7 +369,7 @@ Panel {
   }
 
   function declOf(name) {
-    var list = root.tab === "overlay" && root.svc ? root.svc.overlayDeclarations : root.settingsDecl
+    var list = root.performancePageActive ? PerformanceModel.declarations : root.overlayPageActive && root.svc ? root.svc.overlayDeclarations : root.settingsDecl
     for (var i = 0; i < list.length; i++) if (list[i].name === name) return list[i]
     return null
   }
@@ -368,7 +380,7 @@ Panel {
   function stepSetting(name, direction, wrap) {
     var d = root.declOf(name)
     if (!d || !root.svc) return
-    var v = (root.tab === "overlay" ? root.svc.overlayValues : root.settingsValues)[name]
+    var v = (root.performancePageActive ? root.svc.performanceValues : root.overlayPageActive ? root.svc.overlayValues : root.settingsValues)[name]
     var next = v
     if (d.kind === "toggle") next = v ? 0 : 1
     else if (d.kind === "color") next = ColorModel.step(v, direction, wrap, root.svc.themeSwatches)
@@ -381,13 +393,14 @@ Panel {
 
   function setSettingValue(name, value) {
     if (!root.svc) return
-    if (root.tab === "overlay") root.svc.setOverlay(name, value)
+    if (root.performancePageActive) root.svc.setPerformance(name, value)
+    else if (root.overlayPageActive) root.svc.setOverlay(name, value)
     else root.svc.setSetting(root.settingsPath, name, value)
   }
 
   function settingValueText(d) {
-    var v = (root.tab === "overlay" && root.svc ? root.svc.overlayValues : root.settingsValues)[d.name]
-    if (root.tab === "overlay" && d.name === "opacity") return Math.round(v * 100) + "%"
+    var v = (root.performancePageActive && root.svc ? root.svc.performanceValues : root.overlayPageActive && root.svc ? root.svc.overlayValues : root.settingsValues)[d.name]
+    if (root.overlayPageActive && d.name === "opacity") return Math.round(v * 100) + "%"
     if (d.kind === "range") return (Math.round(v * 1000) / 1000) + (d.unit !== "" ? " " + d.unit : "")
     return ""
   }
@@ -418,8 +431,11 @@ Panel {
 
   function activate() {
     var row = root.rows[root.cursor]
-    if (row === "tabs") setTab(["screensaver", "overlay", "about"][( ["screensaver", "overlay", "about"].indexOf(root.tab) + 1) % 3])
+    if (row === "tabs") setTab(["screensaver", "settings", "about"][( ["screensaver", "settings", "about"].indexOf(root.tab) + 1) % 3])
     else if (row.indexOf("about:") === 0) openLink(row)
+    else if (row === "settings:tabs") root.setSettingsTab(root.settingsTab === "overlay" ? "performance" : "overlay")
+    else if (row === "performance:prepare") { if (svc) svc.prepareSelected() }
+    else if (row === "performance:clear") { if (svc) svc.clearPrepared() }
     else if (row === "enable") toggleOnIdle()
     else if (row === "delay") stepDelay(1)
     else if (row === "settings:back") closeSettings()
@@ -513,7 +529,9 @@ Panel {
         } else if (dx !== 0 && root.rows[root.cursor] === "delay") {
           root.stepDelay(dx)
         } else if (dx !== 0 && root.rows[root.cursor] === "tabs") {
-          root.setTab(["screensaver", "overlay", "about"][( ["screensaver", "overlay", "about"].indexOf(root.tab) + (dx > 0 ? 1 : 2)) % 3])
+          root.setTab(["screensaver", "settings", "about"][( ["screensaver", "settings", "about"].indexOf(root.tab) + (dx > 0 ? 1 : 2)) % 3])
+        } else if (dx !== 0 && root.rows[root.cursor] === "settings:tabs") {
+          root.setSettingsTab(root.settingsTab === "overlay" ? "performance" : "overlay")
         } else if (dx !== 0 && root.rows[root.cursor].indexOf("set:") === 0) {
           root.stepSetting(root.rows[root.cursor].slice(4), dx > 0 ? 1 : -1, false)
         } else if (dx !== 0 && root.rows[root.cursor].indexOf("color:") === 0) {
@@ -618,7 +636,7 @@ Panel {
             spacing: Style.space(8)
 
             Repeater {
-              model: [{ value: "screensaver", label: "Screensaver" }, { value: "overlay", label: "Overlay" }, { value: "about", label: "About" }]
+              model: [{ value: "screensaver", label: "Screensaver" }, { value: "settings", label: "Settings" }, { value: "about", label: "About" }]
               Button {
                 required property var modelData
                 text: modelData.label
@@ -1068,7 +1086,7 @@ Panel {
 
       Column {
         id: overlayPositionDock
-        visible: root.tab === "overlay" && root.overlayPositionDecl !== null
+        visible: root.overlayPageActive && root.overlayPositionDecl !== null
         height: visible ? implicitHeight : 0
         anchors.left: parent.left
         anchors.right: parent.right
@@ -1081,12 +1099,97 @@ Panel {
         }
       }
 
+      Row {
+        id: settingsTabs
+        visible: root.tab === "settings"
+        anchors.top: header.bottom
+        anchors.topMargin: Style.space(8)
+        anchors.horizontalCenter: parent.horizontalCenter
+        spacing: Style.space(8)
+        Repeater {
+          model: [{ value: "overlay", label: "Overlay" }, { value: "performance", label: "Performance" }]
+          Button {
+            required property var modelData
+            text: modelData.label
+            selected: root.settingsTab === modelData.value
+            hasCursor: root.at("settings:tabs") && selected
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            bordered: true
+            onClicked: root.setSettingsTab(modelData.value)
+            onHovered: function(on) { if (on) root.hoverPoint("settings:tabs") }
+          }
+        }
+      }
+
       Flickable {
-        id: overlayScroller
-        visible: root.tab === "overlay"
+        id: performanceScroller
+        visible: root.performancePageActive
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: header.bottom
+        anchors.top: settingsTabs.bottom
+        anchors.topMargin: Style.space(8)
+        anchors.bottom: footer.top
+        contentWidth: width
+        contentHeight: performancePage.implicitHeight
+        boundsBehavior: Flickable.StopAtBounds
+        clip: true
+        Column {
+          id: performancePage
+          width: parent.width
+          spacing: Style.space(8)
+          PanelSectionHeader { text: "PERFORMANCE"; foreground: root.foreground; fontFamily: root.fontFamily }
+          Text {
+            width: parent.width
+            text: "Prepared loops can reduce power for demanding screensavers. Simple effects may use less power live. Preparation runs on external power. Live clocks, photos, videos and the overlay use normal playback."
+            textFormat: Text.PlainText
+            wrapMode: Text.Wrap
+            color: root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+          }
+          Repeater {
+            model: PerformanceModel.declarations
+            SettingRow { required property var modelData; width: performancePage.width; decl: modelData }
+          }
+          Text {
+            width: parent.width
+            text: root.svc ? root.svc.performanceDetail : ""
+            textFormat: Text.PlainText
+            wrapMode: Text.Wrap
+            color: root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+          }
+          Repeater {
+            model: [{ row: "performance:prepare", title: root.svc && root.svc.preparing ? "Cancel preparation" : "Prepare selected screensaver", detail: "Build a local loop for the current theme and settings" }, { row: "performance:clear", title: "Clear prepared loops", detail: "Keep screensavers and their settings" }]
+            CursorSurface {
+              required property var modelData
+              width: performancePage.width
+              implicitHeight: actionText.implicitHeight + Style.spacing.rowPaddingX
+              hasCursor: root.at(modelData.row)
+              foreground: root.foreground
+              onHasCursorChanged: if (hasCursor) root.revealInPage(this)
+              RowText { id: actionText; anchors.centerIn: parent; width: parent.width - Style.space(20); title: modelData.title; detail: modelData.detail }
+              MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onPositionChanged: function(mouse) { root.pointFrom(this, mouse, parent.modelData.row) }
+                onClicked: if (root.svc) { if (parent.modelData.row === "performance:prepare") root.svc.prepareSelected(); else root.svc.clearPrepared() }
+              }
+            }
+          }
+        }
+      }
+
+      Flickable {
+        id: overlayScroller
+        visible: root.overlayPageActive
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: settingsTabs.bottom
+        anchors.topMargin: Style.space(8)
         anchors.bottom: overlayPositionDock.top
         anchors.bottomMargin: Style.space(4)
         contentWidth: width
@@ -1231,7 +1334,7 @@ Panel {
       // Preview, pinned below the list.
       Column {
         id: footer
-        visible: root.tab === "overlay" || (root.tab === "screensaver" && !(root.settingsPath !== "" && root.liveOn))
+        visible: root.overlayPageActive || (root.tab === "screensaver" && !(root.settingsPath !== "" && root.liveOn))
         height: visible ? implicitHeight : 0
         anchors.left: parent.left
         anchors.right: parent.right
@@ -1629,8 +1732,8 @@ Panel {
     property var decl
     property bool compactColor: false
     readonly property string row: "set:" + decl.name
-    readonly property var value: (root.tab === "overlay" && root.svc ? root.svc.overlayValues : root.settingsValues)[decl.name]
-    visible: root.tab === "overlay" || root.settingActive(decl)
+    readonly property var value: (root.performancePageActive && root.svc ? root.svc.performanceValues : root.overlayPageActive && root.svc ? root.svc.overlayValues : root.settingsValues)[decl.name]
+    visible: root.overlayPageActive || root.performancePageActive || root.settingActive(decl)
     hasCursor: root.at(row)
     foreground: root.foreground
     implicitHeight: (decl.kind === "color" ? colorLayout.implicitHeight : settingLayout.implicitHeight) + Style.spacing.rowPaddingX
@@ -1707,7 +1810,7 @@ Panel {
       }
 
       Grid {
-        visible: root.tab === "overlay" && settingRow.decl.name === "position"
+        visible: root.overlayPageActive && settingRow.decl.name === "position"
         columns: 3
         spacing: Style.space(3)
         Layout.alignment: Qt.AlignVCenter
@@ -1732,7 +1835,7 @@ Panel {
 
       // A range: its value between steps down and up.
       RowLayout {
-        visible: settingRow.decl.kind === "range" && !(root.tab === "overlay" && settingRow.decl.name === "position")
+        visible: settingRow.decl.kind === "range" && !(root.overlayPageActive && settingRow.decl.name === "position")
         spacing: Style.space(8)
         Layout.alignment: Qt.AlignVCenter
 

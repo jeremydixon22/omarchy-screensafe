@@ -173,6 +173,23 @@ impl Guard {
         self.commit(cells, now, assessment);
         true
     }
+
+    /// State relevant to future admission, relative to a binary-exact 64 Hz
+    /// clock. Prepared-loop approval uses this to establish a periodic
+    /// invariant. Old events cannot affect a future one-second window; the
+    /// ring's insertion slot and total historical count do not affect it either.
+    pub fn periodic_state(&self, tick: u64) -> Vec<i64> {
+        let mut out = Vec::new();
+        for t in self.luminance.iter().chain(&self.red) {
+            out.extend([t.anchor.to_bits() as i64, t.direction as i64, i64::from(t.started)]);
+            let mut ages: Vec<i64> =
+                t.times[..t.count.min(t.times.len())].iter().map(|time| tick as i64 - (time * 64.0) as i64).filter(|age| *age <= 64).collect();
+            ages.sort_unstable();
+            out.push(ages.len() as i64);
+            out.extend(ages);
+        }
+        out
+    }
 }
 
 /// Whether any 16 x 9 window has more than a quarter of its cells flashing, and the most flashing in one window.

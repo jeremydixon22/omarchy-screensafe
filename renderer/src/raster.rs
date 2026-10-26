@@ -167,7 +167,8 @@ pub fn decode_prepared(bytes: &[u8], max_w: u32, max_h: u32, crop: u32, filter: 
     let orientation = decoder.orientation().unwrap_or(image::metadata::Orientation::NoTransforms);
     let mut decoded = image::DynamicImage::from_decoder(decoder).map_err(|e| e.to_string())?;
     decoded.apply_orientation(orientation);
-    let mut rgba = decoded.to_rgba8();
+    let known_opaque = !decoded.color().has_alpha();
+    let mut rgba = decoded.into_rgba8();
     if crop > 0 {
         let (w, h) = rgba.dimensions();
         let aspect = crop as f64 / 10_000.0;
@@ -187,15 +188,20 @@ pub fn decode_prepared(bytes: &[u8], max_w: u32, max_h: u32, crop: u32, filter: 
     }
     let (w, h) = rgba.dimensions();
     apply_filter(&mut rgba, filter);
-    let mut pixmap = Pixmap::new(w, h).ok_or("image is too large")?;
-    for (dst, src) in pixmap.data_mut().chunks_exact_mut(4).zip(rgba.as_raw().chunks_exact(4)) {
-        let a = src[3] as u16;
-        dst[0] = ((src[0] as u16 * a + 127) / 255) as u8;
-        dst[1] = ((src[1] as u16 * a + 127) / 255) as u8;
-        dst[2] = ((src[2] as u16 * a + 127) / 255) as u8;
-        dst[3] = src[3];
+    let mut pixels = rgba.into_raw();
+    // Crops and the RGB-only filters preserve opaque alpha. Check the actual
+    // pixels after resampling or when the source has an alpha channel.
+    let opaque = (known_opaque && shrink >= 1.0) || pixels.chunks_exact(4).all(|p| p[3] == 255);
+    if !opaque {
+        for p in pixels.chunks_exact_mut(4) {
+            let a = p[3] as u16;
+            for c in &mut p[..3] {
+                *c = ((*c as u16 * a + 127) / 255) as u8;
+            }
+        }
     }
-    Ok(pixmap)
+    let size = tiny_skia::IntSize::from_wh(w, h).ok_or("image is too large")?;
+    Pixmap::from_vec(pixels, size).ok_or_else(|| "image is too large".to_string())
 }
 
 /// Gives straight RGBA pixels a filter's look.

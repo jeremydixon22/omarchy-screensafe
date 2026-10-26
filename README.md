@@ -26,7 +26,7 @@ A screensaver in ScreenSafe is a **pack**: a folder with a `screensafe.toml` and
 - **Settings without code.** Packs can offer a speed, a density or a picture; change them in the panel and watch the pack update live.
 - **Made to be safe.** A sandboxed renderer, a checked format, and a flash limit no pack can get past.
 
-**0.5.0 development build:** this local version adds the trusted overlay and bounded Videos playback. Videos import is described in [the prototype notes](docs/VIDEO-PROTOTYPE.md). These local development binaries have not yet received CI provenance attestations.
+**0.5.0 development build:** this local version adds the trusted overlay, bounded Videos playback, and opt-in prepared playback. Videos import is described in [the prototype notes](docs/VIDEO-PROTOTYPE.md). These local development binaries have not yet received CI provenance attestations.
 
 ## The packs
 
@@ -57,7 +57,8 @@ Click the shield in the bar.
 
 | | |
 |---|---|
-| **Overlay tab** | Optional clock, date, battery, CPU and memory over any pack. The position grid stays pinned while other options scroll. Choose one of nine positions, size, opacity and colors; slow drift is on by default. System readings are off until selected. Use Preview to try the result. |
+| **Settings → Overlay** | Optional clock, date, battery, CPU and memory over any pack. The position grid stays pinned while other options scroll. Choose one of nine positions, size, opacity and colors; slow drift is on by default. System readings are off until selected. Use Preview to try the result. |
+| **Settings → Performance** | Prepare a short loop of a supported screensaver on external power, then reuse it to reduce runtime work. Off by default; use on battery only or all the time, choose a storage limit, cancel preparation, or clear loops. Prepared loops repeat a segment. Clocks, Photos, Videos, the overlay, and unsupported displays use normal playback. |
 | **Enable** | Show ScreenSafe instead of Omarchy's screensaver when you're idle. Right-clicking the shield does the same. |
 | **After … idle** | How long you're idle before it shows. It follows Omarchy's screensaver time until you choose your own with **−** and **+** (or the arrow keys), from 1 minute to an hour; step back below 1 minute to follow Omarchy's again. Point at it to see whose time it is and when Omarchy locks. |
 | **Pack** | Which screensaver to show. **Automatic** shows the current theme's pack if it has one, and the Omarchy pack otherwise. Every entry shows its thumbnail and description in a stable card. Press `f` or click ☆ to make it a favorite, listed first. |
@@ -128,7 +129,7 @@ To share it, see [Community packs](docs/COMMUNITY.md).
 
 - **Packs are data.** The format has no way to run a program, open a file outside its own folder, reach the network or loop without end. Everything a pack asks for is checked and compiled before it's shown, and every per-frame cost is bounded.
 - **The renderer confines itself.** Before reading a pack it can only read the packs, theme, art and photos folder it was given; after loading it, it gives up new file access. Photo files opened while loading remain readable. It can never reach the network or start programs. This uses Linux's Landlock, and the renderer refuses to read a pack if the kernel can't confine it.
-- **Flashing is limited.** The renderer measures every frame and won't show more than three large-area flashes a second, the WCAG 2.2 limit for photosensitivity, whatever a pack asks for.
+- **Flashing is limited.** Normal playback measures every combined frame. Prepared playback checks the final GPU output, repeat seam and black entry/exit before issuing a local approval bound to the video's SHA-256 and exact playback profile. A missing, changed or incompatible approval uses normal playback. See [the limits and trust assumptions](SECURITY.md#prepared-playback-05-development).
 - **Stalled frames are stopped.** If drawing a frame stalls for about five seconds, the renderer exits and ScreenSafe falls back to the built-in pack.
 - **The binaries are checkable.** Both renderers are built reproducibly from [`renderer/`](renderer), and release CI attests each one; see [how to rebuild and compare them](docs/BINARY-PROVENANCE.md).
 
@@ -140,16 +141,16 @@ To share it, see [Community packs](docs/COMMUNITY.md).
 omarchy plugin remove io.github.jeremydixon22.screensafe
 ```
 
-Removing the plugin switches Omarchy's screensaver back on if ScreenSafe had switched it off. ScreenSafe keeps a small record in `~/.local/state/screensafe/` while it holds Omarchy's screensaver off; you can delete that folder afterwards. Your own packs in `~/.config/omarchy/screensafe/` are left in place.
+Removing the plugin switches Omarchy's screensaver back on if ScreenSafe had switched it off. ScreenSafe keeps a small record in `~/.local/state/screensafe/` while it holds Omarchy's screensaver off; you can delete that folder afterwards. Your own packs in `~/.config/omarchy/screensafe/` are left in place. Prepared loops are private, reproducible files in `~/.cache/omarchy/screensafe/prepared/`; clear them in Performance or remove that cache directory after uninstalling.
 
 ## What's inside
 
-- `Service.qml`, `Panel.qml` and `ShieldMark.qml`: the plugin. They start only ScreenSafe's own renderer and Omarchy's `omarchy-shell` (to ask whether the session is locked).
+- `Service.qml`, `Panel.qml` and `ShieldMark.qml`: the plugin. Normal playback starts ScreenSafe's renderer and Omarchy's `omarchy-shell`. Optional prepared playback also uses the trusted local controller and a confined codec/GPU worker.
 - `bin/screensafe-x86_64` and `bin/screensafe-aarch64`: the renderer, static Linux executables built reproducibly from [`renderer/`](renderer). The plugin runs the one for your machine.
 - `packs/`: the built-in packs, and `tools/`: the generators for the larger ones.
 - `skills/screensafe-packs/`: instructions for coding agents that make packs. The plugin doesn't install or read them.
 
-The renderer embeds [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) (SIL Open Font License 1.1) and uses the Rust libraries listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). It needs nothing else at run time.
+The renderer embeds [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) (SIL Open Font License 1.1) and uses the Rust libraries listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Normal playback needs nothing else at run time. Optional prepared playback also needs Python 3, Bubblewrap, FFmpeg, libmpv, EGL/OpenGL, GBM and libseccomp. The worker connects to one render node; it has no compositor socket, home directory or network access.
 
 The expression language borrows ideas and a few function names from MilkDrop's preset equations, but no code; [Expressions](docs/EXPRESSIONS.md#compared-with-milkdrop) describes how they differ.
 
@@ -158,3 +159,20 @@ The expression language borrows ideas and a few function names from MilkDrop's p
 MIT; see [LICENSE](LICENSE).
 
 Local development: [Videos prototype and import instructions](docs/VIDEO-PROTOTYPE.md).
+
+<details>
+<summary>Prepared playback development build</summary>
+
+The native worker is optional and built for the target system's libraries. Build the Rust renderers with `scripts/build-release`, then build the worker on that system (C compiler, pkg-config and the corresponding development headers required):
+
+```sh
+scripts/build-cache-worker "bin/screensafe-cache-$(uname -m)"
+```
+
+This development path supports a single, unrotated display up to 4096 × 2160 and 64 Hz when its driver exports linear XRGB buffers. Preparation checks both software and hardware-copy decoding and uses a passing profile; direct hardware interop is excluded. Updates to relevant binaries, graphics/codec libraries, kernel, theme, settings or display invalidate reuse. Previews stay live.
+
+Prepared playback can reduce power for demanding effects. Simple screensavers may cost less to draw live than to decode and present as video; preparation is manual so you can choose which packs use this path. The prepared segment repeats, while live playback can continue generating new variations.
+
+The worker links system libraries. [mpv defaults to GPLv2+ and can be built in an LGPL configuration](https://github.com/mpv-player/mpv/blob/v0.41.0/Copyright); linked libraries also affect the resulting binary's license. Worker binary distribution must include its applicable notices and corresponding source. The project's own source remains MIT. Native-worker release packaging/provenance is separate from the static Rust renderer's build; these development artifacts are not release-attested.
+
+</details>

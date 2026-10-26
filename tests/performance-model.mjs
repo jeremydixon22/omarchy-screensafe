@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+const model = vm.createContext({});
+vm.runInContext(fs.readFileSync(new URL('../PerformanceModel.js', import.meta.url), 'utf8'), model);
+const plain = x => JSON.parse(JSON.stringify(x));
+assert.deepEqual(plain(model.values({})), { enabled: 0, batteryOnly: 1, maxMiB: 512 });
+assert.equal(model.values({ enabled: '1' }).enabled, 0);
+assert.equal(model.values(JSON.parse('{"__proto__":{"enabled":1}}')).enabled, 0);
+assert.equal(model.values({ maxMiB: Infinity }).maxMiB, 512);
+assert.equal(model.values({ maxMiB: -1 }).maxMiB, 512);
+assert.deepEqual(plain(model.changed({ enabled: 1 }, 'unknown', 42)), { enabled: 1, batteryOnly: 1, maxMiB: 512 });
+assert.equal(model.changed({}, 'batteryOnly', 0).batteryOnly, 0);
+for (const d of model.declarations) if (d.kind === 'choice') assert.equal(d.choices.length, d.values.length);
+console.log('Performance defaults and preference validation passed.');

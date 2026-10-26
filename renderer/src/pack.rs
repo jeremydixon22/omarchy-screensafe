@@ -1,6 +1,7 @@
 //! Loading a pack: reading `screensafe.toml` and its files, checking every value, and compiling every expression.
 //! Nothing in a pack runs as code; anything this module doesn't recognize is refused rather than ignored.
 
+use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::path::Path;
 
@@ -489,6 +490,8 @@ pub struct Pack {
     /// A digest of everything the pack was made from: its manifest and files, the theme's colors and backgrounds it
     /// uses, the art it shows, and this renderer's version. The panel keeps a pack's thumbnail until it changes.
     pub fingerprint: u64,
+    pub cache_digest: [u8; 32],
+    pub cache_clock: bool,
 }
 
 /// One of the viewer's photos, held open so it can be read once the renderer can open nothing more.
@@ -528,6 +531,8 @@ impl Pack {
 /// What a pack may read besides its own directory.
 #[derive(Default)]
 pub struct Environment<'a> {
+    /// Strong source identity is needed only for preparation, not ordinary loads.
+    pub cache_identity: bool,
     pub palette: Option<&'a Palette>,
     /// The current theme's directory, for `source = "theme-backgrounds"`.
     pub theme: Option<&'a Path>,
@@ -709,6 +714,7 @@ impl<'a> Fields<'a> {
 // Compiling
 
 struct Loader<'a> {
+    cache_clock: std::cell::Cell<bool>,
     dir: Dir,
     env: &'a Environment<'a>,
     palette: Palette,
@@ -771,9 +777,18 @@ impl Loader<'_> {
         Ok(bytes)
     }
 
+    fn track_cache(&self, program: &Program) {
+        let b = self.builtins;
+        let clock = [b.hour, b.minute, b.second, b.clock, b.day, b.month, b.year, b.weekday, b.utc_offset, b.utc_clock];
+        if program.inputs().any(|slot| clock.contains(&slot)) {
+            self.cache_clock.set(true);
+        }
+    }
+
     fn compile(&self, fields: &Fields, key: &str, src: &str, scope: &Scope, ty: Ty, budget: &mut Budget) -> Result<Program> {
         match expr::compile(src, scope, ty) {
             Ok(p) => {
+                self.track_cache(&p);
                 budget.cost += p.cost();
                 Ok(p)
             }
@@ -831,6 +846,7 @@ impl Loader<'_> {
                 Ok(p) => p,
                 Err(e) => return f.err(key, format!("{name}: {e}\n    {src}{}", caret(e.at))),
             };
+            self.track_cache(&program);
             budget.cost += program.cost();
             let slot = self.alloc(if program.ty == Ty::Color { 4 } else { 1 })?;
             scope.bind(name, slot, program.ty);
@@ -864,6 +880,9 @@ impl Loader<'_> {
         let visible = match f.expr_source("visible")? {
             Some(src) => {
                 let (cost, gates) = expr::compile_predicates(&src, &scope).or_else(|e| f.err("visible", format!("{e}\n    {src}{}", caret(e.at))))?;
+                for gate in &gates {
+                    self.track_cache(gate);
+                }
                 budget.cost += cost;
                 gates
             }
@@ -1215,6 +1234,7 @@ impl Loader<'_> {
                 if !literal.is_empty() {
                     segments.push(Segment::Literal(std::mem::take(&mut literal)));
                 }
+                self.cache_clock.set(true);
                 segments.push(Segment::Clock(*word));
                 rest = &brace[end + 1..];
                 continue;
@@ -1656,15 +1676,21 @@ pub fn load(path: &Path, env: &Environment) -> Result<Pack> {
     let bytes = dir.read(MANIFEST, MANIFEST_LIMIT).map_err(|e| LoadError(e.0))?;
     let text = String::from_utf8(bytes).or_else(|_| fail(format!("{MANIFEST} must be UTF-8 text")))?;
     let mut pack = load_manifest(dir, &text, env)?;
-    pack.fingerprint = fingerprint(&text, &pack, env);
+    let (fast, strong) = fingerprint(&text, &pack, env);
+    pack.fingerprint = fast;
+    pack.cache_digest = strong;
     Ok(pack)
 }
 
 /// FNV-1a, 64 bits: fast, and good enough to tell that something changed. It isn't a security measure.
-struct Fnv(u64);
+struct Fnv(u64, Option<Sha256>);
 
 impl Fnv {
     fn bytes(&mut self, bytes: &[u8]) {
+        if let Some(hash) = &mut self.1 {
+            hash.update((bytes.len() as u64).to_le_bytes());
+            hash.update(bytes);
+        }
         for &b in bytes {
             self.0 = (self.0 ^ b as u64).wrapping_mul(0x0100_0000_01b3);
         }
@@ -1675,8 +1701,8 @@ impl Fnv {
     }
 }
 
-fn fingerprint(manifest: &str, pack: &Pack, env: &Environment) -> u64 {
-    let mut h = Fnv(0xcbf2_9ce4_8422_2325);
+fn fingerprint(manifest: &str, pack: &Pack, env: &Environment) -> (u64, [u8; 32]) {
+    let mut h = Fnv(0xcbf2_9ce4_8422_2325, env.cache_identity.then(Sha256::new));
     h.bytes(env!("CARGO_PKG_VERSION").as_bytes());
     h.bytes(manifest.as_bytes());
     for image in &pack.images {
@@ -1715,6 +1741,13 @@ fn fingerprint(manifest: &str, pack: &Pack, env: &Environment) -> u64 {
             h.bytes(row.iter().collect::<String>().as_bytes());
         }
     }
+    if let Some(hash) = &mut h.1 {
+        hash.update(b"resolved initial values");
+        hash.update((pack.initial.len() as u64).to_le_bytes());
+        for value in &pack.initial {
+            hash.update(value.to_bits().to_le_bytes());
+        }
+    }
     match env.palette {
         None => h.bytes(b"default palette"),
         Some(palette) => {
@@ -1727,7 +1760,7 @@ fn fingerprint(manifest: &str, pack: &Pack, env: &Environment) -> u64 {
             h.bytes(if palette.light { b"light" } else { b"dark" });
         }
     }
-    h.0
+    (h.0, h.1.map(|hash| hash.finalize().into()).unwrap_or([0; 32]))
 }
 
 fn load_manifest(dir: Dir, text: &str, env: &Environment) -> Result<Pack> {
@@ -1798,6 +1831,7 @@ fn load_manifest(dir: Dir, text: &str, env: &Environment) -> Result<Pack> {
         return f.err("format", needs_2("source = \"videos\""));
     }
     let mut loader = Loader {
+        cache_clock: std::cell::Cell::new(false),
         dir,
         env,
         palette: palette.clone(),
@@ -2093,6 +2127,8 @@ fn load_manifest(dir: Dir, text: &str, env: &Environment) -> Result<Pack> {
         uses_videos,
         warnings: loader.warnings,
         fingerprint: 0,
+        cache_digest: [0; 32],
+        cache_clock: loader.cache_clock.get(),
     })
 }
 
@@ -2591,6 +2627,7 @@ colors = ["accent", "foreground"]
         std::fs::write(theme.join("backgrounds/1.png"), crate::raster::tests::tiny_png()).unwrap();
         std::fs::write(theme.join("backgrounds/notes.md"), "x").unwrap();
         let env = Environment {
+            cache_identity: false,
             palette: None,
             theme: Some(&theme),
             branding: Some(&art),
@@ -2611,6 +2648,7 @@ colors = ["accent", "foreground"]
         std::fs::write(&logo, "LOGO").unwrap();
         let missing = dir.join("missing.txt");
         let env = Environment {
+            cache_identity: false,
             palette: None,
             theme: None,
             branding: Some(&missing),

@@ -27,6 +27,10 @@ use wayland_protocols::wp::fractional_scale::v1::client::{
     wp_fractional_scale_manager_v1::WpFractionalScaleManagerV1,
     wp_fractional_scale_v1::{self, WpFractionalScaleV1},
 };
+use wayland_protocols::wp::linux_dmabuf::zv1::client::{
+    zwp_linux_buffer_params_v1::{self, ZwpLinuxBufferParamsV1},
+    zwp_linux_dmabuf_v1::{self, ZwpLinuxDmabufV1},
+};
 use wayland_protocols::wp::viewporter::client::{wp_viewport::WpViewport, wp_viewporter::WpViewporter};
 use wayland_protocols_wlr::layer_shell::v1::client::{
     zwlr_layer_shell_v1::{Layer, ZwlrLayerShellV1},
@@ -142,6 +146,8 @@ struct Output {
     surface: Option<Surface>,
     /// The output's own name ("eDP-1"), once the compositor has said it.
     label: Option<String>,
+    refresh: i32,
+    normal_transform: bool,
 }
 
 struct Globals {
@@ -150,9 +156,11 @@ struct Globals {
     layer_shell: ZwlrLayerShellV1,
     viewporter: Option<WpViewporter>,
     fractional: Option<WpFractionalScaleManagerV1>,
+    dmabuf: Option<ZwpLinuxDmabufV1>,
 }
 
 struct State {
+    linear_xrgb: bool,
     globals: Globals,
     overlay: Option<crate::overlay::Overlay>,
     outputs: Vec<Output>,
@@ -172,7 +180,7 @@ impl State {
     fn add_output(&mut self, registry: &WlRegistry, name: u32, version: u32, qh: &QueueHandle<State>) {
         let wl = registry.bind::<WlOutput, _, _>(name, version.clamp(2, 4), qh, name);
         let surface = if self.region.is_some() { None } else { Some(self.make_surface(&wl, name, qh)) };
-        self.outputs.push(Output { name, wl, scale: 1, surface, label: None });
+        self.outputs.push(Output { name, wl, scale: 1, surface, label: None, refresh: 0, normal_transform: true });
     }
 
     fn make_surface(&self, output: &WlOutput, name: u32, qh: &QueueHandle<State>) -> Surface {
@@ -473,9 +481,11 @@ fn connect_to(region: Option<Region>) -> Result<Display, String> {
     let layer_shell = globals.bind::<ZwlrLayerShellV1, _, _>(&qh, 1..=4, ()).map_err(|_| "the compositor doesn't offer layer surfaces (wlr-layer-shell)")?;
     let viewporter = globals.bind::<WpViewporter, _, _>(&qh, 1..=1, ()).ok();
     let fractional = globals.bind::<WpFractionalScaleManagerV1, _, _>(&qh, 1..=1, ()).ok();
+    let dmabuf = globals.bind::<ZwpLinuxDmabufV1, _, _>(&qh, 3..=3, ()).ok();
     let mut state = State {
+        linear_xrgb: false,
         overlay: None,
-        globals: Globals { compositor, shm, layer_shell, viewporter, fractional },
+        globals: Globals { compositor, shm, layer_shell, viewporter, fractional, dmabuf },
         outputs: Vec::new(),
         xbgr: false,
         pointer: None,
@@ -512,6 +522,138 @@ fn connect_to(region: Option<Region>) -> Result<Display, String> {
 pub static DRAWS: AtomicU64 = AtomicU64::new(0);
 
 impl Display {
+    /// Presents one approved immutable loop. The worker has no Wayland socket;
+    /// only this confined Rust process imports its three fixed linear buffers.
+    /// There is one frame in flight, no catch-up, and no live composition.
+    pub fn prepared(mut self, size: (u32, u32), frames: u32, fps: u32, limit: Option<Duration>) -> Result<&'static str, String> {
+        use crate::prepared::{receive, request, MAGIC, XRGB};
+        if self.state.outputs.len() != 1 || !self.state.linear_xrgb {
+            return Err("prepared display format unavailable".into());
+        }
+        let dmabuf = self.state.globals.dmabuf.clone().ok_or("prepared buffers unavailable")?;
+        let qh = self.queue.handle();
+        let input = std::io::stdin();
+        let started = Instant::now();
+        self.state.started = started;
+        let mut expected = 0;
+        let mut outstanding: Option<(u32, usize, Instant)> = None;
+        let mut ready: Option<(u32, usize)> = None;
+        let mut next = started;
+        loop {
+            self.queue.dispatch_pending(&mut self.state).map_err(|e| format!("Wayland error: {e}"))?;
+            if let Some(why) = self.state.dismissed {
+                return Ok(why);
+            }
+            if limit.is_some_and(|d| started.elapsed() >= d) {
+                return Ok("time limit");
+            }
+            if self.state.outputs.len() != 1 {
+                return Err("prepared output changed".into());
+            }
+            let output = &mut self.state.outputs[0];
+            if !output.normal_transform || !(1..=64000).contains(&output.refresh) {
+                return Err("prepared display cadence changed".into());
+            }
+            let Some(s) = output.surface.as_mut() else {
+                return Ok("no screens left");
+            };
+            if s.configured {
+                let scale = if s.scale120 > 0 { s.scale120 } else { (s.integer_scale.max(output.scale).clamp(1, 8) * 120) as u32 };
+                let actual = (((s.logical.0 as u64 * scale as u64 + 60) / 120) as u32, ((s.logical.1 as u64 * scale as u64 + 60) / 120) as u32);
+                if actual != size || s.viewport.is_none() {
+                    return Err("prepared output size changed".into());
+                }
+            }
+            // Bounded work per iteration; a malformed/flooded channel cannot
+            // starve keyboard, pointer or compositor events.
+            for _ in 0..4 {
+                let Some(mut packet) = receive()? else { break };
+                if packet.words == [MAGIC, 4, 0, 0] && packet.fds.is_empty() {
+                    return Ok("asked to stop");
+                }
+                if s.buffers.len() < 3 {
+                    let w = &packet.words;
+                    let index = s.buffers.len();
+                    if packet.fds.len() != 1 {
+                        return Err("invalid prepared buffer layout".into());
+                    }
+                    let fd = packet.fds.pop().unwrap();
+                    let stride = crate::prepared::buffer_layout(w, &fd, index, size)?;
+                    let meta = rustix::fs::fstat(&fd).map_err(|e| format!("can't inspect GPU buffer: {e}"))?;
+                    for previous in &s.buffers {
+                        let other = rustix::fs::fstat(&previous.memfd).map_err(|e| format!("can't inspect buffer identity: {e}"))?;
+                        if (meta.st_dev, meta.st_ino) == (other.st_dev, other.st_ino) {
+                            return Err("prepared pool aliases an existing buffer".into());
+                        }
+                    }
+                    let params = dmabuf.create_params(&qh, ());
+                    params.add(fd.as_fd(), 0, 0, stride, 0, 0);
+                    let wl = params.create_immed(size.0 as i32, size.1 as i32, XRGB, zwp_linux_buffer_params_v1::Flags::empty(), &qh, (output.name, index));
+                    params.destroy();
+                    s.buffers.push(Buffer { memfd: fd, wl, busy: false });
+                } else {
+                    let Some((frame, slot, _)) = outstanding else {
+                        return Err("unsolicited prepared frame".into());
+                    };
+                    if packet.words != [MAGIC, 3, frame, slot as u32] || !packet.fds.is_empty() || ready.is_some() {
+                        return Err("prepared frame sequence mismatch".into());
+                    }
+                    outstanding = None;
+                    ready = Some((frame, slot));
+                }
+            }
+            if s.buffers.len() < 3 && started.elapsed() > Duration::from_secs(5) {
+                return Err("prepared buffer setup timed out".into());
+            }
+            if outstanding.is_some_and(|(_, _, at)| at.elapsed() > Duration::from_secs(5)) {
+                return Err("prepared frame timed out".into());
+            }
+            let now = Instant::now();
+            if ready.is_some() && s.configured && !s.waiting && now >= next {
+                let (frame, slot) = ready.take().unwrap();
+                if frame != expected || s.buffers[slot].busy {
+                    return Err("prepared ownership mismatch".into());
+                }
+                let buffer = &mut s.buffers[slot];
+                buffer.busy = true;
+                s.viewport.as_ref().unwrap().set_destination(s.logical.0 as i32, s.logical.1 as i32);
+                s.wl.set_buffer_scale(1);
+                s.wl.attach(Some(&buffer.wl), 0, 0);
+                s.wl.damage_buffer(0, 0, size.0 as i32, size.1 as i32);
+                s.wl.frame(&qh, output.name);
+                s.wl.commit();
+                s.waiting = true;
+                expected = (expected + 1) % frames;
+                // A delayed frame slows playback, never compresses the tested
+                // sequence into a burst to catch up with a wall clock.
+                next = now + Duration::from_secs_f64(1.0 / fps as f64);
+            }
+            if s.buffers.len() == 3 && outstanding.is_none() && ready.is_none() {
+                if let Some(slot) = s.buffers.iter().position(|b| !b.busy) {
+                    request(expected, slot)?;
+                    outstanding = Some((expected, slot, Instant::now()));
+                }
+            }
+            let wait = if ready.is_some() && !s.waiting { next.saturating_duration_since(Instant::now()) } else { Duration::from_millis(250) }
+                .min(Duration::from_millis(250));
+            self.queue.flush().map_err(|e| format!("Wayland error: {e}"))?;
+            if let Some(guard) = self.conn.prepare_read() {
+                let fd = guard.connection_fd();
+                let mut fds = [rustix::event::PollFd::new(&fd, rustix::event::PollFlags::IN), rustix::event::PollFd::new(&input, rustix::event::PollFlags::IN)];
+                let timeout = rustix::event::Timespec { tv_sec: 0, tv_nsec: wait.as_nanos() as i64 };
+                match rustix::event::poll(&mut fds, Some(&timeout)) {
+                    Ok(_) => {
+                        if fds[0].revents().contains(rustix::event::PollFlags::IN) {
+                            guard.read().map_err(|e| format!("Wayland error: {e}"))?;
+                        }
+                    }
+                    Err(rustix::io::Errno::INTR) => {}
+                    Err(e) => return Err(format!("prepared poll failed: {e}")),
+                }
+            }
+        }
+    }
+
     /// The pixel format frames are sent in.
     pub fn format(&self) -> &'static str {
         if self.state.xbgr {
@@ -792,12 +934,25 @@ impl Dispatch<WlOutput, u32> for State {
     fn event(state: &mut Self, _: &WlOutput, event: wl_output::Event, name: &u32, _: &Connection, _: &QueueHandle<Self>) {
         let Some(o) = state.outputs.iter_mut().find(|o| o.name == *name) else { return };
         match event {
+            wl_output::Event::Mode { flags: WEnum::Value(flags), refresh, .. } if flags.contains(wl_output::Mode::Current) => o.refresh = refresh,
+            wl_output::Event::Geometry { transform, .. } => o.normal_transform = transform == WEnum::Value(wl_output::Transform::Normal),
             wl_output::Event::Scale { factor } => o.scale = factor,
             wl_output::Event::Name { name } => o.label = Some(name.chars().take(64).collect()),
             _ => {}
         }
     }
 }
+
+impl Dispatch<ZwpLinuxDmabufV1, ()> for State {
+    fn event(state: &mut Self, _: &ZwpLinuxDmabufV1, event: zwp_linux_dmabuf_v1::Event, _: &(), _: &Connection, _: &QueueHandle<Self>) {
+        if let zwp_linux_dmabuf_v1::Event::Modifier { format, modifier_hi: 0, modifier_lo: 0 } = event {
+            if format == crate::prepared::XRGB {
+                state.linear_xrgb = true;
+            }
+        }
+    }
+}
+delegate_noop!(State: ignore ZwpLinuxBufferParamsV1);
 
 impl Dispatch<WlSurface, u32> for State {
     fn event(state: &mut Self, _: &WlSurface, event: wl_surface::Event, name: &u32, _: &Connection, _: &QueueHandle<Self>) {
