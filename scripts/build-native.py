@@ -61,11 +61,16 @@ def build(output, cache):
     archive = download(cache, compiler['tarball'], compiler['shasum'])
     upstream = download(cache, lock['bubblewrap']['url'], lock['bubblewrap']['sha256'])
     vendor = ROOT/'vendor'/('bubblewrap-'+lock['bubblewrap']['version'])
-    # Verify that the shipped upstream source is exactly the hashed release.
+    # Upstream license aliases are regular copies for Omarchy's no-symlink
+    # installation rule. Verify their resolved bytes as well as all source.
     with tarfile.open(upstream) as source:
         for member in source.getmembers():
-            if member.isfile():
+            if member.isfile() or member.issym():
                 relative = Path(member.name).relative_to(vendor.name)
+                if member.issym() and (str(relative) not in {'COPYING.LIB', 'LICENSE'} or member.linkname != 'COPYING'):
+                    raise ValueError('unexpected Bubblewrap source symlink')
+                if (vendor/relative).is_symlink():
+                    raise ValueError('vendored Bubblewrap files must be regular copies')
                 if source.extractfile(member).read() != (vendor/relative).read_bytes():
                     raise ValueError('vendored Bubblewrap source differs from pinned release')
     output.mkdir(parents=True, exist_ok=True)

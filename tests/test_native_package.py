@@ -1,6 +1,7 @@
 """Check the delivered architecture, ABI surface and source/binary receipt."""
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import struct
@@ -11,6 +12,16 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class NativePackageTests(unittest.TestCase):
+    def test_installation_sources_have_no_symbolic_links(self):
+        # Omarchy rejects links anywhere in an installed plugin, including
+        # vendor license aliases. Git internals and local builds are not shipped.
+        excluded = {ROOT/'.git', ROOT/'renderer/target'}
+        for directory, dirs, files in os.walk(ROOT, followlinks=False):
+            base = Path(directory)
+            dirs[:] = [name for name in dirs if base/name not in excluded]
+            for name in dirs + files:
+                self.assertFalse((base/name).is_symlink(), str((base/name).relative_to(ROOT)))
+
     def test_receipt_matches_all_six_binaries_and_build_sources(self):
         metadata = json.loads((ROOT/'bin/native-build.json').read_text())
         sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()

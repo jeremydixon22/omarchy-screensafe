@@ -26,7 +26,7 @@
     }
   },
   "bubblewrap_archive_sha256": "0e85c8702248b8dd64144f594147553650cdd0e4c951690345faace79c217c4d",
-  "build_script_sha256": "8325f32083ade4d6c5160f00fe37d8b64c4db67e77c7dca5452dd63dbb7d91a4",
+  "build_script_sha256": "a399f264660f7e9cd3e2c4957965ccba98dda7a26898120c5a9e682a5dcd90db",
   "glibc_minimum": "2.34",
   "inputs_sha256": "e3186f50482a885a7c7a96acee7b3e6437881438e4963d63f365f5d537251e2d",
   "media_launcher_source_sha256": "aca37c915aab3ed525b02bc14c77a6b16baf6834cbbab154b5c85c28899e758e",
