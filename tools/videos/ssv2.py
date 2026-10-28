@@ -234,7 +234,7 @@ def import_video(source, destination, codec=H264):
                     '-vf',f'scale={width}:{height},setsar=1,fps={FPS}','-frames:v',str(min(job_seconds*FPS,MAX_FRAMES-len(entries)+1)),'-threads','2',
                     '-pix_fmt','yuv420p','-g',str(GOP),'-keyint_min',str(GOP)]
                 if codec == H264:
-                    command += ['-c:v','libx264','-preset','medium','-crf','16','-bf','0','-sc_threshold','0','-x264-params',
+                    command += ['-c:v','libx264','-preset','medium','-tune','fastdecode','-crf','16','-bf','0','-sc_threshold','0','-x264-params',
                         f'keyint={GOP}:min-keyint={GOP}:scenecut=0:bframes=0:repeat-headers=1:aud=1:open-gop=0','-f','h264','pipe:1']
                     splitter = annexb_frames
                 else:

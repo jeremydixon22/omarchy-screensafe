@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local SSVv2 prototype broker: isolated CPU decode, sealed pixel snapshots.
+"""Local SSVv2 prototype broker: isolated CPU decode into renderer-owned pixels.
 
 Run: play_v2.py --renderer /absolute/screensafe -- run --pack ... --videos ...
 This does not install, change preferences or enable the offline-approval player.

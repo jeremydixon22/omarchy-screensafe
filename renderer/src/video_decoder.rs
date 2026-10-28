@@ -1,6 +1,6 @@
 //! Optional prototype-only CPU decoder channel. No codec code or new process
-//! authority in the renderer. Only fully write-sealed, bounded RGBA snapshots
-//! enter the ordinary compositor and its runtime flash guard.
+//! authority in the renderer. Bounded RGBA delivery becomes owned memory before
+//! entering the ordinary compositor and its runtime flash guard.
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::Read;
