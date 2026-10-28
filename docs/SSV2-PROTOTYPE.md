@@ -16,7 +16,7 @@ python3 tools/videos/play_v2.py --renderer "$PWD/bin/screensafe-$(uname -m)" -- 
   run --pack "$PWD/packs/videos" --videos /tmp/ssv2-clips
 ```
 
-The wrapper also supports `render`, `check`, `thumbnail` and `catalog`. It does not wrap `preview` or other commands that already use stdin for their own protocol. No settings or installed plugin files are changed. Do not present this as marketplace-approved functionality or a finalized interchange standard.
+The wrapper also supports `render`, `check`, `thumbnail` and `catalog`. It does not wrap `preview` or other commands that already use stdin for their own protocol. The default delivery streams pixels directly into renderer-owned buffers; `--delivery snapshot` selects the original sealed-snapshot comparison path. No settings or installed plugin files are changed. Do not present this as marketplace-approved functionality or a finalized interchange standard.
 
 ## Encode and validate
 
@@ -49,7 +49,9 @@ A trusted Python broker starts the renderer with a private `SOCK_SEQPACKET` stdi
 
 The broker independently validates the index and uses one active CPU decoder in the existing user/mount/PID/network namespace cage. It receives no home, compositor socket or GPU node. FFmpeg has fixed decoder/demuxer arguments, thread-only process creation, bounded stderr and pipe backpressure. A cold seek decodes at most one GOP; a sequential request normally decodes one new frame. Each request has a five-second decode budget. The decoder is recycled before its normal cumulative CPU usage reaches the hard limit, so long playback does not depend on an unbounded process budget.
 
-Twelve cached RGBA snapshots bound the working set independently of clip length. One additional snapshot can be under construction; the software codec's own reference buffers are separate and resource-limited. Cache entries are memfds sealed against writing, growth and shrinkage, with sealing itself also locked. Rust checks response identity, descriptor count, dimensions, byte length and every required seal, then copies pixels into renderer-owned memory. No worker-writable buffer can change the image after admission.
+The default delivery transfers a private Unix stream descriptor and Rust reads exactly one bounded frame into owned memory under a total five-second deadline. This avoids routing every frame through Python byte buffers and a new memfd. Rust rejects other socket families/types and checks response identity, descriptor count, dimensions and byte length. Twelve raw frames are cached in Rust for neighbor access and crop/tone variants; returned images are separately owned. An internal clip identity prevents cache confusion when descriptors are reused; frame references remain 16-bit.
+
+Skipped neighboring frames can use a bounded sealed-memfd cache in the broker, and `--delivery snapshot` uses that transport for every frame. Rust verifies all write/grow/shrink/seal locks and exact size before reading a snapshot. Both transports finish the owned copy before compositing or guarding. No worker-writable buffer can change the image after admission. Working sets are bounded independently of clip length; codec reference buffers are separate and resource-limited.
 
 The ordinary rasterizer applies crop, tone, curvature, device/Film art and optional overlay. The existing runtime flash guard remains after final composition. This path does **not** use the procedural cache's offline GPU approval or assume that a media hash constrains decoder output. A compromised codec still has its confined syscall/kernel surface; isolation is not a promise that bugs are impossible.
 
@@ -57,7 +59,7 @@ There is no idle broker polling timer: renderer EOF and the parent's pidfd end t
 
 ## Evidence and remaining qualification
 
-Tests cover v1 compatibility, the 16-bit ceiling, malformed indexes, byte-wise stream framing, encoder job/GOP boundaries, a clip longer than five minutes, immutable snapshots, full neighbor/loop access, all six device styles, actual composed-frame flash rejection, and parent-death cleanup.
+Tests cover v1 compatibility, the 16-bit ceiling, malformed indexes, byte-wise stream framing, encoder job/GOP boundaries, a clip longer than five minutes, immutable snapshots, direct/snapshot pixel equality, stream ownership/deadlines, full neighbor/loop access, all six device styles, actual composed-frame flash rejection, and parent-death cleanup.
 
 Earlier laptop power tests already guide the baseline: guarded software H.264 delivery used less package power than hardware decode with CPU readback. Later owned-pixel work also reduced JPEG SSV cost, so the old difference is not a fresh savings claim for this implementation. AV1 was not covered by those power trials. File size, decoder CPU, image quality and watts are distinct measurements; no new battery-runtime percentage is claimed here.
 

@@ -64,6 +64,22 @@ class CompressedVideoTests(unittest.TestCase):
                 self.assertEqual(os.pread(frames.frame(fd,0),160*90*4,0),a)
             finally:frames.close();os.close(fd)
 
+    def test_direct_delivery_matches_snapshot_pixels_across_seeks_and_seams(self):
+        for path in self.clips.values():
+            fd=os.open(path,os.O_RDONLY);reference=play_v2.Frames();direct=play_v2.StreamFrames()
+            try:
+                for n in [0,1,24,25,23,71,0,1,70,71,2,23,24,47,48]:
+                    expected=os.pread(reference.frame(fd,n),160*90*4,0)
+                    delivered=direct.frame(fd,n)
+                    if direct.delivery==0:actual=os.pread(delivered,len(expected),0)
+                    else:
+                        actual=bytearray()
+                        while len(actual)<len(expected):
+                            data=os.read(delivered,len(expected)-len(actual))
+                            self.assertTrue(data);actual.extend(data)
+                    self.assertEqual(actual,expected,n)
+            finally:reference.close();direct.close();os.close(fd)
+
     def test_header_index_and_trailing_data_fail_closed(self):
         valid=self.clips[ssv2.H264].read_bytes()
         with tempfile.TemporaryFile() as output:

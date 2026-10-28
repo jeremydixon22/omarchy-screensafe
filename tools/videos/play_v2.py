@@ -35,21 +35,32 @@ def stamp(fd):
 
 class Decoder:
     """One bounded subprocess, lazily consumed through pipe backpressure."""
-    def __init__(self, fd, info, start):
-        self.next = start
+    def __init__(self, fd, info, start, direct=False, first=None):
+        self.next = start if first is None else first
         codec = 'h264' if info['codec'] == ssv2.H264 else 'libdav1d'
         form = 'h264' if info['codec'] == ssv2.H264 else 'obu'
         offset = info['entries'][start][0]
         command = ['/usr/bin/ffmpeg','-v','error','-xerror','-err_detect','explode','-nostdin','-threads','2','-filter_threads','1',
             '-hwaccel','none','-skip_initial_bytes',str(offset),'-probesize','32','-analyzeduration','1','-fpsprobesize','0',
             '-f',form,'-c:v',codec,'-r',str(info['fps']),'-protocol_whitelist','file','-i','/input.mp4',
-            '-map','0:v:0','-an','-sn','-dn','-threads','2','-vf',f"scale={info['width']}:{info['height']},format=rgba",
+            '-map','0:v:0','-an','-sn','-dn','-threads','2','-vf',
+            (f'select=gte(n\\,{first-start}),' if first is not None else '')+f"scale={info['width']}:{info['height']},format=rgba",
             '-frames:v',str(info['frames']-start),'-fps_mode','passthrough','-f','rawvideo','-flush_packets','1','pipe:1']
-        with ssv2.media.media_process_filter() as policy:
-            self.proc = subprocess.Popen([ssv2.media.media_launcher()]+ssv2.media.sandbox(fd,command,policy),
-                pass_fds=(fd,policy),stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,start_new_session=True)
+        self.output=None
+        if direct:
+            self.output,writer=socket.socketpair(socket.AF_UNIX,socket.SOCK_STREAM)
+        else:writer=subprocess.PIPE
+        try:
+            with ssv2.media.media_process_filter() as policy:
+                self.proc = subprocess.Popen([ssv2.media.media_launcher()]+ssv2.media.sandbox(fd,command,policy),
+                    pass_fds=(fd,policy),stdin=subprocess.DEVNULL,stdout=writer,stderr=subprocess.PIPE,start_new_session=True)
+        except BaseException:
+            if direct:self.output.close();writer.close()
+            raise
+        if direct:writer.close()
+        else:self.output=self.proc.stdout
         self.selector=selectors.DefaultSelector()
-        self.selector.register(self.proc.stdout,selectors.EVENT_READ,'out')
+        self.selector.register(self.output,selectors.EVENT_READ,'out')
         self.selector.register(self.proc.stderr,selectors.EVENT_READ,'err')
         self.pending=bytearray();self.errors=bytearray()
         self.frame_bytes=info['width']*info['height']*4
@@ -91,7 +102,7 @@ class Decoder:
             self.proc.terminate()
             try:self.proc.wait(timeout=1)
             except subprocess.TimeoutExpired:self.proc.kill();self.proc.wait(timeout=1)
-        self.proc.stdout.close();self.proc.stderr.close()
+        self.output.close();self.proc.stderr.close()
 
 
 class Frames:
@@ -99,6 +110,7 @@ class Frames:
     def __init__(self):
         self.fd=None;self.info=None;self.identity=None;self.decoder=None
         self.cache=OrderedDict();self.starts=0;self.decodes=0;self.hits=0
+        self.delivery=0
 
     def close(self):
         if self.decoder is not None:self.decoder.close();self.decoder=None
@@ -107,7 +119,7 @@ class Frames:
         if self.fd is not None:os.close(self.fd);self.fd=None
         self.identity=None
 
-    def frame(self, fd, target):
+    def activate(self, fd, target):
         if fcntl.fcntl(fd,fcntl.F_GETFL)&os.O_ACCMODE != os.O_RDONLY:
             raise ValueError('compressed input descriptor must be read-only')
         identity=stamp(fd)
@@ -117,6 +129,24 @@ class Frames:
             self.fd=os.dup(fd);self.identity=identity
         if not 0<=target<self.info['frames']:
             raise ValueError('compressed frame index out of range')
+        return identity
+
+    def remember(self,index,pixels):
+        snapshot=os.memfd_create('screensafe-video-frame',os.MFD_CLOEXEC|os.MFD_ALLOW_SEALING)
+        try:
+            at=0
+            while at<len(pixels):
+                written=os.write(snapshot,pixels[at:])
+                if written<=0:raise OSError('short pixel snapshot write')
+                at+=written
+            fcntl.fcntl(snapshot,fcntl.F_ADD_SEALS,SEALS)
+        except BaseException:os.close(snapshot);raise
+        if index in self.cache:os.close(self.cache.pop(index))
+        self.cache[index]=snapshot
+        while len(self.cache)>CACHE_FRAMES:os.close(self.cache.popitem(last=False)[1])
+
+    def frame(self, fd, target):
+        identity=self.activate(fd,target)
         if target in self.cache:
             self.hits+=1;self.cache.move_to_end(target)
             return self.cache[target]
@@ -129,24 +159,42 @@ class Frames:
         # playback reuses the same process and decodes one new frame per request.
         while self.decoder.next<=target:
             index=self.decoder.next;pixels=self.decoder.read(deadline);self.decodes+=1
-            snapshot=os.memfd_create('screensafe-video-frame',os.MFD_CLOEXEC|os.MFD_ALLOW_SEALING)
-            try:
-                at=0
-                while at<len(pixels):
-                    written=os.write(snapshot,pixels[at:])
-                    if written<=0:raise OSError('short pixel snapshot write')
-                    at+=written
-                fcntl.fcntl(snapshot,fcntl.F_ADD_SEALS,SEALS)
-            except BaseException:os.close(snapshot);raise
-            if index in self.cache:os.close(self.cache.pop(index))
-            self.cache[index]=snapshot
-            while len(self.cache)>CACHE_FRAMES:os.close(self.cache.popitem(last=False)[1])
+            self.remember(index,pixels)
         if stamp(self.fd)!=identity:raise ValueError('compressed video changed during decoding')
         return self.cache[target]
 
 
-def serve(channel, renderer):
-    frames=Frames();requests=0;failures=0
+class StreamFrames(Frames):
+    """Steady frames go straight from the cage to renderer-owned memory.
+
+    Only skipped neighboring frames need snapshots. A renderer-side raw cache
+    covers already delivered frames and variations in crop/tone.
+    """
+    def frame(self,fd,target):
+        identity=self.activate(fd,target)
+        for index in list(self.cache):
+            distance=min((target-index)%self.info['frames'],(index-target)%self.info['frames'])
+            if distance>CACHE_FRAMES:os.close(self.cache.pop(index))
+        if target in self.cache:
+            self.hits+=1;self.delivery=0;self.cache.move_to_end(target)
+            return self.cache[target]
+        if (self.decoder is None or target<self.decoder.next or target-self.decoder.next>=ssv2.GOP
+                or self.decoder.cpu_seconds()>100):
+            if self.decoder is not None:self.decoder.close()
+            base=target//ssv2.GOP*ssv2.GOP
+            self.decoder=Decoder(self.fd,self.info,base,direct=True,first=target)
+            self.decodes+=target-base;self.starts+=1
+        deadline=time.monotonic()+FRAME_DEADLINE
+        while self.decoder.next<target:
+            index=self.decoder.next;pixels=self.decoder.read(deadline);self.decodes+=1
+            if target-index<=8:self.remember(index,pixels)
+        if stamp(self.fd)!=identity:raise ValueError('compressed video changed before delivery')
+        self.decoder.next+=1;self.decodes+=1;self.delivery=1
+        return self.decoder.output.fileno()
+
+
+def serve(channel, renderer, delivery='pipe'):
+    frames=StreamFrames() if delivery=='pipe' else Frames();requests=0;failures=0
     try:
         while True:
             data,ancillary,flags,_=channel.recvmsg(REQUEST.size,socket.CMSG_SPACE(4*4),socket.MSG_CMSG_CLOEXEC)
@@ -167,7 +215,7 @@ def serve(channel, renderer):
                 requests+=1
                 try:
                     fd=frames.frame(descriptors[0],target);info=frames.info
-                    response=RESPONSE.pack(MAGIC,sequence,target,info['width'],info['height'],info['width']*info['height']*4,0,0)
+                    response=RESPONSE.pack(MAGIC,sequence,target,info['width'],info['height'],info['width']*info['height']*4,0,frames.delivery)
                     sent=channel.sendmsg([response],[(socket.SOL_SOCKET,socket.SCM_RIGHTS,array.array('i',[fd]))])
                 except InterruptedError:
                     raise
@@ -185,6 +233,7 @@ def serve(channel, renderer):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--delivery',choices=['pipe','snapshot'],default='pipe')
     parser.add_argument('--renderer',type=Path,required=True);parser.add_argument('args',nargs=argparse.REMAINDER)
     args=parser.parse_args();command=args.args[1:] if args.args[:1]==['--'] else args.args
     if not args.renderer.is_absolute() or not args.renderer.is_file() or not command:
@@ -200,8 +249,9 @@ def main():
     child=None
     try:
         with ssv2.media.ParentLifetime():
-            child=subprocess.Popen([str(args.renderer)]+command,stdin=client,env=dict(os.environ,SCREENSAFE_SSV2_WORKER='1'))
-            client.close();serve(server,child);return child.wait(timeout=5)
+            child=subprocess.Popen([str(args.renderer)]+command,stdin=client,
+                env=dict(os.environ,SCREENSAFE_SSV2_WORKER='1',SCREENSAFE_SSV2_PIPE='1' if args.delivery=='pipe' else '0'))
+            client.close();serve(server,child,args.delivery);return child.wait(timeout=5)
     finally:
         client.close();server.close()
         if child is not None and child.poll() is None:

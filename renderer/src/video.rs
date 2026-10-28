@@ -4,7 +4,10 @@ use crate::safefs::Dir;
 use std::fs::File;
 use std::os::unix::fs::FileExt;
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+
+static NEXT_VIDEO_ID: AtomicU64 = AtomicU64::new(1);
 
 pub const FOLDER: &str = "Videos/Screensaver";
 pub const FILE_LIMIT: u64 = 512 << 20;
@@ -32,6 +35,7 @@ pub struct Video {
     pub fps: u32,
     frames: Arc<[(u64, u32)]>,
     compressed: bool,
+    identity: u64,
 }
 
 pub enum FrameBytes {
@@ -103,7 +107,18 @@ impl Video {
         if end != opened.size {
             return Err("video has unexpected trailing data".into());
         }
-        Ok(Self { name, file: Arc::new(opened.file), size: opened.size, modified: opened.modified, width, height, fps, frames: frames.into(), compressed })
+        Ok(Self {
+            name,
+            file: Arc::new(opened.file),
+            size: opened.size,
+            modified: opened.modified,
+            width,
+            height,
+            fps,
+            frames: frames.into(),
+            compressed,
+            identity: NEXT_VIDEO_ID.fetch_add(1, Ordering::Relaxed),
+        })
     }
 
     pub fn duration(&self) -> f64 {
@@ -150,7 +165,7 @@ impl Video {
         }
         if self.compressed {
             let index = u16::try_from(frame).map_err(|_| "compressed frame exceeds 16-bit reference")?;
-            crate::video_decoder::frame(&self.file, index, self.width, self.height).map(FrameBytes::Rgba)
+            crate::video_decoder::frame(&self.file, index, self.width, self.height, self.identity).map(FrameBytes::Rgba)
         } else {
             self.read_frame(frame).map(FrameBytes::Jpeg)
         }
