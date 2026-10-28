@@ -91,6 +91,31 @@ class CompressedVideoTests(unittest.TestCase):
             output.seek(0);output.truncate();output.write(valid+b'extra');output.flush()
             with self.assertRaises(ValueError):ssv2.read_index(output.fileno())
 
+    def test_cpu_budget_recycling_preserves_the_next_frame(self):
+        # Long clips must outlive a worker's cumulative CPU allowance. Inject
+        # the accounting threshold rather than burning 100 CPU seconds here.
+        for path in self.clips.values():
+            for delivery in [play_v2.Frames,play_v2.StreamFrames]:
+                fd=os.open(path,os.O_RDONLY);reference=play_v2.Frames();frames=delivery()
+                def pixels(index):
+                    delivered=frames.frame(fd,index)
+                    if frames.delivery==0:return os.pread(delivered,160*90*4,0)
+                    import socket
+                    with socket.socket(fileno=os.dup(delivered)) as stream:
+                        stream.settimeout(2);data=bytearray()
+                        while len(data)<160*90*4:
+                            block=stream.recv(160*90*4-len(data))
+                            self.assertTrue(block);data.extend(block)
+                    return data
+                try:
+                    pixels(0);previous=frames.decoder
+                    with patch.object(previous,'cpu_seconds',return_value=101):
+                        self.assertEqual(pixels(1),os.pread(reference.frame(fd,1),160*90*4,0))
+                    self.assertEqual(frames.starts,2)
+                    self.assertIsNotNone(previous.proc.poll())
+                    self.assertEqual(pixels(2),os.pread(reference.frame(fd,2),160*90*4,0))
+                finally:frames.close();reference.close();os.close(fd)
+
     def test_framing_is_independent_of_pipe_chunk_boundaries(self):
         for codec,path in self.clips.items():
             fd=os.open(path,os.O_RDONLY)
