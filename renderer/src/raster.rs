@@ -168,7 +168,20 @@ pub fn decode_prepared(bytes: &[u8], max_w: u32, max_h: u32, crop: u32, filter: 
     let mut decoded = image::DynamicImage::from_decoder(decoder).map_err(|e| e.to_string())?;
     decoded.apply_orientation(orientation);
     let known_opaque = !decoded.color().has_alpha();
-    let mut rgba = decoded.into_rgba8();
+    finish_rgba(decoded.into_rgba8(), max_w, max_h, crop, filter, known_opaque)
+}
+
+fn decode_video(clip: &crate::video::Video, frame: u32, crop: u32, filter: Filter) -> Result<Pixmap, String> {
+    match clip.read_pixels(frame)? {
+        crate::video::FrameBytes::Jpeg(bytes) => decode_prepared(&bytes, clip.width, clip.height, crop, filter),
+        crate::video::FrameBytes::Rgba(bytes) => {
+            let rgba = image::RgbaImage::from_raw(clip.width, clip.height, bytes).ok_or("invalid decoder pixel dimensions")?;
+            finish_rgba(rgba, clip.width, clip.height, crop, filter, false)
+        }
+    }
+}
+
+fn finish_rgba(mut rgba: image::RgbaImage, max_w: u32, max_h: u32, crop: u32, filter: Filter, known_opaque: bool) -> Result<Pixmap, String> {
     if crop > 0 {
         let (w, h) = rgba.dimensions();
         let aspect = crop as f64 / 10_000.0;
@@ -430,7 +443,7 @@ impl Raster {
         let clip = pack.videos[video as usize].clone();
         let (send, receive) = mpsc::channel();
         std::thread::spawn(move || {
-            let result = clip.read_frame(frame as u32).and_then(|bytes| decode_prepared(&bytes, clip.width, clip.height, source.crop, source.filter));
+            let result = decode_video(&clip, frame as u32, source.crop, source.filter);
             let _ = send.send(result);
         });
         self.pending.push((source, receive));
@@ -445,7 +458,7 @@ impl Raster {
         let exact = self.images.iter().position(|(r, _)| *r == source);
         if !self.background_decoding && exact.is_none() {
             let clip = &pack.videos[video];
-            match clip.read_frame(frame).and_then(|bytes| decode_prepared(&bytes, clip.width, clip.height, source.crop, source.filter)) {
+            match decode_video(clip, frame, source.crop, source.filter) {
                 Ok(pixels) => self.keep(source, pixels),
                 Err(e) => {
                     self.video_failed.push(video);

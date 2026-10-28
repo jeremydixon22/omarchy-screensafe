@@ -28,6 +28,8 @@ A screensaver in ScreenSafe is a **pack**: a folder with a `screensafe.toml` and
 
 **0.5.0 release candidate:** adds the trusted overlay, bounded Videos playback, and opt-in prepared playback. All application helpers are included for x86-64 and ARM64; installation builds and downloads nothing else. Videos import is described in [the Videos guide](docs/VIDEO-PROTOTYPE.md). Marketplace approval of 0.4.8 does not cover this newer candidate; verify the exact commit and binary attestations as described below.
 
+This R&D branch also contains a separate [SSVv2 compressed-video experiment](docs/SSV2-PROTOTYPE.md). It requires an explicit command-line wrapper and retains runtime final-composition flash guarding; normal plugin playback continues to use SSV v1.
+
 ## The packs
 
 | | | |

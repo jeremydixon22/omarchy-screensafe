@@ -36,6 +36,7 @@ mod safefs;
 mod sandbox;
 mod takeover;
 mod video;
+mod video_decoder;
 mod wayland;
 
 use std::path::{Path, PathBuf};
@@ -730,6 +731,10 @@ fn watch_draws() {
 const TIMED_OUT: i32 = 124;
 
 fn main() -> ExitCode {
+    if let Err(error) = video_decoder::initialize() {
+        tell!("screensafe: {error}");
+        return ExitCode::from(2);
+    }
     let args = match Args::parse(std::env::args().skip(1)) {
         Ok(a) => a,
         Err(e) => {

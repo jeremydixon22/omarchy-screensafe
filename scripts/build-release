@@ -10,6 +10,7 @@ set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 out=${1:-$root/bin}
+out=$(realpath -m -- "$out")
 cargo_home=${CARGO_HOME:-$HOME/.cargo}
 rustup_home=${RUSTUP_HOME:-$HOME/.rustup}
 target_dir=${CARGO_TARGET_DIR:-$root/renderer/target}

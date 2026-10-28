@@ -9,6 +9,7 @@ use std::sync::Arc;
 pub const FOLDER: &str = "Videos/Screensaver";
 pub const FILE_LIMIT: u64 = 512 << 20;
 const MAX_FRAMES: usize = 7200;
+pub const MAX_COMPRESSED_FRAMES: usize = u16::MAX as usize;
 const MAX_FRAME_BYTES: u32 = 2 << 20;
 const MAX_VIDEOS: usize = 32;
 const HEADER: usize = 32;
@@ -30,32 +31,69 @@ pub struct Video {
     pub height: u32,
     pub fps: u32,
     frames: Arc<[(u64, u32)]>,
+    compressed: bool,
+}
+
+pub enum FrameBytes {
+    Jpeg(Vec<u8>),
+    Rgba(Vec<u8>),
 }
 
 impl Video {
     fn open(name: String, opened: crate::safefs::OpenFile) -> Result<Self, String> {
         let mut header = [0; HEADER];
         opened.file.read_exact_at(&mut header, 0).map_err(|e| e.to_string())?;
-        if &header[..8] != b"SSVID001" || header[24..].iter().any(|b| *b != 0) {
+        let compressed = &header[..8] == b"SSVID002";
+        if (!compressed && &header[..8] != b"SSVID001") || (!compressed && header[24..].iter().any(|b| *b != 0)) {
             return Err("not a ScreenSafe prepared video (version 1)".into());
         }
         let word = |at| u32::from_le_bytes(header[at..at + 4].try_into().unwrap());
         let (width, height, fps, count) = (word(8), word(12), word(16), word(20) as usize);
-        if width == 0 || width > 1280 || height == 0 || height > 720 || fps == 0 || fps > 24 || count == 0 || count > MAX_FRAMES || count > fps as usize * 300 {
+        let maximum = if compressed { MAX_COMPRESSED_FRAMES } else { MAX_FRAMES };
+        if width == 0
+            || width > 1280
+            || height == 0
+            || height > 720
+            || fps == 0
+            || fps > 24
+            || count == 0
+            || count > maximum
+            || (!compressed && count > fps as usize * 300)
+        {
             return Err("video dimensions, rate or duration exceed prototype limits".into());
         }
-        let mut index = vec![0; count * ENTRY];
-        opened.file.read_exact_at(&mut index, HEADER as u64).map_err(|e| e.to_string())?;
+        let (header_size, stride) = if compressed {
+            let mut extra = [0u8; 32];
+            opened.file.read_exact_at(&mut extra, 32).map_err(|e| e.to_string())?;
+            let extra_word = |at| u32::from_le_bytes(extra[at..at + 4].try_into().unwrap());
+            if width % 2 != 0
+                || height % 2 != 0
+                || fps != 24
+                || ![1, 2].contains(&word(24))
+                || word(28) != 24
+                || extra_word(0) != 1
+                || extra[4..].iter().any(|b| *b != 0)
+            {
+                return Err("unsupported compressed video profile".into());
+            }
+            (64usize, 16usize)
+        } else {
+            (HEADER, ENTRY)
+        };
+        let mut index = vec![0; count * stride];
+        opened.file.read_exact_at(&mut index, header_size as u64).map_err(|e| e.to_string())?;
         let mut frames = Vec::with_capacity(count);
         let mut end = 0u64;
-        for entry in index.chunks_exact(ENTRY) {
+        for (i, entry) in index.chunks_exact(stride).enumerate() {
             let offset = u64::from_le_bytes(entry[..8].try_into().unwrap());
-            let length = u32::from_le_bytes(entry[8..].try_into().unwrap());
+            let length = u32::from_le_bytes(entry[8..12].try_into().unwrap());
             if length == 0
                 || length > MAX_FRAME_BYTES
-                || offset < (HEADER + index.len()) as u64
-                || (frames.is_empty() && offset > (HEADER + MAX_FRAMES * ENTRY) as u64)
+                || offset < (header_size + index.len()) as u64
+                || (frames.is_empty() && offset > (header_size + maximum * stride) as u64)
                 || (!frames.is_empty() && offset != end)
+                || (compressed && frames.is_empty() && offset != (header_size + index.len()) as u64)
+                || (compressed && u32::from_le_bytes(entry[12..16].try_into().unwrap()) != u32::from(i % 24 == 0))
             {
                 return Err("invalid video frame index".into());
             }
@@ -65,7 +103,7 @@ impl Video {
         if end != opened.size {
             return Err("video has unexpected trailing data".into());
         }
-        Ok(Self { name, file: Arc::new(opened.file), size: opened.size, modified: opened.modified, width, height, fps, frames: frames.into() })
+        Ok(Self { name, file: Arc::new(opened.file), size: opened.size, modified: opened.modified, width, height, fps, frames: frames.into(), compressed })
     }
 
     pub fn duration(&self) -> f64 {
@@ -94,6 +132,9 @@ impl Video {
     }
 
     pub fn read_frame(&self, frame: u32) -> Result<Vec<u8>, String> {
+        if self.compressed {
+            return Err("compressed video needs the isolated decoder".into());
+        }
         let &(offset, length) = self.frames.get(frame as usize).ok_or("video frame out of range")?;
         let mut bytes = vec![0; length as usize];
         self.file.read_exact_at(&mut bytes, offset).map_err(|e| e.to_string())?;
@@ -101,6 +142,18 @@ impl Video {
             return Err("video frame format or dimensions changed".into());
         }
         Ok(bytes)
+    }
+
+    pub fn read_pixels(&self, frame: u32) -> Result<FrameBytes, String> {
+        if frame as usize >= self.frames.len() {
+            return Err("video frame out of range".into());
+        }
+        if self.compressed {
+            let index = u16::try_from(frame).map_err(|_| "compressed frame exceeds 16-bit reference")?;
+            crate::video_decoder::frame(&self.file, index, self.width, self.height).map(FrameBytes::Rgba)
+        } else {
+            self.read_frame(frame).map(FrameBytes::Jpeg)
+        }
     }
 }
 
@@ -114,6 +167,9 @@ pub fn open(folder: &Path, warnings: &mut Vec<String>) -> Vec<Video> {
     for name in names.into_iter().filter(|n| n.to_ascii_lowercase().ends_with(".ssv")).take(MAX_VIDEOS) {
         let result = dir.open_user_file(&name, FILE_LIMIT).map_err(|e| e.0).and_then(|file| Video::open(name.clone(), file));
         match result {
+            Ok(video) if video.compressed && !crate::video_decoder::available() => {
+                warnings.push(format!("{name}: SSVv2 needs the explicit prototype decoder wrapper"));
+            }
             Ok(video) => videos.push(video),
             Err(e) => warnings.push(format!("{name}: {e}")),
         }
@@ -124,6 +180,38 @@ pub fn open(folder: &Path, warnings: &mut Vec<String>) -> Vec<Video> {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+    fn compressed_archive(count: usize) -> Vec<u8> {
+        let mut bytes = b"SSVID002".to_vec();
+        for word in [2u32, 2, 24, count as u32, 2, 24, 1, 0, 0, 0, 0, 0, 0, 0] {
+            bytes.extend_from_slice(&word.to_le_bytes());
+        }
+        let start = 64 + count * 16;
+        for i in 0..count {
+            bytes.extend_from_slice(&((start + i) as u64).to_le_bytes());
+            bytes.extend_from_slice(&1u32.to_le_bytes());
+            bytes.extend_from_slice(&u32::from(i % 24 == 0).to_le_bytes());
+        }
+        bytes.resize(start + count, 0);
+        bytes
+    }
+
+    #[test]
+    fn compressed_video_keeps_16_bit_references_and_exact_index_bounds() {
+        let video = load(&compressed_archive(MAX_COMPRESSED_FRAMES), "compressed-video-max").unwrap();
+        assert_eq!(video.frame_count(), 65535);
+        assert_eq!(video.frame_at(f64::MAX), 65534);
+        assert_eq!(video.frame_offset(f64::MAX, 4.0, true), 3);
+        assert!(load(&compressed_archive(MAX_COMPRESSED_FRAMES + 1), "compressed-video-over").is_err());
+        let valid = compressed_archive(25);
+        for (at, value) in [(24usize, 3u32), (28, 0), (32, 0), (36, 1), (40, 1), (64, 0), (64 + 12, 0), (64 + 24 * 16 + 12, 0)] {
+            let mut bad = valid.clone();
+            bad[at..at + 4].copy_from_slice(&value.to_le_bytes());
+            assert!(load(&bad, "compressed-video-bad").is_err(), "byte {at}");
+        }
+        let mut trailing = valid;
+        trailing.push(0);
+        assert!(load(&trailing, "compressed-video-trailing").is_err());
+    }
     pub(crate) fn archive_colors(colors: &[[u8; 3]]) -> Vec<u8> {
         archive_sized(colors, 3, 2)
     }
