@@ -106,7 +106,7 @@ Item {
   }
 
   function environment(withShell) {
-    var env = { HOME: root.home, XDG_RUNTIME_DIR: root.runtimeDir, WAYLAND_DISPLAY: root.waylandDisplay }
+    var env = { HOME: root.home, XDG_RUNTIME_DIR: root.runtimeDir, WAYLAND_DISPLAY: root.waylandDisplay, PYTHONDONTWRITEBYTECODE: "1" }
     if (root.stateHome !== "") env.XDG_STATE_HOME = root.stateHome
     if (/^:?[A-Za-z0-9_+\-\/,.<>]{1,64}$/.test(root.timeZone)) env.TZ = root.timeZone
     if (withShell) {
