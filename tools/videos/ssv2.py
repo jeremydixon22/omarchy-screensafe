@@ -226,12 +226,18 @@ def import_video(source, destination, codec=H264):
             payload_name = Path(payload.name)
             entries=[]
             job_seconds = ENCODE_SECONDS if codec == H264 else AV1_ENCODE_SECONDS
-            for part in range(math.ceil(duration/job_seconds)):
+            total_frames=max(1,round(duration*FPS))
+            for part in range(math.ceil(total_frames/(job_seconds*FPS))):
                 remaining()
-                start=part*job_seconds;seconds=min(job_seconds,duration-start)
-                command = ['/usr/bin/ffmpeg','-v','error','-nostdin','-threads','2','-filter_threads','1','-ss',str(start),'-f','mov',
-                    '-protocol_whitelist','file','-i','/input.mp4','-t',str(seconds),'-map','0:v:0','-an','-sn','-dn','-map_metadata','-1',
-                    '-vf',f'scale={width}:{height},setsar=1,fps={FPS}','-frames:v',str(min(job_seconds*FPS,MAX_FRAMES-len(entries)+1)),'-threads','2',
+                start=part*job_seconds;seek=max(0,start-1);preroll=(start-seek)*FPS
+                count=min(job_seconds*FPS,total_frames-len(entries))
+                # Preserve a common24fps phase across fractional/VFR inputs.
+                # Keep the keyframe preroll, then trim on the normalized frame
+                # grid; an accurate input seek can otherwise lose a boundary.
+                command = ['/usr/bin/ffmpeg','-v','error','-nostdin','-threads','2','-filter_threads','1','-ss',str(seek),'-noaccurate_seek','-f','mov',
+                    '-protocol_whitelist','file','-i','/input.mp4','-map','0:v:0','-an','-sn','-dn','-map_metadata','-1',
+                    '-vf',f'scale={width}:{height},setsar=1,fps={FPS}:start_time=0,trim=start_frame={preroll}:end_frame={preroll+count},setpts=PTS-STARTPTS',
+                    '-frames:v',str(count),'-threads','2',
                     '-pix_fmt','yuv420p','-g',str(GOP),'-keyint_min',str(GOP)]
                 if codec == H264:
                     command += ['-c:v','libx264','-preset','medium','-tune','fastdecode','-crf','16','-bf','0','-sc_threshold','0','-x264-params',
@@ -248,7 +254,7 @@ def import_video(source, destination, codec=H264):
                         raise ValueError('compressed video exceeds frame/storage limit')
                     entries.append((payload.tell(),len(frame)));payload.write(frame)
                 produced=len(entries)-initial
-                if not produced or (seconds==job_seconds and produced!=job_seconds*FPS):
+                if produced!=count:
                     raise ValueError('compressed segment duration differs')
                 payload.flush();check_profile(payload.fileno(),offset,produced,width,height,codec,min(90,remaining()))
             if not entries:

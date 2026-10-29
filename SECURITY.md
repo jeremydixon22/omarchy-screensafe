@@ -81,6 +81,10 @@ This is an automated approximation of WCAG's test, not a certification. It measu
 
 ## Limits of all this
 
+The 0.6.0 testing candidate also has a trusted compressed-video broker. It retains read-only SSVv2 descriptors and keeps codec parsing inside a resource-limited user/mount/PID/network namespace cage. Fixed seccomp policy denies new sockets, processes, namespaces, ptrace and io_uring. The caller may explicitly enable H.264 hardware decoding, adding one identity-checked PCI render node and eight pinned read-only metadata files; no display connection, primary GPU node or whole sysfs is exposed. Software mode receives no GPU authority.
+
+Copied pixels become renderer-owned before tone, surrounds, overlays and final runtime flash guarding. No GPU-writable buffer is admitted. Hardware startup verifies a full frame before streaming. Preview's inherited text pipe is retained before confinement and stays separate from the private decoder channel; only pipe/regular-file controls are accepted. Resource limits also constrain coded dimensions and individual allocations. GPU rendering ioctls still add kernel/driver attack surface and do not come with a global GPU-memory quota or guaranteed recovery from driver hangs. See [the decoder boundary](docs/SSV2-PROTOTYPE.md). These constraints are not a claim of new battery savings or medical certification.
+
 These measures make a pack's reach small and checkable. They don't make bugs impossible. The renderer depends on Rust libraries for TOML, fonts, images and Wayland, listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). A bug in one of them could still crash the renderer or make it draw the wrong thing, though not reach beyond the renderer's confinement. Please report anything you find.
 
 ## Optional trusted information overlay (0.5.0)

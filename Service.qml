@@ -195,6 +195,18 @@ Item {
 
   // Global overlay data stays separate from pack settings and expressions. Off until opted in.
   readonly property var performanceValues: PerformanceModel.values(root.entry.performance)
+  property string videoDecoderState: "idle"
+  readonly property string videoDecoderDetail: {
+    if (root.videoDecoderState === "unavailable") return "Video decoding was unavailable. Try software decoding or another clip."
+    if (root.videoDecoderState === "hardware") return "Last compressed video: hardware H.264. The final picture is still checked for flashes."
+    if (root.videoDecoderState === "software") return "Last compressed video: software decoding."
+    return root.performanceValues.videoHardware === 1 ? "Hardware H.264 selected. JPEG clips use image playback; AV1 needs software mode." : "Software decoding selected. Hardware H.264 is available for testing on supported GPUs."
+  }
+  function videoCommand(args, hardware) { return PerformanceModel.playerCommand(root.pluginDir, root.renderer, args, hardware) }
+  function observeVideoOutput(text) {
+    var state = PerformanceModel.videoStatus(text)
+    if (state !== "") root.videoDecoderState = state
+  }
   readonly property string cacheWorker: root.pluginDir + "/bin/screensafe-cache-" + root.arch
   readonly property string cacheRoot: root.home + "/.cache/omarchy/screensafe/prepared"
   property string performanceState: "unknown"
@@ -212,6 +224,7 @@ Item {
   function setPerformance(name, value) {
     if (!PerformanceModel.declarations.some(function(d) { return d.name === name })) return
     saveSettings({ performance: PerformanceModel.changed(root.entry.performance, name, value) })
+    if (name === "videoHardware") { root.videoDecoderState = "idle"; root.stopLive(); return }
     if (name === "maxMiB") root.trimPrepared()
     else root.refreshPerformance()
   }
@@ -454,7 +467,8 @@ Item {
     if (settings !== "") args = args.concat(["--settings", settings])
     root.livePath = path
     root.liveRegion = region
-    livePreviewProc.command = [root.renderer].concat(args, ["--overlay", root.overlayArgument])
+    var complete = args.concat(["--overlay", root.overlayArgument])
+    livePreviewProc.command = root.videosOf(path) >= 0 ? root.videoCommand(complete, root.performanceValues.videoHardware === 1) : [root.renderer].concat(complete)
     livePreviewProc.environment = root.environment(false)
     liveErr.reset()
     root.liveStopping = false
@@ -786,15 +800,18 @@ Item {
   function launch(packPath) {
     root.launching = packPath
     root.stoppedForLock = false
-    rendererProc.command = [root.renderer, "run", "--pack", packPath, "--theme", root.themeDir, "--branding", root.branding, "--logo", root.logo, "--badge", root.badge, "--photos", root.photos, "--videos", root.videos, "--settings", root.settingsArg(packPath), "--role", "org.omarchy.screensaver", "--overlay", root.overlayArgument]
-    if (root.performanceValues.enabled === 1) rendererProc.command = root.cacheCommand("run", packPath)
-    rendererProc.environment = root.performanceValues.enabled === 1 ? root.cacheEnvironment() : root.environment(false)
+    var args = ["run", "--pack", packPath, "--theme", root.themeDir, "--branding", root.branding, "--logo", root.logo, "--badge", root.badge, "--photos", root.photos, "--videos", root.videos, "--settings", root.settingsArg(packPath), "--role", "org.omarchy.screensaver", "--overlay", root.overlayArgument]
+    var video = root.videosOf(packPath) >= 0
+    var prepared = root.performanceValues.enabled === 1 && !video
+    rendererProc.command = video ? root.videoCommand(args, root.performanceValues.videoHardware === 1) : prepared ? root.cacheCommand("run", packPath) : [root.renderer].concat(args)
+    rendererProc.environment = prepared ? root.cacheEnvironment() : root.environment(false)
     rendererOut.reset()
     rendererErr.reset()
     rendererProc.running = true
   }
 
   function rendererExited(code, errors) {
+    if (code !== 0 && root.videosOf(root.launching) >= 0) root.videoDecoderState = "unavailable"
     if (code === 3 && root.launching !== root.defaultPack) {
       // The pack can't be used: say so, and show the built-in one instead.
       root.problem = root.nameOf(root.launching) + " can't be used: " + lastLine(errors).replace(/^screensafe: /, "")
@@ -832,7 +849,7 @@ Item {
 
   function runShort(proc, args) {
     if (proc.running) return
-    proc.command = [root.renderer].concat(args)
+    proc.command = ["catalog", "thumbnail", "check", "render"].indexOf(args[0]) >= 0 ? root.videoCommand(args, false) : [root.renderer].concat(args)
     proc.environment = root.environment(false)
     begin(proc)
   }
@@ -967,7 +984,7 @@ Item {
     clearEnvironment: true
     stdinEnabled: true
     stdout: BoundedOutput { id: liveOut; limit: 4096 }
-    stderr: BoundedOutput { id: liveErr; limit: 16384 }
+    stderr: BoundedOutput { id: liveErr; limit: 16384; onTextChanged: root.observeVideoOutput(text) }
     // The one that was running has gone: start the one waiting, if any, now that it's safe to.
     onExited: function(code) {
       if (!root.liveStopping && code !== 0 && root.livePath !== "") root.liveFailed = root.livePath
@@ -985,7 +1002,7 @@ Item {
     clearEnvironment: true
     stdout: BoundedOutput { id: rendererOut; limit: 4096 }
     // Only its last line is shown, when it fails; a renderer that says more is cut off, but keeps running.
-    stderr: BoundedOutput { id: rendererErr; limit: 65536 }
+    stderr: BoundedOutput { id: rendererErr; limit: 65536; onTextChanged: root.observeVideoOutput(text) }
     onExited: function(code) { root.rendererExited(code, rendererErr.text) }
   }
 
@@ -1129,6 +1146,11 @@ Item {
     // Seconds idle before ScreenSafe shows, from 10 to 86400; or 0 or "omarchy" to follow Omarchy's.
     function delay(seconds: string): string { return root.setIdleSeconds(seconds) }
     function overlaySettings(): string { return JSON.stringify({ offered: root.overlayDeclarations, chosen: root.overlayValues }) }
+    function performanceSettings(): string { return JSON.stringify({ offered: PerformanceModel.declarations, chosen: root.performanceValues, videoDecoder: root.videoDecoderState }) }
+    function performanceSetting(name: string, value: string): string {
+      root.setPerformance(name, Number(value))
+      return JSON.stringify(root.performanceValues)
+    }
     function overlaySetting(name: string, value: string): string { return root.setOverlay(name, Number(value)) }
     function status(): string { return root.statusJson() }
   }

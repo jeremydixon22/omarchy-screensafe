@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/jeremydixon22/omarchy-screensafe/actions/workflows/ci.yml"><img src="https://github.com/jeremydixon22/omarchy-screensafe/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://img.shields.io/badge/version-0.5.0-9ece6a" alt="Version 0.5.0">
+  <img src="https://img.shields.io/badge/version-0.6.0-9ece6a" alt="Version 0.6.0">
   <img src="https://img.shields.io/badge/Omarchy-4-9ece6a" alt="Omarchy 4">
   <img src="https://img.shields.io/badge/license-MIT-9ece6a" alt="MIT license">
 </p>
@@ -26,9 +26,9 @@ A screensaver in ScreenSafe is a **pack**: a folder with a `screensafe.toml` and
 - **Settings without code.** Packs can offer a speed, a density or a picture; change them in the panel and watch the pack update live.
 - **Made to be safe.** A sandboxed renderer, a checked format, and a flash limit no pack can get past.
 
-**0.5.0 release candidate:** adds the trusted overlay, bounded Videos playback, and opt-in prepared playback. All application helpers are included for x86-64 and ARM64; installation builds and downloads nothing else. Videos import is described in [the Videos guide](docs/VIDEO-PROTOTYPE.md). Marketplace approval of 0.4.8 does not cover this newer candidate; verify the exact commit and binary attestations as described below.
+**0.6.0 testing candidate:** combines the compiler and sprite optimizations, video styles, theme colors, trusted overlay and opt-in prepared loops with compressed SSVv2 videos. H.264 hardware decoding is an explicit control under Settings → Performance; the live preview and full-screen player use the same policy and final flash guard. All application helpers are included for x86-64 and ARM64; installation builds and downloads nothing else. See [the Videos guide](docs/VIDEO-PROTOTYPE.md). Marketplace approval of 0.4.8 does not cover this candidate; verify the exact commit and binary attestations as described below.
 
-This R&D branch also contains a separate [SSVv2 compressed-video experiment](docs/SSV2-PROTOTYPE.md). It requires an explicit command-line wrapper and retains runtime final-composition flash guarding; normal plugin playback continues to use SSV v1.
+The [SSVv2 boundary notes](docs/SSV2-PROTOTYPE.md) describe codec isolation, hardware authority and owned frame delivery. Existing JPEG clips remain supported, and final-composition flash guarding stays active in both video modes.
 
 ## The packs
 

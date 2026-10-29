@@ -751,11 +751,11 @@ impl Display {
         options: &Options,
         raster: &mut Raster,
         reload: &mut dyn FnMut(&str) -> Result<Pack, String>,
+        control: std::fs::File,
     ) -> Result<&'static str, String> {
         let qh = self.queue.handle();
         self.state.overlay = Some(crate::overlay::Overlay::new(options.overlay.clone(), options.clock.clone().unwrap_or_else(crate::clock::Clock::fixed)));
-        let stdin = std::io::stdin();
-        let input = stdin.as_fd();
+        let input = control.as_fd();
         let flags = rustix::fs::fcntl_getfl(input).map_err(|e| format!("can't read standard input: {e}"))?;
         rustix::fs::fcntl_setfl(input, flags | rustix::fs::OFlags::NONBLOCK).map_err(|e| format!("can't read standard input: {e}"))?;
         let mut line: Vec<u8> = Vec::new();

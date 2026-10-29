@@ -1,6 +1,6 @@
-# Videos (0.5.0)
+# Videos (0.6.0 testing candidate)
 
-This release candidate contains the retained compiler, prefetch and sprite optimizations, plus a Photos-like Videos pack. It is not covered by the earlier 0.4.8 marketplace approval.
+This candidate combines the retained compiler, prefetch and sprite optimizations, Photos-like Videos, colors, overlays and prepared procedural loops with compressed SSVv2 playback. It is not covered by the earlier 0.4.8 marketplace approval.
 
 Videos has Full screen, Whole, Film, CRT Fit, CRT Box and Flatscreen styles; Original, Greyscale, Sepia and Theme tones; shuffle/in-order selection; and a display interval or Full length. Loop is on by default and repeats the playlist. With Loop off, the playlist plays once, then holds the final video's frame at the end of the chosen interval (or the clip's end, if earlier). Full length uses the longest imported clip as a common interval; shorter clips hold their final frame until the next selection.
 
@@ -12,7 +12,7 @@ The surrounds are generated bitmap artwork distributed with this prototype under
 
 ## Import a clip
 
-The prototype imports ordinary MP4 files once, then plays the prepared result. Dropping an MP4 into the folder does not yet import it automatically.
+Import ordinary MP4 files once, then play the normalized result. Dropping an MP4 into the folder does not import it automatically. H.264 SSVv2 is the default:
 
 ```sh
 python3 tools/videos/import.py INPUT.mp4 "$HOME/Videos/Screensaver/clip.ssv"
@@ -22,7 +22,15 @@ Import uses Omarchy's Python 3, FFmpeg/ffprobe, and ScreenSafe's included sandbo
 
 The importer runs media tools with a private network/PID/mount namespace, no capabilities, no home or graphics devices, one selected read-only input descriptor and public system runtime files. It has fixed commands, no author-supplied player/filter arguments, bounded output, CPU/address-space/file/descriptor limits and deadlines. Scratch tmpfs is limited to 64 MiB. A pre-exec seccomp filter permits codec threads but denies new processes, namespace changes, ptrace, cross-process memory access, execveat and io_uring. The initial execve remains allowed to enter FFmpeg/ffprobe; replacing that same confined process grants no additional mounts, descendants or resource budget. Failure to establish isolation is an error; there is no unconfined fallback.
 
-Current limits: MP4 up to 2 GiB and five minutes; normalized JPEG frames up to 1280×720 at 24 FPS without enlarging a smaller source; prepared file up to 512 MiB, 7,200 frames and 2 MiB per frame. At most 32 prepared videos are opened from `~/Videos/Screensaver`, without following file symlinks. Invalid files are skipped with a warning. The user-provided example is not included in the repository.
+Current SSVv2 limits: source MP4 up to 2 GiB; even dimensions up to 1280×720 at 24 FPS without enlarging a smaller source; up to 65,535 frames (45m30.625s), 512 MiB per file and 2 MiB per access unit. Frame references remain 16-bit. Bounded import jobs have a 30-minute overall conversion budget, which may be exhausted before the format ceiling. JPEG v1 retains its five-minute/7,200-frame limit. At most 32 videos are opened from `~/Videos/Screensaver`, without following file symlinks. User media is not included in the repository.
+
+## Choose video decoding
+
+Use `--format v1` for JPEG compatibility, or `--codec av1` for software-decoded SSVv2. Existing JPEG clips continue to work. Settings → Performance → Video decoding offers **Hardware H.264 videos**, off by default. Hardware mode requires a supported PCI VAAPI GPU and H.264; it never silently downgrades to software. If unavailable, select software mode. JPEG clips continue through the image renderer. The panel reports the last compressed video's successful decoder, or an unavailable state. This diagnostic grants no approvals.
+
+The service routes catalog, thumbnails, live preview and full-screen Videos through the bounded player. Static thumbnails use software decoding; live preview and full-screen Videos follow the selected policy. Procedural prepared playback does not intercept Videos. Hardware startup produces a complete owned frame before streaming continues. Preview settings/region/Quit retain their own text pipe, separate from the decoder's private packet channel.
+
+Hardware mode adds one identity-checked render node and eight read-only metadata files to the codec cage. No GPU-writable image reaches the renderer: pixels become Rust-owned before tone, surrounds, overlays and the final flash guard. GPU-driver/kernel exposure and global GPU resource quotas remain limitations. Other hardware APIs and physical ARM GPUs remain unqualified. See [format and boundary details](SSV2-PROTOTYPE.md). No new battery savings are claimed.
 
 ## Playback and safety
 

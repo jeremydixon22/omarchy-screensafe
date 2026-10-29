@@ -30,6 +30,46 @@ class CompressedVideoTests(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):cls.temp.cleanup()
 
+    def test_import_cli_defaults_to_h264_v2_and_retains_explicit_v1(self):
+        with tempfile.TemporaryDirectory() as directory:
+            tool=Path(ssv2.__file__).with_name('import.py')
+            for form,magic in [('v2',ssv2.MAGIC),('v1',ssv2.media.MAGIC)]:
+                output=Path(directory)/(form+'.ssv')
+                command=['/usr/bin/python3',str(tool),str(self.source),str(output)]
+                if form=='v1':command+=['--format','v1']
+                p=subprocess.run(command,capture_output=True,text=True,timeout=20)
+                self.assertEqual(p.returncode,0,p.stderr)
+                self.assertEqual(output.read_bytes()[:8],magic)
+                self.assertEqual(json.loads(p.stdout)['frames'],72)
+
+    def test_preview_input_is_separate_from_the_decoder_channel(self):
+        with tempfile.TemporaryDirectory() as directory:
+            renderer=Path(directory)/'renderer'
+            renderer.write_text('''#!/usr/bin/python3
+import array,json,os,socket,struct,sys
+controls=os.read(int(os.environ['SCREENSAFE_PREVIEW_INPUT_FD']),4096)
+s=socket.socket(fileno=0);fd=os.open(sys.argv[2],os.O_RDONLY)
+s.sendmsg([struct.pack('<4I',0x32565353,1,0,0)],[(socket.SOL_SOCKET,socket.SCM_RIGHTS,array.array('i',[fd]))])
+body,ancillary,flags,_=s.recvmsg(32,256);words=struct.unpack('<8I',body)
+assert words[6]==0 and words[5]==160*90*4
+rights=array.array('i');rights.frombytes(ancillary[0][2]);pixel=rights[0]
+if words[7]==0:data=os.pread(pixel,words[5],0)
+else:
+ data=bytearray()
+ while len(data)<words[5]:
+  block=os.read(pixel,words[5]-len(data));assert block;data.extend(block)
+assert len(data)==words[5];os.close(pixel);os.close(fd)
+print(json.dumps({'controls':controls.decode(),'pixels':len(data)}))
+''');renderer.chmod(0o755)
+            wrapper=Path(play_v2.__file__).resolve()
+            options=[]
+            if os.environ.get('SCREENSAFE_TEST_RENDER_NODE'):
+                options=['--decoder','vaapi','--device',os.environ['SCREENSAFE_TEST_RENDER_NODE']]
+            p=subprocess.run(['/usr/bin/python3',str(wrapper)]+options+['--renderer',str(renderer),'--','preview',str(self.clips[ssv2.H264])],
+                input='settings style=2\nquit\n',capture_output=True,text=True,timeout=12)
+            self.assertEqual(p.returncode,0,p.stderr)
+            self.assertEqual(json.loads(p.stdout),{'controls':'settings style=2\nquit\n','pixels':160*90*4})
+
     def test_sequential_seek_film_neighbors_and_loop_use_immutable_snapshots(self):
         for codec,path in self.clips.items():
             fd=os.open(path,os.O_RDONLY);frames=play_v2.Frames()
@@ -243,6 +283,34 @@ class CompressedVideoTests(unittest.TestCase):
                         data=os.pread(frames.frame(fd,i),16*16*4,0)
                         expected=round((i%8)*30*255/219)
                         self.assertLessEqual(abs(data[0]-expected),3,(codec,i,data[0],expected))
+                finally:frames.close();os.close(fd)
+
+    def test_fractional_source_rate_matches_one_global_frame_grid(self):
+        #23.976fps exposed a719-frame second job in a real clip. Compare both
+        #4s/30s job seams against a single-pass24fps reference, including the
+        #source-frame duplication around the thousandth output frame.
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);source=root/'fractional.mp4'
+            subprocess.run(['/usr/bin/ffmpeg','-v','error','-f','lavfi','-i',
+                "nullsrc=s=16x16:r=24000/1001:d=61,geq=lum='16+30*mod(N,8)':cb=128:cr=128",
+                '-c:v','libx264','-crf','0','-threads','1','-g','48',str(source)],check=True)
+            fd=os.open(source,os.O_RDONLY)
+            try:
+                command=['/usr/bin/ffmpeg','-v','error','-nostdin','-threads','2','-filter_threads','1','-f','mov','-i','/input.mp4',
+                    '-vf','fps=24:start_time=0,format=rgba','-an','-sn','-dn','-pix_fmt','rgba','-f','rawvideo','pipe:1']
+                reference=bytearray()
+                for chunk in ssv2.media.output_chunks(fd,command,20):
+                    reference.extend(chunk);self.assertLess(len(reference),2<<20)
+            finally:os.close(fd)
+            self.assertEqual(len(reference)%(16*16*4),0);count=len(reference)//(16*16*4)
+            for codec in [ssv2.H264,ssv2.AV1]:
+                output=root/f'{codec}.ssv';result=ssv2.import_video(source,output,codec)
+                self.assertEqual(result['frames'],count)
+                fd=os.open(output,os.O_RDONLY);frames=play_v2.Frames()
+                try:
+                    for i in [0,23,24,95,96,97,718,719,720,721,999,1000,1001,1439,1440,1441,count-1]:
+                        pixel=os.pread(frames.frame(fd,i),16*16*4,0)[0]
+                        self.assertLessEqual(abs(pixel-reference[i*16*16*4]),3,(codec,i,pixel,reference[i*16*16*4]))
                 finally:frames.close();os.close(fd)
 
     def test_parent_death_stops_broker_renderer_and_codec(self):

@@ -42,7 +42,7 @@ ScreenSafe's own code is in `renderer/src`, with no `unsafe` code (`#![forbid(un
 
 Run `bin/screensafe-$(uname -m) version` to see its version, and the pack format and expression language it reads.
 
-## 0.5.0 candidate
+## 0.5.0 and later candidates
 
 Local reproduction and release attestations are separate evidence. CI must pass and attest the exact pushed commit before any candidate is described as attested. Native ARM CI runs the Rust tests and helper API/seccomp checks; it does not establish that every ARM GPU supports prepared playback. GPU eligibility and final decoded output are checked on the user's system before an approval is issued.
 

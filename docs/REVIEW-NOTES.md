@@ -2,6 +2,14 @@
 
 A summary of what ScreenSafe does on a user's machine, for marketplace and other reviewers. [SECURITY.md](../SECURITY.md) has the full account.
 
+## 0.6.0 combined testing candidate
+
+This retains 0.5.0's compiler/sprite optimizations, video art/startup/drift, colors, overlay and opt-in procedural loops. It integrates SSVv2 into catalog/thumbnail/live preview/full-screen Videos, with a software default and an explicit Hardware H.264 control. Videos bypass procedural cache routing. Imports default to H.264 SSVv2; JPEG remains readable and explicitly importable. V2 keeps 16-bit references, 65,535 frames, 720p/24 FPS and the 512 MiB file cap.
+
+The trusted broker selects codec/device policy; packs cannot request commands or devices. Hardware adds one identity-checked PCI render node and eight pinned read-only metadata files. No compositor socket, full sysfs or primary GPU node is exposed. New worker sockets are denied. Allocation/pixel limits constrain coded headers as well as the envelope. Hardware produces a complete snapshot before streaming, with no silent software downgrade. Copied owned pixels still pass final composition/runtime guarding.
+
+Preview settings/region/Quit use a separately retained inherited text pipe, preserving the private decoder packet channel and bounded control parsing. No named endpoint, unsafe Rust or new native helper was added. GPU kernel/driver authority, global GPU resource limits, physical ARM hardware and end-to-end power remain qualification items. Existing marketplace approval does not cover this candidate.
+
 ## Expected baseline result
 
 The 0.4.8 release's baseline was `review-required`, with no findings and one capability: `bundled-executable-binary`. The 0.5.0 candidate adds six native helper executables to the two static Rust renderers, so a fresh exact-commit scan and human review are required. All eight binaries are included and have rebuild/attestation recipes; see [BINARY-PROVENANCE.md](BINARY-PROVENANCE.md) and [native packaging](NATIVE-PACKAGE.md). Installation never downloads dependencies, builds source or runs privileged setup. Omarchy supplies the existing media/graphics libraries.

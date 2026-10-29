@@ -1,6 +1,6 @@
-# SSVv2: local compressed-video experiment
+# SSVv2 format and decoder boundary
 
-This is an R&D path, separate from the normal 0.5.0 plugin install and from prepared procedural playback. Ordinary invocation continues to use JPEG SSV v1. Compressed files require the explicit decoder wrapper below; without it they are skipped with a warning. Pack authors still provide data, not commands or native code.
+ScreenSafe 0.6.0's testing candidate integrates this path into Videos, thumbnails and live preview. It remains separate from prepared procedural playback and has not received marketplace approval. Bare renderer invocation still requires the trusted wrapper to read compressed files. Pack authors provide data, not commands or native code.
 
 The experiment keeps **16-bit frame references**. It permits up to **65,535 frames**, fixed **24 FPS**, even dimensions up to **1280 × 720**, and **512 MiB per file**. That is at most **45 minutes 30.625 seconds**, subject to storage and conversion budgets. JPEG SSV v1 keeps its existing five-minute, 7,200-frame limits. No renderer frame identifiers were widened.
 
@@ -16,7 +16,7 @@ python3 tools/videos/play_v2.py --renderer "$PWD/bin/screensafe-$(uname -m)" -- 
   run --pack "$PWD/packs/videos" --videos /tmp/ssv2-clips
 ```
 
-The wrapper also supports `render`, `check`, `thumbnail` and `catalog`. It does not wrap `preview` or other commands that already use stdin for their own protocol. The default delivery streams pixels directly into renderer-owned buffers; `--delivery snapshot` selects the original sealed-snapshot comparison path. No settings or installed plugin files are changed. Do not present this as marketplace-approved functionality or a finalized interchange standard.
+The wrapper supports `render`, `check`, `thumbnail`, `catalog` and `preview`. Preview retains a separate inherited text-input pipe before confinement; decoder packets keep their private stdin socket. Only a bounded pipe or regular control file is accepted, with no unsafe raw-FD construction or named listener. The default delivery streams pixels into renderer-owned buffers; `--delivery snapshot` selects sealed snapshots. Hardware startup first admits a complete snapshot so unavailable hardware cannot return a misleading stream. Direct CLI use changes no preferences. This candidate is not marketplace-approved or a finalized interchange standard.
 
 ## Explicit H.264 hardware profile
 
@@ -83,6 +83,6 @@ Local laptop trials of a 47-second, grain-heavy 720p clip found a storage/runtim
 
 The tested device styles and loop transitions completed without broker failures. Observed client submissions stayed near 24/s without gaps over 100 ms, which does not establish physical presentation timing or guarantee that every submission contains a fresh video frame. These short trials do not establish thermal endurance.
 
-Earlier laptop power tests already guide the baseline: guarded software H.264 delivery used less package power than hardware decode with CPU readback. Later owned-pixel work also reduced JPEG SSV cost, so the old difference is not a fresh savings claim for this implementation. AV1 was not covered by those power trials. File size, decoder CPU, image quality and watts are distinct measurements; no new battery-runtime percentage is claimed here. Keep ordinary JPEG playback as the default. For clips within v1's limits, explicit one-time preparation through the existing MP4 importer remains the available way to trade local disk space for its lower measured runtime CPU cost.
+Earlier laptop power tests found guarded software H.264 delivery used less package power than hardware decode with CPU readback in that pipeline. Later owned-pixel work also reduced JPEG cost, so those results are not a fresh comparison of this combined implementation. AV1 has no corresponding watt measurement. New imports default to H.264 for storage, duration and the hardware target; JPEG remains an explicit compatibility option. Hardware selection stays opt-in pending broader power/security qualification. File size, CPU, image quality and watts are distinct measurements; no new battery-runtime percentage is claimed.
 
 Before production routing or a marketplace update: extend laptop endurance and native ARM playback qualification, compare quality on more representative inputs, review the new trusted broker and codec-at-playback surface, and decide whether these profiles and envelope are ready to freeze. GitHub attestations cover the committed application executables; they do not certify codec correctness, encoded-media quality or battery savings.

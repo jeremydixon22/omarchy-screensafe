@@ -318,7 +318,7 @@ fn live_preview(args: &Args) -> Result<(), String> {
     let display = wayland::connect_preview(region)?;
     tell!("screensafe: previewing {}; {confinement}, reading only; {}", pack.meta.name, display.format());
     let mut reload = |given: &str| load_with(&dir, args, &parse_settings(given)?, None);
-    let why = display.preview(pack, &options, &mut raster, &mut reload)?;
+    let why = display.preview(pack, &options, &mut raster, &mut reload, video_decoder::preview_input()?)?;
     say!("{why}");
     Ok(())
 }

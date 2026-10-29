@@ -176,9 +176,18 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path)
     parser.add_argument("destination", type=Path)
+    parser.add_argument("--format", choices=["v2", "v1"], default="v2", help="v2 H.264 by default; v1 retains JPEG compatibility")
+    parser.add_argument("--codec", choices=["h264", "av1"], default="h264", help="compressed v2 codec")
     args = parser.parse_args()
+    if args.format == "v1" and args.codec != "h264":
+        parser.error("v1 uses JPEG frames; --codec applies to v2")
     try:
-        print(json.dumps(import_video(args.source, args.destination)))
+        if args.format == "v2":
+            import ssv2
+            result = ssv2.import_video(args.source, args.destination, ssv2.H264 if args.codec == "h264" else ssv2.AV1)
+        else:
+            result = import_video(args.source, args.destination)
+        print(json.dumps(result))
     except (ValueError, OSError, KeyError, IndexError, subprocess.SubprocessError) as error:
         parser.exit(1, f"screensafe video import: {error}\n")
 

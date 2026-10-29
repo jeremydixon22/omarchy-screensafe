@@ -86,3 +86,12 @@ class RenderNode:
 
     def __enter__(self):return self
     def __exit__(self,*unused):self.close()
+
+
+def select_node(path):
+    """The trusted caller may select an explicit node or root-controlled list."""
+    if str(path)!='auto':return RenderNode(path)
+    for candidate in sorted(Path('/dev/dri').glob('renderD*'))[:4]:
+        try:return RenderNode(candidate)
+        except (ValueError,OSError):pass
+    raise ValueError('no eligible hardware video device; select software decoding')

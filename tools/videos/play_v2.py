@@ -20,7 +20,7 @@ import subprocess
 import time
 
 import ssv2
-from hardware import RenderNode
+from hardware import RenderNode, select_node
 
 MAGIC = 0x32565353
 REQUEST = struct.Struct('<4I')
@@ -198,6 +198,13 @@ class StreamFrames(Frames):
             base=target//ssv2.GOP*ssv2.GOP
             self.decoder=Decoder(self.fd,self.info,base,direct=True,first=target,hardware=self.hardware)
             self.decodes+=target-base;self.starts+=1
+            if self.hardware is not None:
+                # Establish actual hardware output before returning a stream.
+                # Startup failure is a normal refusal, not a partial pixel reply.
+                pixels=self.decoder.read(time.monotonic()+FRAME_DEADLINE);self.decodes+=1
+                if stamp(self.fd)!=identity:raise ValueError('compressed video changed during startup')
+                self.remember(target,pixels);self.delivery=0
+                return self.cache[target]
         deadline=time.monotonic()+FRAME_DEADLINE
         while self.decoder.next<target:
             index=self.decoder.next;pixels=self.decoder.read(deadline);self.decodes+=1
@@ -208,7 +215,7 @@ class StreamFrames(Frames):
 
 
 def serve(channel, renderer, delivery='pipe', hardware=None):
-    frames=StreamFrames(hardware) if delivery=='pipe' else Frames(hardware);requests=0;failures=0
+    frames=StreamFrames(hardware) if delivery=='pipe' else Frames(hardware);requests=0;failures=0;reported=None
     try:
         while True:
             data,ancillary,flags,_=channel.recvmsg(REQUEST.size,socket.CMSG_SPACE(4*4),socket.MSG_CMSG_CLOEXEC)
@@ -229,12 +236,19 @@ def serve(channel, renderer, delivery='pipe', hardware=None):
                 requests+=1
                 try:
                     fd=frames.frame(descriptors[0],target);info=frames.info
+                    profile='software' if hardware is None else 'hardware'
+                    if profile!=reported:
+                        print(json.dumps({'screensafeVideo':{'decoder':profile}}),file=__import__('sys').stderr,flush=True)
+                        reported=profile
                     response=RESPONSE.pack(MAGIC,sequence,target,info['width'],info['height'],info['width']*info['height']*4,0,frames.delivery)
                     sent=channel.sendmsg([response],[(socket.SOL_SOCKET,socket.SCM_RIGHTS,array.array('i',[fd]))])
                 except InterruptedError:
                     raise
                 except (ValueError,OSError) as error:
                     failures+=1;frames.close()
+                    if hardware is not None and reported!='unavailable':
+                        print(json.dumps({'screensafeVideo':{'decoder':'unavailable'}}),file=__import__('sys').stderr,flush=True)
+                        reported='unavailable'
                     print('screensafe-video: '+str(error),file=__import__('sys').stderr,flush=True)
                     sent=channel.send(RESPONSE.pack(MAGIC,sequence,target,0,0,0,1,0))
                 if sent!=RESPONSE.size:raise ValueError('short video response')
@@ -250,13 +264,19 @@ def launch(renderer, command, delivery, hardware):
     """Launch only after the trusted caller has selected and pinned authority."""
     server,client=socket.socketpair(socket.AF_UNIX,socket.SOCK_SEQPACKET)
     server.setsockopt(socket.SOL_SOCKET,socket.SO_SNDTIMEO,struct.pack('@ll',2,0))
-    child=None
+    child=None;preview_input=None
     try:
+        env=dict(os.environ,SCREENSAFE_SSV2_WORKER='1',SCREENSAFE_SSV2_PIPE='1' if delivery=='pipe' else '0')
+        env.pop('SCREENSAFE_PREVIEW_INPUT_FD',None)
+        if command[0]=='preview':
+            preview_input=os.dup(0)
+            env['SCREENSAFE_PREVIEW_INPUT_FD']=str(preview_input)
         child=subprocess.Popen([str(renderer)]+command,stdin=client,
-            env=dict(os.environ,SCREENSAFE_SSV2_WORKER='1',SCREENSAFE_SSV2_PIPE='1' if delivery=='pipe' else '0'))
+            pass_fds=(() if preview_input is None else (preview_input,)),env=env)
         client.close();serve(server,child,delivery,hardware);return child.wait(timeout=5)
     finally:
         client.close();server.close()
+        if preview_input is not None:os.close(preview_input)
         if child is not None and child.poll() is None:
             child.terminate()
             try:child.wait(timeout=2)
@@ -272,17 +292,21 @@ def main():
     args=parser.parse_args();command=args.args[1:] if args.args[:1]==['--'] else args.args
     if not args.renderer.is_absolute() or not args.renderer.is_file() or not command:
         parser.error('an absolute renderer and its command are required')
-    if command[0] not in ['run','check','render','thumbnail','catalog']:
-        parser.error('this prototype wraps run/check/render/thumbnail/catalog; stdin-control commands use a different protocol')
+    if command[0] not in ['run','preview','check','render','thumbnail','catalog']:
+        parser.error('unsupported video player command')
     if (args.decoder=='vaapi') != (args.device is not None):
         parser.error('--decoder vaapi requires --device; software decode accepts no GPU authority')
     def interrupted(*unused):raise InterruptedError('video broker cancelled')
     signal.signal(signal.SIGTERM,interrupted)
     with ssv2.media.ParentLifetime():
-        with (RenderNode(args.device) if args.decoder=='vaapi' else nullcontext(None)) as hardware:
+        with (select_node(args.device) if args.decoder=='vaapi' else nullcontext(None)) as hardware:
             return launch(args.renderer,command,args.delivery,hardware)
 
 
 if __name__=='__main__':
     try:raise SystemExit(main())
     except (InterruptedError,KeyboardInterrupt):raise SystemExit(130)
+    except (ValueError,OSError) as error:
+        print(json.dumps({'screensafeVideo':{'decoder':'unavailable'}}),file=__import__('sys').stderr,flush=True)
+        print('screensafe-video: '+str(error),file=__import__('sys').stderr)
+        raise SystemExit(2)

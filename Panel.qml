@@ -93,7 +93,7 @@ Panel {
       for (var o = 0; o < declared.length; o++) overlayRows.push("set:" + declared[o].name)
       return overlayRows.concat(["overlay:reset"]).concat(root.overlayPositionDecl ? ["set:position", "preview"] : ["preview"])
     }
-    if (root.performancePageActive) return ["delay", "tabs", "enable", "settings:tabs"].concat(PerformanceModel.declarations.map(function(d) { return "set:" + d.name })).concat(["performance:prepare", "performance:clear"])
+    if (root.performancePageActive) return ["delay", "tabs", "enable", "settings:tabs"].concat(PerformanceModel.preparedDeclarations.map(function(d) { return "set:" + d.name })).concat(["performance:prepare", "performance:clear", "set:videoHardware"])
     if (root.tab === "about") return ["delay", "tabs", "enable", "about:project", "about:find", "about:make", "about:share"]
     if (root.settingsPath !== "") {
       var page = ["delay", "tabs", "enable", "settings:back", "settings:live"]
@@ -1149,7 +1149,7 @@ Panel {
             font.pixelSize: Style.font.caption
           }
           Repeater {
-            model: PerformanceModel.declarations
+            model: PerformanceModel.preparedDeclarations
             SettingRow { required property var modelData; width: performancePage.width; decl: modelData }
           }
           Text {
@@ -1179,6 +1179,20 @@ Panel {
                 onClicked: if (root.svc) { if (parent.modelData.row === "performance:prepare") root.svc.prepareSelected(); else root.svc.clearPrepared() }
               }
             }
+          }
+          PanelSectionHeader { text: "VIDEO DECODING"; foreground: root.foreground; fontFamily: root.fontFamily }
+          Repeater {
+            model: PerformanceModel.videoDeclarations
+            SettingRow { required property var modelData; width: performancePage.width; decl: modelData }
+          }
+          Text {
+            width: parent.width
+            text: root.svc ? root.svc.videoDecoderDetail : ""
+            textFormat: Text.PlainText
+            wrapMode: Text.Wrap
+            color: root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
           }
         }
       }
