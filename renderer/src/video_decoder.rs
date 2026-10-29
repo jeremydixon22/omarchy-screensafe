@@ -1,4 +1,4 @@
-//! Optional prototype-only CPU decoder channel. No codec code or new process
+//! Optional prototype-only decoder channel. No codec code or new process
 //! authority in the renderer. Bounded RGBA delivery becomes owned memory before
 //! entering the ordinary compositor and its runtime flash guard.
 use std::collections::VecDeque;
@@ -245,6 +245,92 @@ mod tests {
                 owned[0] = 0;
                 assert_eq!(client.frame(&source, 7, 2, 2, 99).unwrap(), vec![127; 16]);
             }
+            worker.join().unwrap();
+        }
+    }
+
+    #[test]
+    fn hostile_replies_never_admit_pixels_or_leave_the_channel_usable() {
+        use rustix::net::{sendmsg, SendAncillaryBuffer, SendAncillaryMessage, SendFlags};
+        for case in [
+            "magic",
+            "sequence",
+            "dimensions",
+            "status",
+            "transport",
+            "missing-fd",
+            "extra-fd",
+            "short",
+            "oversized",
+            "wrong-size",
+            "partial-seals",
+            "device-fd",
+            "datagram-fd",
+            "foreign-stream",
+            "refusal-with-fd",
+        ] {
+            let (mut client, peer) = pair();
+            client.pipe = true;
+            let worker = std::thread::spawn(move || {
+                let mut request = [0; 16];
+                (&peer).read_exact(&mut request).unwrap();
+                let sequence = u32::from_le_bytes(request[4..8].try_into().unwrap());
+                let mut words = [MAGIC, sequence, 7, 2, 2, 16, 0, 0];
+                match case {
+                    "magic" => words[0] = 0,
+                    "sequence" => words[1] += 1,
+                    "dimensions" => words[3] = 1280,
+                    "status" => words[6] = 2,
+                    "transport" => words[7] = 2,
+                    "datagram-fd" | "foreign-stream" => words[7] = 1,
+                    "refusal-with-fd" => words[6] = 1,
+                    _ => (),
+                }
+                let mut bytes: Vec<u8> = words.iter().flat_map(|v| v.to_le_bytes()).collect();
+                if case == "short" {
+                    bytes.pop();
+                }
+                if case == "oversized" {
+                    bytes.push(0);
+                }
+                let fd = rustix::fs::memfd_create("hostile-video", rustix::fs::MemfdFlags::CLOEXEC | rustix::fs::MemfdFlags::ALLOW_SEALING).unwrap();
+                let mut file = File::from(fd);
+                file.write_all(&[127; 16]).unwrap();
+                if case == "wrong-size" {
+                    file.set_len(32).unwrap();
+                }
+                let seals = if case == "partial-seals" {
+                    rustix::fs::SealFlags::GROW | rustix::fs::SealFlags::SHRINK | rustix::fs::SealFlags::SEAL
+                } else {
+                    rustix::fs::SealFlags::WRITE | rustix::fs::SealFlags::GROW | rustix::fs::SealFlags::SHRINK | rustix::fs::SealFlags::SEAL
+                };
+                rustix::fs::fcntl_add_seals(&file, seals).unwrap();
+                if case == "device-fd" {
+                    file = File::open("/dev/null").unwrap();
+                }
+                let (datagram, _) = std::os::unix::net::UnixDatagram::pair().unwrap();
+                let foreign = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+                let selected = match case {
+                    "datagram-fd" => datagram.as_fd(),
+                    "foreign-stream" => foreign.as_fd(),
+                    _ => file.as_fd(),
+                };
+                let rights = match case {
+                    "missing-fd" => vec![],
+                    "extra-fd" => vec![selected, selected],
+                    _ => vec![selected],
+                };
+                let mut space = [MaybeUninit::uninit(); rustix::cmsg_space!(ScmRights(2))];
+                let mut control = SendAncillaryBuffer::new(&mut space);
+                if !rights.is_empty() {
+                    assert!(control.push(SendAncillaryMessage::ScmRights(&rights)));
+                }
+                sendmsg(&peer, &[std::io::IoSlice::new(&bytes)], &mut control, SendFlags::NOSIGNAL).unwrap();
+            });
+            let source = File::open("/dev/null").unwrap();
+            assert!(client.frame(&source, 7, 2, 2, 100).is_err(), "{case}");
+            assert!(client.failed, "{case}");
+            assert!(client.cache.is_empty(), "{case}");
             worker.join().unwrap();
         }
     }

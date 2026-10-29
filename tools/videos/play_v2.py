@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local SSVv2 prototype broker: isolated CPU decode into renderer-owned pixels.
+"""Local SSVv2 prototype broker: confined decode into renderer-owned pixels.
 
 Run: play_v2.py --renderer /absolute/screensafe -- run --pack ... --videos ...
 This does not install, change preferences or enable the offline-approval player.
@@ -7,6 +7,7 @@ This does not install, change preferences or enable the offline-approval player.
 import argparse
 import array
 from collections import OrderedDict
+from contextlib import nullcontext
 import fcntl
 import json
 import os
@@ -19,6 +20,7 @@ import subprocess
 import time
 
 import ssv2
+from hardware import RenderNode
 
 MAGIC = 0x32565353
 REQUEST = struct.Struct('<4I')
@@ -35,16 +37,24 @@ def stamp(fd):
 
 class Decoder:
     """One bounded subprocess, lazily consumed through pipe backpressure."""
-    def __init__(self, fd, info, start, direct=False, first=None):
+    def __init__(self, fd, info, start, direct=False, first=None, hardware=None):
         self.next = start if first is None else first
         codec = 'h264' if info['codec'] == ssv2.H264 else 'libdav1d'
         form = 'h264' if info['codec'] == ssv2.H264 else 'obu'
         offset = info['entries'][start][0]
-        command = ['/usr/bin/ffmpeg','-v','error','-xerror','-err_detect','explode','-nostdin','-threads','2','-filter_threads','1',
-            '-hwaccel','none','-skip_initial_bytes',str(offset),'-probesize','32','-analyzeduration','1','-fpsprobesize','0',
+        if hardware is not None and info['codec']!=ssv2.H264:
+            raise ValueError('the VAAPI profile accepts H.264 only')
+        acceleration=(['-hwaccel','none'] if hardware is None else
+            ['-hwaccel','vaapi','-hwaccel_device',str(hardware.path),'-hwaccel_output_format','vaapi',
+             '-hwaccel_flags','0','-extra_hw_frames','0'])
+        command = ['/usr/bin/ffmpeg','-v','error','-xerror','-err_detect','explode','-nostdin',
+            '-max_alloc',str(64<<20),'-threads','2','-filter_threads','1']+acceleration+[
+            '-max_pixels',str(1280*720),
+            '-skip_initial_bytes',str(offset),'-probesize','32','-analyzeduration','1','-fpsprobesize','0',
             '-f',form,'-c:v',codec,'-r',str(info['fps']),'-protocol_whitelist','file','-i','/input.mp4',
             '-map','0:v:0','-an','-sn','-dn','-threads','2','-vf',
-            (f'select=gte(n\\,{first-start}),' if first is not None else '')+f"scale={info['width']}:{info['height']},format=rgba",
+            (f'select=gte(n\\,{first-start}),' if first is not None else '')+
+            ('hwdownload,format=nv12,' if hardware is not None else '')+f"scale={info['width']}:{info['height']},format=rgba",
             '-frames:v',str(info['frames']-start),'-fps_mode','passthrough','-f','rawvideo','-flush_packets','1','pipe:1']
         self.output=None
         if direct:
@@ -52,8 +62,11 @@ class Decoder:
         else:writer=subprocess.PIPE
         try:
             with ssv2.media.media_process_filter() as policy:
-                self.proc = subprocess.Popen([ssv2.media.media_launcher()]+ssv2.media.sandbox(fd,command,policy),
-                    pass_fds=(fd,policy),stdin=subprocess.DEVNULL,stdout=writer,stderr=subprocess.PIPE,start_new_session=True)
+                cage=ssv2.media.sandbox(fd,[],policy)
+                if hardware is not None:cage+=hardware.mounts();command=hardware.command(command)
+                self.proc = subprocess.Popen([ssv2.media.media_launcher()]+cage+['--']+command,
+                    pass_fds=(fd,policy,*(() if hardware is None else hardware.pass_fds)),
+                    stdin=subprocess.DEVNULL,stdout=writer,stderr=subprocess.PIPE,start_new_session=True)
         except BaseException:
             if direct:self.output.close();writer.close()
             raise
@@ -107,8 +120,9 @@ class Decoder:
 
 class Frames:
     """One active clip, twelve immutable frames, no total-duration RAM growth."""
-    def __init__(self):
+    def __init__(self, hardware=None):
         self.fd=None;self.info=None;self.identity=None;self.decoder=None
+        self.hardware=hardware
         self.cache=OrderedDict();self.starts=0;self.decodes=0;self.hits=0
         self.delivery=0
 
@@ -153,7 +167,7 @@ class Frames:
         if (self.decoder is None or target<self.decoder.next or target-self.decoder.next>=ssv2.GOP
                 or self.decoder.cpu_seconds()>100):
             if self.decoder is not None:self.decoder.close()
-            self.decoder=Decoder(self.fd,self.info,target//ssv2.GOP*ssv2.GOP);self.starts+=1
+            self.decoder=Decoder(self.fd,self.info,target//ssv2.GOP*ssv2.GOP,hardware=self.hardware);self.starts+=1
         deadline=time.monotonic()+FRAME_DEADLINE
         # A cold/random request decodes no more than one fixed GOP. Sequential
         # playback reuses the same process and decodes one new frame per request.
@@ -182,7 +196,7 @@ class StreamFrames(Frames):
                 or self.decoder.cpu_seconds()>100):
             if self.decoder is not None:self.decoder.close()
             base=target//ssv2.GOP*ssv2.GOP
-            self.decoder=Decoder(self.fd,self.info,base,direct=True,first=target)
+            self.decoder=Decoder(self.fd,self.info,base,direct=True,first=target,hardware=self.hardware)
             self.decodes+=target-base;self.starts+=1
         deadline=time.monotonic()+FRAME_DEADLINE
         while self.decoder.next<target:
@@ -193,8 +207,8 @@ class StreamFrames(Frames):
         return self.decoder.output.fileno()
 
 
-def serve(channel, renderer, delivery='pipe'):
-    frames=StreamFrames() if delivery=='pipe' else Frames();requests=0;failures=0
+def serve(channel, renderer, delivery='pipe', hardware=None):
+    frames=StreamFrames(hardware) if delivery=='pipe' else Frames(hardware);requests=0;failures=0
     try:
         while True:
             data,ancillary,flags,_=channel.recvmsg(REQUEST.size,socket.CMSG_SPACE(4*4),socket.MSG_CMSG_CLOEXEC)
@@ -227,37 +241,46 @@ def serve(channel, renderer, delivery='pipe'):
             finally:
                 for fd in descriptors:os.close(fd)
     finally:
-        stats={'requests':requests,'failures':failures,'decoderStarts':frames.starts,'decodedFrames':frames.decodes,'cacheHits':frames.hits}
+        stats={'requests':requests,'failures':failures,'decoderStarts':frames.starts,'decodedFrames':frames.decodes,'cacheHits':frames.hits,
+            'decoderProfile':'software' if hardware is None else 'vaapi-required'}
         frames.close();print(json.dumps({'ssv2':stats}),file=__import__('sys').stderr,flush=True)
 
 
-def main():
-    parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--delivery',choices=['pipe','snapshot'],default='pipe')
-    parser.add_argument('--renderer',type=Path,required=True);parser.add_argument('args',nargs=argparse.REMAINDER)
-    args=parser.parse_args();command=args.args[1:] if args.args[:1]==['--'] else args.args
-    if not args.renderer.is_absolute() or not args.renderer.is_file() or not command:
-        parser.error('an absolute renderer and its command are required')
-    if command[0] not in ['run','check','render','thumbnail','catalog']:
-        parser.error('this prototype wraps run/check/render/thumbnail/catalog; stdin-control commands use a different protocol')
+def launch(renderer, command, delivery, hardware):
+    """Launch only after the trusted caller has selected and pinned authority."""
     server,client=socket.socketpair(socket.AF_UNIX,socket.SOCK_SEQPACKET)
-    # Peer EOF wakes recvmsg when the renderer exits. Avoid an idle polling
-    # timer; bound only sends, so a non-reading client cannot strand the broker.
     server.setsockopt(socket.SOL_SOCKET,socket.SO_SNDTIMEO,struct.pack('@ll',2,0))
-    def interrupted(*unused):raise InterruptedError('video broker cancelled')
-    signal.signal(signal.SIGTERM,interrupted)
     child=None
     try:
-        with ssv2.media.ParentLifetime():
-            child=subprocess.Popen([str(args.renderer)]+command,stdin=client,
-                env=dict(os.environ,SCREENSAFE_SSV2_WORKER='1',SCREENSAFE_SSV2_PIPE='1' if args.delivery=='pipe' else '0'))
-            client.close();serve(server,child,args.delivery);return child.wait(timeout=5)
+        child=subprocess.Popen([str(renderer)]+command,stdin=client,
+            env=dict(os.environ,SCREENSAFE_SSV2_WORKER='1',SCREENSAFE_SSV2_PIPE='1' if delivery=='pipe' else '0'))
+        client.close();serve(server,child,delivery,hardware);return child.wait(timeout=5)
     finally:
         client.close();server.close()
         if child is not None and child.poll() is None:
             child.terminate()
             try:child.wait(timeout=2)
             except subprocess.TimeoutExpired:child.kill();child.wait(timeout=2)
+
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--delivery',choices=['pipe','snapshot'],default='pipe')
+    parser.add_argument('--decoder',choices=['software','vaapi'],default='software')
+    parser.add_argument('--device',type=Path)
+    parser.add_argument('--renderer',type=Path,required=True);parser.add_argument('args',nargs=argparse.REMAINDER)
+    args=parser.parse_args();command=args.args[1:] if args.args[:1]==['--'] else args.args
+    if not args.renderer.is_absolute() or not args.renderer.is_file() or not command:
+        parser.error('an absolute renderer and its command are required')
+    if command[0] not in ['run','check','render','thumbnail','catalog']:
+        parser.error('this prototype wraps run/check/render/thumbnail/catalog; stdin-control commands use a different protocol')
+    if (args.decoder=='vaapi') != (args.device is not None):
+        parser.error('--decoder vaapi requires --device; software decode accepts no GPU authority')
+    def interrupted(*unused):raise InterruptedError('video broker cancelled')
+    signal.signal(signal.SIGTERM,interrupted)
+    with ssv2.media.ParentLifetime():
+        with (RenderNode(args.device) if args.decoder=='vaapi' else nullcontext(None)) as hardware:
+            return launch(args.renderer,command,args.delivery,hardware)
 
 
 if __name__=='__main__':

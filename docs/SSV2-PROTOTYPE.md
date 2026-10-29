@@ -18,6 +18,24 @@ python3 tools/videos/play_v2.py --renderer "$PWD/bin/screensafe-$(uname -m)" -- 
 
 The wrapper also supports `render`, `check`, `thumbnail` and `catalog`. It does not wrap `preview` or other commands that already use stdin for their own protocol. The default delivery streams pixels directly into renderer-owned buffers; `--delivery snapshot` selects the original sealed-snapshot comparison path. No settings or installed plugin files are changed. Do not present this as marketplace-approved functionality or a finalized interchange standard.
 
+## Explicit H.264 hardware profile
+
+The default wrapper profile is software decoding. Hardware H.264 is an explicit R&D profile for PCI VAAPI render nodes:
+
+```sh
+python3 tools/videos/play_v2.py --decoder vaapi --device /dev/dri/renderD128 \
+  --renderer "$PWD/bin/screensafe-$(uname -m)" -- \
+  check "$PWD/packs/videos" --videos /tmp/ssv2-clips --size 640x360 --seconds 5
+```
+
+The caller selects the device; packs and decoder requests cannot supply one. This profile requires VAAPI frames followed by `hwdownload` into the existing owned-pixel path. Unavailable hardware, unsupported profiles or AV1 files are refused. There is no silent software fallback; select `--decoder software` explicitly when needed. Decoder profile/level mismatch and unsafe-output overrides are disabled. Generic FFmpeg allocation and decoded-pixel limits are applied in addition to the process caps, so a small SSV header cannot authorize an oversized coded picture.
+
+The broker retains the render-node identity and verifies it again inside the cage before codec startup. Symlinks, primary/card nodes and non-render devices are refused. The worker receives one render node and eight pinned read-only metadata files with the sysfs links needed by the driver. It receives no whole `/sys`, PCI resource/config/ROM files, other GPU devices or display socket. The parent-only device handle is not inherited, and setup descriptors are consumed before codec execution. New sockets and connections are denied by seccomp independently of network namespaces; normal threads remain available.
+
+This preserves final CPU composition and runtime guarding. No DMA-BUF or GPU-writable image is admitted to the renderer. Both direct delivery and sealed snapshots finish copying pixels before checking or displaying them. Render nodes exclude modesetting/DRM-master authority, but expose rendering ioctls and the kernel/driver attack surface; see the [kernel DRM documentation](https://docs.kernel.org/gpu/drm-uapi.html#render-nodes). CPU/address-space limits do not establish a global GPU-memory quota, guarantee recovery from a kernel/driver hang, or make arbitrary GPU ioctls harmless. This requires review before production routing.
+
+Physical-GPU tests are opt-in: set `SCREENSAFE_TEST_RENDER_NODE` to an explicit accessible render node when running the importer/playback suite. Ordinary CI runs the software cage, protocol and failure tests and skips physical-GPU cases. Actual laptop tests cover hardware-required composition in all six styles, flash rejection, seeks, neighbors, loops, immutable delivery and parent-death cleanup. These are functional/security checks, not a new power or endurance result. Native ARM display/hardware qualification and other hardware APIs remain open.
+
 ## Encode and validate
 
 The explicit importer accepts a retained, no-follow regular MP4 descriptor of at most 2 GiB. It normalizes one video stream to fixed 8-bit YUV420, dimensions and cadence, with no audio, subtitles or variable resolution. HDR transfer functions are refused. The profiles use closed one-second GOPs without frame reordering. H.264 uses CRF 16, x264's `fastdecode` tuning, and disabled B-frames and scene-cut keyframes. The tuning disables CABAC, deblocking and weighted prediction to reduce software decode work; see the [x264 implementation](https://github.com/mirror/x264/blob/master/common/base.c). AV1 uses libaom CRF 24, no lag/alternate-reference frames, and fixed keyframe spacing. These are experiment profiles, not a claim of equivalent quality between codecs.
@@ -47,7 +65,7 @@ The header is followed by one 16-byte `(offset:u64, length:u32, flags:u32)` reco
 
 A trusted Python broker starts the renderer with a private `SOCK_SEQPACKET` stdin channel. The renderer duplicates it before confinement, then retains the same filesystem/network/process restrictions as ordinary playback. A request carries one retained read-only input descriptor, a sequence number and a bounded frame index. It cannot choose a command, path, filter or decoder option.
 
-The broker independently validates the index and uses one active CPU decoder in the existing user/mount/PID/network namespace cage. It receives no home, compositor socket or GPU node. FFmpeg has fixed decoder/demuxer arguments, thread-only process creation, bounded stderr and pipe backpressure. A cold seek decodes at most one GOP; a sequential request normally decodes one new frame. Each request has a five-second decode budget. The decoder is recycled before its normal cumulative CPU usage reaches the hard limit, so long playback does not depend on an unbounded process budget.
+The broker independently validates the index and uses one active decoder in the existing user/mount/PID/network namespace cage. It receives no home or compositor socket; software mode receives no GPU node, while the explicit VAAPI profile has the authority described above. FFmpeg has fixed decoder/demuxer arguments, thread-only process creation, bounded stderr and pipe backpressure. A cold seek decodes at most one GOP; a sequential request normally decodes one new frame. Each request has a five-second decode budget. The decoder is recycled before its normal cumulative CPU usage reaches the hard limit, so long playback does not depend on an unbounded process budget.
 
 The default delivery transfers a private Unix stream descriptor and Rust reads exactly one bounded frame into owned memory under a total five-second deadline. This avoids routing every frame through Python byte buffers and a new memfd. Rust rejects other socket families/types and checks response identity, descriptor count, dimensions and byte length. Twelve raw frames are cached in Rust for neighbor access and crop/tone variants; returned images are separately owned. An internal clip identity prevents cache confusion when descriptors are reused; frame references remain 16-bit.
 
@@ -55,7 +73,7 @@ Skipped neighboring frames can use a bounded sealed-memfd cache in the broker, a
 
 The ordinary rasterizer applies crop, tone, curvature, device/Film art and optional overlay. The existing runtime flash guard remains after final composition. This path does **not** use the procedural cache's offline GPU approval or assume that a media hash constrains decoder output. A compromised codec still has its confined syscall/kernel surface; isolation is not a promise that bugs are impossible.
 
-There is no idle broker polling timer: renderer EOF and the parent's pidfd end the work. Codec death, invalid metadata, incomplete frames, expired deadlines or input mutation refuse the video. A well-formed refusal allows subsequent clips; a broken transport closes the prototype session. Shutdown cleans up the decoder and renderer. Hardware decode is intentionally outside this CPU experiment's authority and qualification.
+There is no idle broker polling timer: renderer EOF and the parent's pidfd end the work. Codec death, invalid metadata, incomplete frames, expired deadlines or input mutation refuse the video. A well-formed refusal allows subsequent clips; a broken transport closes the prototype session. Shutdown cleans up the decoder and renderer.
 
 ## Evidence and remaining qualification
 

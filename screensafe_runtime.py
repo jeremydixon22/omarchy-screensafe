@@ -36,7 +36,9 @@ def media_process_filter():
     remains necessary for that launch; replacing the same already-confined
     process cannot reset its CPU limit, expand mounts or create descendants.
     execveat and io_uring are denied. No media bytes or author options influence
-    this fixed policy. libseccomp is supplied by Omarchy's base systemd stack.
+    this fixed policy. New sockets/connections are denied independently of the
+    private network namespace; file conversion and GPU readback need none.
+    libseccomp is supplied by Omarchy's base systemd stack.
     """
     class Compare(ctypes.Structure):
         _fields_ = [('arg', ctypes.c_uint), ('op', ctypes.c_int),
@@ -66,7 +68,8 @@ def media_process_filter():
             raise ValueError('cannot compile media process policy')
     try:
         for name in ('fork', 'vfork', 'execveat', 'io_uring_setup', 'ptrace',
-                     'process_vm_readv', 'process_vm_writev', 'unshare', 'setns'):
+                     'process_vm_readv', 'process_vm_writev', 'unshare', 'setns',
+                     'socket', 'socketpair', 'connect', 'bind', 'listen', 'accept', 'accept4'):
             rule(name, errno.EPERM)
         rule('clone3', errno.ENOSYS)  # pthread falls back to inspectable clone flags.
         rule('clone', errno.EPERM, Compare(0, 7, 0x10000, 0))  # no CLONE_THREAD
