@@ -15,6 +15,7 @@ from pathlib import Path
 import selectors
 import signal
 import socket
+import stat
 import struct
 import subprocess
 import time
@@ -264,19 +265,25 @@ def launch(renderer, command, delivery, hardware):
     """Launch only after the trusted caller has selected and pinned authority."""
     server,client=socket.socketpair(socket.AF_UNIX,socket.SOCK_SEQPACKET)
     server.setsockopt(socket.SOL_SOCKET,socket.SO_SNDTIMEO,struct.pack('@ll',2,0))
-    child=None;preview_input=None
+    child=None;control_input=None
     try:
         env=dict(os.environ,SCREENSAFE_SSV2_WORKER='1',SCREENSAFE_SSV2_PIPE='1' if delivery=='pipe' else '0')
-        env.pop('SCREENSAFE_PREVIEW_INPUT_FD',None)
-        if command[0]=='preview':
-            preview_input=os.dup(0)
-            env['SCREENSAFE_PREVIEW_INPUT_FD']=str(preview_input)
+        env.pop('SCREENSAFE_CONTROL_INPUT_FD',None)
+        if command[0] in ['run','preview']:
+            control_input=os.dup(0)
+            kind=os.fstat(control_input).st_mode
+            if not (stat.S_ISFIFO(kind) or stat.S_ISREG(kind)):
+                # Standalone launches may inherit a terminal or /dev/null.
+                # Retain an empty pipe instead of granting device input.
+                os.close(control_input)
+                control_input,writer=os.pipe();os.close(writer)
+            env['SCREENSAFE_CONTROL_INPUT_FD']=str(control_input)
         child=subprocess.Popen([str(renderer)]+command,stdin=client,
-            pass_fds=(() if preview_input is None else (preview_input,)),env=env)
+            pass_fds=(() if control_input is None else (control_input,)),env=env)
         client.close();serve(server,child,delivery,hardware);return child.wait(timeout=5)
     finally:
         client.close();server.close()
-        if preview_input is not None:os.close(preview_input)
+        if control_input is not None:os.close(control_input)
         if child is not None and child.poll() is None:
             child.terminate()
             try:child.wait(timeout=2)

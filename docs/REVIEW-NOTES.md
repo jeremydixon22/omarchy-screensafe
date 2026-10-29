@@ -8,7 +8,7 @@ This retains 0.5.0's compiler/sprite optimizations, video art/startup/drift, col
 
 The trusted broker selects codec/device policy; packs cannot request commands or devices. Hardware adds one identity-checked PCI render node and eight pinned read-only metadata files. No compositor socket, full sysfs or primary GPU node is exposed. New worker sockets are denied. Allocation/pixel limits constrain coded headers as well as the envelope. Hardware produces a complete snapshot before streaming, with no silent software downgrade. Copied owned pixels still pass final composition/runtime guarding.
 
-Preview settings/region/Quit use a separately retained inherited text pipe, preserving the private decoder packet channel and bounded control parsing. No named endpoint, unsafe Rust or new native helper was added. GPU kernel/driver authority, global GPU resource limits, physical ARM hardware and end-to-end power remain qualification items. Existing marketplace approval does not cover this candidate.
+Fullscreen overlay/stats/Quit and preview settings/region/Quit use a separately retained inherited text pipe, preserving the private decoder packet channel and bounded control parsing. No named endpoint, unsafe Rust or new native helper was added. GPU kernel/driver authority, global GPU resource limits, physical ARM hardware and end-to-end power remain qualification items. Existing marketplace approval does not cover this candidate.
 
 ## Expected baseline result
 

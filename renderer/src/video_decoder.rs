@@ -14,33 +14,33 @@ use std::time::Instant;
 
 const MAGIC: u32 = 0x32565353;
 static CLIENT: OnceLock<Mutex<Client>> = OnceLock::new();
-static PREVIEW_INPUT: OnceLock<File> = OnceLock::new();
+static CONTROL_INPUT: OnceLock<File> = OnceLock::new();
 
-fn inherited_preview_input(number: u32) -> Result<File, String> {
+fn inherited_control_input(number: u32) -> Result<File, String> {
     if !(3..=1023).contains(&number) {
-        return Err("invalid preview input descriptor".into());
+        return Err("invalid control input descriptor".into());
     }
     // Reopening a pipe through procfs is safe Rust and keeps the decoder's
     // private stdin socket separate from the panel's bounded text controls.
     let path = format!("/proc/self/fd/{number}");
     let kind = std::fs::metadata(&path).map_err(|e| e.to_string())?.file_type();
     if !kind.is_fifo() && !kind.is_file() {
-        return Err("preview input must be a pipe or regular file".into());
+        return Err("control input must be a pipe or regular file".into());
     }
     let input = std::fs::OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_NONBLOCK | libc::O_CLOEXEC)
         .open(path)
-        .map_err(|e| format!("can't retain preview input: {e}"))?;
+        .map_err(|e| format!("can't retain control input: {e}"))?;
     let kind = input.metadata().map_err(|e| e.to_string())?.file_type();
     if !kind.is_fifo() && !kind.is_file() {
-        return Err("preview input must be a pipe or regular file".into());
+        return Err("control input must be a pipe or regular file".into());
     }
     Ok(input)
 }
 
-pub fn preview_input() -> Result<File, String> {
-    match PREVIEW_INPUT.get() {
+pub fn control_input() -> Result<File, String> {
+    match CONTROL_INPUT.get() {
         Some(input) => input.try_clone().map_err(|e| e.to_string()),
         None => std::io::stdin().as_fd().try_clone_to_owned().map(File::from).map_err(|e| e.to_string()),
     }
@@ -65,9 +65,9 @@ pub fn initialize() -> Result<(), String> {
     if std::env::var("SCREENSAFE_SSV2_WORKER").as_deref() != Ok("1") {
         return Ok(());
     }
-    if let Ok(raw) = std::env::var("SCREENSAFE_PREVIEW_INPUT_FD") {
-        let number = raw.parse::<u32>().map_err(|_| "invalid preview input descriptor")?;
-        PREVIEW_INPUT.set(inherited_preview_input(number)?).map_err(|_| "duplicate preview input")?;
+    if let Ok(raw) = std::env::var("SCREENSAFE_CONTROL_INPUT_FD") {
+        let number = raw.parse::<u32>().map_err(|_| "invalid control input descriptor")?;
+        CONTROL_INPUT.set(inherited_control_input(number)?).map_err(|_| "duplicate control input")?;
     }
     let fd = std::io::stdin().as_fd().try_clone_to_owned().map_err(|e| e.to_string())?;
     if rustix::net::sockopt::socket_type(&fd).map_err(|e| e.to_string())? != rustix::net::SocketType::SEQPACKET {
@@ -195,10 +195,10 @@ mod tests {
     use std::io::{Read, Write};
 
     #[test]
-    fn preview_controls_use_a_retained_pipe_and_never_the_decoder_socket() {
+    fn text_controls_use_a_retained_pipe_and_never_the_decoder_socket() {
         use std::os::fd::AsRawFd;
         let (reader, mut writer) = std::io::pipe().unwrap();
-        let mut retained = inherited_preview_input(reader.as_raw_fd() as u32).unwrap();
+        let mut retained = inherited_control_input(reader.as_raw_fd() as u32).unwrap();
         drop(reader);
         writer.write_all(b"settings style=2\nquit\n").unwrap();
         drop(writer);
@@ -206,8 +206,8 @@ mod tests {
         retained.read_to_string(&mut text).unwrap();
         assert_eq!(text, "settings style=2\nquit\n");
         let (socket, _) = UnixStream::pair().unwrap();
-        assert!(inherited_preview_input(socket.as_raw_fd() as u32).is_err());
-        assert!(inherited_preview_input(0).is_err());
+        assert!(inherited_control_input(socket.as_raw_fd() as u32).is_err());
+        assert!(inherited_control_input(0).is_err());
     }
 
     fn pair() -> (Client, UnixStream) {

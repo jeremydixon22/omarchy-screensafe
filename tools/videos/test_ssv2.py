@@ -42,12 +42,12 @@ class CompressedVideoTests(unittest.TestCase):
                 self.assertEqual(output.read_bytes()[:8],magic)
                 self.assertEqual(json.loads(p.stdout)['frames'],72)
 
-    def test_preview_input_is_separate_from_the_decoder_channel(self):
+    def test_text_controls_are_separate_from_the_decoder_channel(self):
         with tempfile.TemporaryDirectory() as directory:
             renderer=Path(directory)/'renderer'
             renderer.write_text('''#!/usr/bin/python3
 import array,json,os,socket,struct,sys
-controls=os.read(int(os.environ['SCREENSAFE_PREVIEW_INPUT_FD']),4096)
+controls=os.read(int(os.environ['SCREENSAFE_CONTROL_INPUT_FD']),4096)
 s=socket.socket(fileno=0);fd=os.open(sys.argv[2],os.O_RDONLY)
 s.sendmsg([struct.pack('<4I',0x32565353,1,0,0)],[(socket.SOL_SOCKET,socket.SCM_RIGHTS,array.array('i',[fd]))])
 body,ancillary,flags,_=s.recvmsg(32,256);words=struct.unpack('<8I',body)
@@ -65,10 +65,13 @@ print(json.dumps({'controls':controls.decode(),'pixels':len(data)}))
             options=[]
             if os.environ.get('SCREENSAFE_TEST_RENDER_NODE'):
                 options=['--decoder','vaapi','--device',os.environ['SCREENSAFE_TEST_RENDER_NODE']]
-            p=subprocess.run(['/usr/bin/python3',str(wrapper)]+options+['--renderer',str(renderer),'--','preview',str(self.clips[ssv2.H264])],
-                input='settings style=2\nquit\n',capture_output=True,text=True,timeout=12)
-            self.assertEqual(p.returncode,0,p.stderr)
-            self.assertEqual(json.loads(p.stdout),{'controls':'settings style=2\nquit\n','pixels':160*90*4})
+            for mode,controls in [('preview','settings style=2\nquit\n'),('run','stats cpu=12,memory=37,battery=82\nquit\n'),('run',None)]:
+                with self.subTest(mode=mode,controls=controls):
+                    source={'stdin':subprocess.DEVNULL} if controls is None else {'input':controls}
+                    p=subprocess.run(['/usr/bin/python3',str(wrapper)]+options+['--renderer',str(renderer),'--',mode,str(self.clips[ssv2.H264])],
+                        **source,capture_output=True,text=True,timeout=12)
+                    self.assertEqual(p.returncode,0,p.stderr)
+                    self.assertEqual(json.loads(p.stdout),{'controls':controls or '', 'pixels':160*90*4})
 
     def test_sequential_seek_film_neighbors_and_loop_use_immutable_snapshots(self):
         for codec,path in self.clips.items():

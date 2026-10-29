@@ -252,20 +252,23 @@ fn parse_system_info(cpu: &str, memory: &str) -> Result<String, String> {
 }
 
 /// One bounded read per ready turn; EOF disables control without ending a standalone `run`.
-#[derive(Default)]
 pub struct Input {
+    input: std::fs::File,
     line: Vec<u8>,
     over: bool,
     closed: bool,
 }
 impl Input {
+    pub fn new(input: std::fs::File) -> Self {
+        Self { input, line: Vec::new(), over: false, closed: false }
+    }
+
     pub fn poll(&mut self) -> Vec<String> {
         use std::os::fd::AsFd;
         if self.closed {
             return Vec::new();
         }
-        let stdin = std::io::stdin();
-        let input = stdin.as_fd();
+        let input = self.input.as_fd();
         let mut fds = [rustix::event::PollFd::new(&input, rustix::event::PollFlags::IN)];
         if !matches!(rustix::event::poll(&mut fds, Some(&rustix::event::Timespec { tv_sec: 0, tv_nsec: 0 })), Ok(n) if n > 0) {
             return Vec::new();
@@ -302,6 +305,20 @@ impl Input {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn run_controls_read_the_retained_pipe_and_drop_oversized_lines() {
+        use std::io::Write;
+        let (reader, mut writer) = std::io::pipe().unwrap();
+        let fd: std::os::fd::OwnedFd = reader.into();
+        let mut input = Input::new(fd.into());
+        writer.write_all(&vec![b'x'; 1024]).unwrap();
+        writer.write_all(b"\nstats cpu=12,memory=37,battery=82\nquit\n").unwrap();
+        drop(writer);
+        let lines: Vec<_> = (0..8).flat_map(|_| input.poll()).collect();
+        assert_eq!(lines, ["stats cpu=12,memory=37,battery=82", "quit"]);
+        assert!(input.closed);
+    }
 
     #[test]
     fn control_accepts_only_finite_known_numbers_and_preserves_state_on_rejection() {

@@ -664,10 +664,10 @@ impl Display {
     }
 
     /// Shows the pack until input dismisses it, returning why it closed.
-    pub fn run(mut self, pack: &Pack, options: &Options, raster: &mut Raster) -> Result<&'static str, String> {
+    pub fn run(mut self, pack: &Pack, options: &Options, raster: &mut Raster, input: std::fs::File) -> Result<&'static str, String> {
         let qh = self.queue.handle();
         self.state.overlay = Some(crate::overlay::Overlay::new(options.overlay.clone(), options.clock.clone().unwrap_or_else(crate::clock::Clock::fixed)));
-        let mut control = crate::overlay::Input::default();
+        let mut control = crate::overlay::Input::new(input);
         let mut eval = Evaluator::new(pack, options.seed, raster.metrics());
         if let Some(clock) = &options.clock {
             eval.set_clock(clock.clone());
