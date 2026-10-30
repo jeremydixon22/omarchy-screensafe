@@ -15,7 +15,7 @@ libc = "0.2"
 fontdue = { version = "0.9", default-features = false, features = ["std"] }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
 landlock = "0.4"
-rustix = { version = "1", features = ["fs", "mm", "process", "time", "event", "net"] }
+rustix = { version = "1", features = ["fs", "mm", "process", "time", "event", "net", "stdio"] }
 tiny-skia = { version = "0.11", default-features = false, features = ["std", "simd"] }
 ttf-parser = { version = "0.25", default-features = false, features = ["opentype-layout", "no-std-float"] }
 tz-rs = { version = "0.7", default-features = false, features = ["std"] }

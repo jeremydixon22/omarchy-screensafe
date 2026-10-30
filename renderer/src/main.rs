@@ -27,6 +27,7 @@ mod crt;
 mod eval;
 mod expr;
 mod flash;
+mod live_capture;
 mod overlay;
 mod pack;
 mod palette;
@@ -229,7 +230,7 @@ fn load_with(dir: &Path, args: &Args, chosen: &[(String, f64)], photo_seed: Opti
     let videos = video_folder(args);
     let palette = theme_palette(theme.as_deref())?;
     let env = Environment {
-        cache_identity: matches!(args.positional.first().map(String::as_str), Some("cache-plan" | "prepare-frames")),
+        cache_identity: matches!(args.positional.first().map(String::as_str), Some("cache-plan" | "prepare-frames" | "run-capture")),
         palette: palette.as_ref(),
         theme: theme.as_deref(),
         branding: branding.as_deref(),
@@ -247,7 +248,24 @@ fn load_with(dir: &Path, args: &Args, chosen: &[(String, f64)], photo_seed: Opti
 const PACK_UNUSABLE: u8 = 3;
 
 fn run(args: &Args) -> Result<Result<(), String>, String> {
-    args.only(&["overlay", "pack", "theme", "branding", "logo", "badge", "photos", "videos", "settings", "seed", "max-fps", "exit-after", "start", "role"])?;
+    args.only(&[
+        "overlay",
+        "pack",
+        "theme",
+        "branding",
+        "logo",
+        "badge",
+        "photos",
+        "videos",
+        "settings",
+        "seed",
+        "max-fps",
+        "exit-after",
+        "start",
+        "role",
+        "capture-size",
+        "capture-seconds",
+    ])?;
     let dir = args.path("pack").ok_or(USAGE)?;
     let seed = match args.number("seed")? {
         Some(s) => s as u64,
@@ -259,17 +277,31 @@ fn run(args: &Args) -> Result<Result<(), String>, String> {
     let clock = clock::Clock::local(&mut clock_warnings).starting_at(start);
     let options = wayland::Options {
         seed,
+        capture: if args.positional.first().is_some_and(|s| s == "run-capture") {
+            let size = parse_size(args.get("capture-size"), (1152, 720))?;
+            let seconds = args.number("capture-seconds")?.unwrap_or(32.0);
+            if !(16.0..=32.0).contains(&seconds) {
+                return Err("capture needs 16..=32 seconds".into());
+            }
+            Some((size, (seconds * 24.0).ceil() as u32))
+        } else {
+            None
+        },
         exit_after: args.number("exit-after")?.map(|s| Duration::from_secs_f64(s.clamp(0.0, 86400.0))),
         max_fps: args.number("max-fps")?.unwrap_or(pack::MAX_FPS).clamp(1.0, pack::MAX_FPS),
         start,
         clock: Some(clock),
         overlay: overlay::Config::parse(args.get("overlay").unwrap_or(""))?,
     };
+    let capture_output = options.capture.map(|_| live_capture::output()).transpose()?;
     confine_reading(args, std::slice::from_ref(&dir))?;
     let pack = match load_with(&dir, args, &settings(args)?, Some(seed)) {
         Ok(p) => p,
         Err(e) => return Ok(Err(e)),
     };
+    if options.capture.is_some() && (prepared::ineligible(&pack).is_some() || options.overlay.enabled) {
+        return Err("this live composition is ineligible for capture".into());
+    }
     for w in &clock_warnings {
         tell!("screensafe: {w}");
     }
@@ -283,11 +315,15 @@ fn run(args: &Args) -> Result<Result<(), String>, String> {
     for w in &pack.warnings {
         tell!("screensafe: {w}");
     }
-    let why = display.run(&pack, &options, &mut raster, video_decoder::control_input()?)?;
+    let why = display.run(&pack, &options, &mut raster, video_decoder::control_input()?, capture_output)?;
     for w in &raster.warnings {
         tell!("screensafe: {w}");
     }
-    say!("{why}");
+    if options.capture.is_none() {
+        say!("{why}");
+    } else {
+        tell!("screensafe: {why}");
+    }
     Ok(Ok(()))
 }
 
@@ -306,6 +342,7 @@ fn live_preview(args: &Args) -> Result<(), String> {
     let pack = load(&dir, args)?;
     let options = wayland::Options {
         seed: args.number("seed")?.map(|s| s as u64).unwrap_or(1),
+        capture: None,
         exit_after: None,
         max_fps: pack::MAX_FPS,
         start: 0.0,
@@ -748,7 +785,7 @@ fn main() -> ExitCode {
         Some("run-prepared") => prepared::run(&args).map(|_| true),
         Some("prepare-frames") => prepared::record(&args).map(|_| true),
         Some("approve-frames") => prepared::certify(&args).map(|_| true),
-        Some("run") => match run(&args) {
+        Some("run" | "run-capture") => match run(&args) {
             Ok(Err(e)) => {
                 tell!("screensafe: {e}");
                 return ExitCode::from(PACK_UNUSABLE);

@@ -3,7 +3,7 @@ use super::*;
 use std::io::{IsTerminal, Read, Write};
 use std::time::Instant;
 
-fn ineligible(pack: &Pack) -> Option<&'static str> {
+pub(crate) fn ineligible(pack: &Pack) -> Option<&'static str> {
     if pack.uses_photos || pack.uses_videos {
         Some("photos and videos use live playback")
     } else if pack.cache_clock {

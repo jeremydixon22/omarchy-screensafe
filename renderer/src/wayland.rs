@@ -78,6 +78,7 @@ impl Region {
 }
 
 pub struct Options {
+    pub capture: Option<((u32, u32), u32)>,
     pub seed: u64,
     pub exit_after: Option<Duration>,
     pub max_fps: f64,
@@ -160,6 +161,7 @@ struct Globals {
 }
 
 struct State {
+    capture: Option<crate::live_capture::Capture>,
     linear_xrgb: bool,
     globals: Globals,
     overlay: Option<crate::overlay::Overlay>,
@@ -419,6 +421,9 @@ impl State {
             s.wl.damage_buffer(0, 0, w as i32, h as i32);
             s.wl.frame(qh, name);
             s.wl.commit();
+            if let Some(capture) = &mut self.capture {
+                capture.offer((w, h), pixmap.data(), pack.scenes[Evaluator::locate(pack, time).0].fps);
+            }
             if pack.uses_videos {
                 s.video_start.presented(time, surround_ready);
             }
@@ -483,6 +488,7 @@ fn connect_to(region: Option<Region>) -> Result<Display, String> {
     let fractional = globals.bind::<WpFractionalScaleManagerV1, _, _>(&qh, 1..=1, ()).ok();
     let dmabuf = globals.bind::<ZwpLinuxDmabufV1, _, _>(&qh, 3..=3, ()).ok();
     let mut state = State {
+        capture: None,
         linear_xrgb: false,
         overlay: None,
         globals: Globals { compositor, shm, layer_shell, viewporter, fractional, dmabuf },
@@ -664,7 +670,21 @@ impl Display {
     }
 
     /// Shows the pack until input dismisses it, returning why it closed.
-    pub fn run(mut self, pack: &Pack, options: &Options, raster: &mut Raster, input: std::fs::File) -> Result<&'static str, String> {
+    pub fn run(
+        mut self,
+        pack: &Pack,
+        options: &Options,
+        raster: &mut Raster,
+        input: std::fs::File,
+        capture_output: Option<std::fs::File>,
+    ) -> Result<&'static str, String> {
+        if let Some((size, frames)) = options.capture {
+            if self.state.outputs.len() != 1 {
+                return Err("live capture requires one output".into());
+            }
+            self.state.capture =
+                Some(crate::live_capture::Capture::new(size, frames, pack.cache_digest, options.seed, capture_output.ok_or("missing capture pipe")?)?);
+        }
         let qh = self.queue.handle();
         self.state.overlay = Some(crate::overlay::Overlay::new(options.overlay.clone(), options.clock.clone().unwrap_or_else(crate::clock::Clock::fixed)));
         let mut control = crate::overlay::Input::new(input);
@@ -688,7 +708,11 @@ impl Display {
                 return Ok("time limit");
             }
             let now = Instant::now();
+            if self.state.outputs.len() != 1 {
+                self.state.capture = None;
+            }
             for line in control.poll() {
+                self.state.capture = None;
                 if line.trim() == "quit" {
                     return Ok("asked to stop");
                 }
