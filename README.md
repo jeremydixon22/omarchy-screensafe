@@ -150,6 +150,7 @@ Removing the plugin switches Omarchy's screensaver back on if ScreenSafe had swi
 - `Service.qml`, `Panel.qml` and `ShieldMark.qml`: the plugin. Procedural playback starts ScreenSafe's renderer and Omarchy's `omarchy-shell`. Compressed Videos uses a separate trusted broker, and optional prepared playback uses its own controller and confined codec/GPU worker.
 - `bin/screensafe-x86_64` and `bin/screensafe-aarch64`: the renderer, static Linux executables built reproducibly from [`renderer/`](renderer). The plugin runs the one for your machine.
 - `bin/screensafe-cache-*`, `screensafe-sandbox-*` and `screensafe-media-*`: the included GPU worker, sandbox launcher and media resource-limit launcher for each architecture. Their sources and pinned rebuild inputs are included.
+- `screensafe_gpu.py`: shared retained-device and bounded PCI metadata checks for both decoder paths.
 - `packs/`: the built-in packs, and `tools/`: the generators for the larger ones.
 - `skills/screensafe-packs/`: instructions for coding agents that make packs. The plugin doesn't install or read them.
 
@@ -173,9 +174,9 @@ python3 scripts/build-native.py /tmp/screensafe-native
 scripts/verify-native
 ```
 
-Prepared playback supports a single, unrotated display up to 4096 × 2160 and 64 Hz when its driver exports linear XRGB buffers. Preparation checks both software and hardware-copy decoding and uses a passing profile; direct hardware interop is excluded. Updates to relevant binaries, graphics/codec libraries, kernel, theme, settings or display invalidate reuse. The small settings preview stays live. Full-screen Preview follows the prepared-playback choice and may reuse an approved loop; it never creates one. Choose **Prepare selected screensaver** to generate and approve a loop on external power. Unsupported setups automatically use normal playback.
+Prepared playback supports a single, unrotated display up to 4096 × 2160 and 64 Hz when a PCI GPU fits the bounded metadata profile and its driver exports linear XRGB buffers. Preparation checks both software and hardware-copy decoding and uses a passing profile; direct hardware interop is excluded. Updates to relevant binaries, graphics/codec libraries, kernel, theme, settings or display invalidate reuse. The small settings preview stays live. Full-screen Preview follows the prepared-playback choice and may reuse an approved loop; it never creates one. Choose **Prepare selected screensaver** to generate and approve a loop on external power. Unsupported setups automatically use normal playback.
 
-Prepared playback can reduce power for demanding effects. Simple screensavers may cost less to draw live than to decode and present as video; preparation is manual so you can choose which packs use this path. The prepared segment repeats, while live playback can continue generating new variations.
+Prepared playback can reduce power for demanding effects. Simple screensavers may cost less to draw live than to decode and present as video; preparation is manual so you can choose which packs use this path. The prepared segment repeats, while live playback can continue generating new variations. An empty cache falls back without hashing the runtime libraries; existing approvals still receive full identity and media verification. Updated decoder/policy identities require fresh preparation.
 
 The worker links stable system-library ABIs and leaves media libraries and hardware drivers with Omarchy, so distribution security updates continue to apply. Full helper source, upstream Bubblewrap source, license texts, build-input checksums and the binary manifest are included; [native packaging](docs/NATIVE-PACKAGE.md) explains the dependency and license boundaries. Reproduction and a matching GitHub attestation are separate checks.
 

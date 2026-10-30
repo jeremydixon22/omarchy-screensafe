@@ -29,6 +29,7 @@
 #include <sys/prctl.h>
 #include <signal.h>
 #include <sys/wait.h>
+#include <pthread.h>
 
 #define MAGIC 0x31435053u /* SPC1, little endian; Linux targets are LE. */
 #define XR24 0x34325258u
@@ -39,6 +40,7 @@ static mpv_render_context *render;
 static int wake_fd;
 static unsigned width, height, frames, fps;
 static const char *decoder;
+static const char *render_node;
 struct buffer { struct gbm_bo *bo; EGLImage image; GLuint texture, fbo; int fd; uint32_t stride; };
 static struct buffer buffers[3];
 static void fail(const char *why) { fprintf(stderr,"screensafe-cache: %s\n",why); exit(2); }
@@ -64,7 +66,7 @@ static void packet(const uint32_t *words,size_t count,int fd) {
     if(n!=(ssize_t)(count*4))fail("packet output closed");
 }
 static void init_gpu(void) {
-    int drm=open("/dev/dri/renderD128",O_RDWR|O_CLOEXEC);if(drm<0)fail("render node unavailable");
+    int drm=open(render_node,O_RDWR|O_CLOEXEC|O_NOFOLLOW);if(drm<0)fail("render node unavailable");
     struct gbm_device *device=gbm_create_device(drm);if(!device)fail("GBM unavailable");
     EGLDisplay display=eglGetPlatformDisplay(EGL_PLATFORM_GBM_KHR,device,NULL);
     EGLint major,minor;if(display==EGL_NO_DISPLAY || !eglInitialize(display,&major,&minor))fail("EGL unavailable");
@@ -157,7 +159,8 @@ static void restrict_execution(void) {
      * ENOSYS lets pthread's clone3 path use the inspectable clone flags. */
     scmp_filter_ctx filter=seccomp_init(SCMP_ACT_ALLOW);
     if(!filter || seccomp_attr_set(filter,SCMP_FLTATR_CTL_TSYNC,1)<0)fail("cannot restrict worker threads");
-    const char *blocked[]={"execve","execveat","fork","vfork","unshare","setns","ptrace","process_vm_readv","process_vm_writev","io_uring_setup"};
+    const char *blocked[]={"execve","execveat","fork","vfork","unshare","setns","ptrace","process_vm_readv","process_vm_writev","io_uring_setup",
+        "socket","socketpair","connect","bind","listen","accept","accept4"};
     for(unsigned i=0;i<sizeof blocked/sizeof blocked[0];i++) {
         int nr=seccomp_syscall_resolve_name(blocked[i]);
         if(nr>=0 && seccomp_rule_add(filter,SCMP_ACT_ERRNO(EPERM),nr,0)<0)fail("cannot build worker filter");
@@ -170,10 +173,51 @@ static void restrict_execution(void) {
     errno=0;
     if(syscall(SYS_execve,NULL,NULL,NULL)!=-1 || errno!=EPERM)fail("worker execution restriction ineffective");
 }
+struct policy_thread { int gate, refused; };
+static void *test_thread_socket(void *argument) {
+    struct policy_thread *test=argument;char token;
+    if(read(test->gate,&token,1)!=1)return NULL;
+    errno=0;int fd=socket(AF_UNIX,SOCK_STREAM|SOCK_CLOEXEC,0);
+    test->refused=fd==-1 && errno==EPERM;
+    if(fd>=0)close(fd);
+    return NULL;
+}
 int main(int argc,char **argv) {
     if(argc==2 && !strcmp(argv[1],"--self-test")) {
+        /* Keep an existing socket to distinguish syscall denial from absent
+         * routes or endpoints. AF_UNSPEC supplies no valid connection target. */
+        int existing=socket(AF_UNIX,SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK,0);
+        if(existing<0)fail("cannot allocate policy test socket");
+        int gate[2],ipc[2];pthread_t thread;
+        if(pipe2(gate,O_CLOEXEC) || socketpair(AF_UNIX,SOCK_SEQPACKET|SOCK_CLOEXEC,0,ipc))fail("cannot allocate policy test channels");
+        struct policy_thread test={gate[0],0};
+        if(pthread_create(&thread,NULL,test_thread_socket,&test))fail("cannot start policy test thread");
         if(prctl(PR_SET_NO_NEW_PRIVS,1,0,0,0))fail("cannot set no_new_privs");
         restrict_execution();
+        if(write(gate[1],"x",1)!=1 || pthread_join(thread,NULL) || !test.refused)fail("existing thread escaped socket policy");
+        test.refused=0;
+        if(pthread_create(&thread,NULL,test_thread_socket,&test) || write(gate[1],"x",1)!=1 || pthread_join(thread,NULL) || !test.refused)fail("new thread escaped socket policy");
+        char token;
+        if(send(ipc[0],"x",1,MSG_NOSIGNAL)!=1 || recv(ipc[1],&token,1,0)!=1 || token!='x')fail("inherited channel unavailable");
+        close(gate[0]);close(gate[1]);close(ipc[0]);close(ipc[1]);
+        const int families[]={AF_UNIX,AF_INET,AF_INET6};
+        for(unsigned i=0;i<sizeof families/sizeof families[0];i++) {
+            errno=0;
+            if(socket(families[i],SOCK_STREAM|SOCK_CLOEXEC,0)!=-1 || errno!=EPERM)fail("worker socket creation restriction ineffective");
+        }
+        int pair[2];errno=0;
+        if(socketpair(AF_UNIX,SOCK_STREAM|SOCK_CLOEXEC,0,pair)!=-1 || errno!=EPERM)fail("worker socketpair restriction ineffective");
+        struct sockaddr address={.sa_family=AF_UNSPEC};errno=0;
+        if(connect(existing,&address,sizeof address)!=-1 || errno!=EPERM)fail("worker connect restriction ineffective");
+        errno=0;
+        if(bind(existing,&address,sizeof address)!=-1 || errno!=EPERM)fail("worker bind restriction ineffective");
+        errno=0;
+        if(listen(existing,0)!=-1 || errno!=EPERM)fail("worker listen restriction ineffective");
+        errno=0;
+        if(accept(existing,NULL,NULL)!=-1 || errno!=EPERM)fail("worker accept restriction ineffective");
+        errno=0;
+        if(accept4(existing,NULL,NULL,SOCK_CLOEXEC)!=-1 || errno!=EPERM)fail("worker accept4 restriction ineffective");
+        close(existing);
         errno=0;long child=syscall(SYS_clone,(unsigned long)SIGCHLD,0,0,0,0);
         if(child>=0) {
             if(child==0)_exit(2);
@@ -182,16 +226,20 @@ int main(int argc,char **argv) {
         if(errno!=EPERM)fail("worker process creation restriction not enforced");
         unsigned long api=mpv_client_api_version();
         if((api>>16)!=(MPV_CLIENT_API_VERSION>>16) || api<MPV_CLIENT_API_VERSION)fail("incompatible libmpv API");
-        printf("{\"worker\":1,\"libmpvApi\":%lu,\"seccomp\":true}\n",api);
+        printf("{\"worker\":1,\"libmpvApi\":%lu,\"seccomp\":true,\"newSocketsBlocked\":true,\"allThreadSocketPolicy\":true}\n",api);
         return 0;
     }
-    if(argc!=7 || (strcmp(argv[1],"capture") && strcmp(argv[1],"verify") && strcmp(argv[1],"serve")))fail("usage: worker capture|verify|serve WIDTH HEIGHT FRAMES FPS copy|software");
+    if(argc!=8 || (strcmp(argv[1],"capture") && strcmp(argv[1],"verify") && strcmp(argv[1],"serve")))fail("usage: worker capture|verify|serve WIDTH HEIGHT FRAMES FPS copy|software /dev/dri/renderD128..255");
     if(!strcmp(argv[6],"copy"))decoder="vaapi-copy";
     else if(!strcmp(argv[6],"software"))decoder="no";
     else fail("invalid decoder profile");
+    const char prefix[]="/dev/dri/renderD";
+    if(strncmp(argv[7],prefix,sizeof prefix-1) || number(argv[7]+sizeof prefix-1,255)<128)fail("invalid render node");
+    render_node=argv[7];
     width=number(argv[2],MAX_SIDE);height=number(argv[3],MAX_SIDE);frames=number(argv[4],3600);fps=number(argv[5],24);
     if((uint64_t)width*height>MAX_PIXELS)fail("canvas exceeds limit");
-    struct rlimit files={96,96},core={0,0},log_size={128u<<20,128u<<20},heap={1024u<<20,1024u<<20};setrlimit(RLIMIT_NOFILE,&files);setrlimit(RLIMIT_CORE,&core);setrlimit(RLIMIT_FSIZE,&log_size);setrlimit(RLIMIT_DATA,&heap);
+    struct rlimit files={96,96},core={0,0},log_size={128u<<20,128u<<20},heap={1024u<<20,1024u<<20};
+    if(setrlimit(RLIMIT_NOFILE,&files) || setrlimit(RLIMIT_CORE,&core) || setrlimit(RLIMIT_FSIZE,&log_size) || setrlimit(RLIMIT_DATA,&heap))fail("cannot establish worker resource limits");
     init_gpu();
     restrict_execution();
     /* No media parsing starts before the all-thread execution restriction. */

@@ -28,9 +28,10 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from screensafe_runtime import ParentLifetime, sandbox_binary, media_launcher, media_process_filter
+from screensafe_gpu import RenderNode
 
 MAGIC = 0x31435053
-VERSION = 1
+VERSION = 2
 MAX_VIDEO = 128 << 20
 STOP = False
 COMMON = ['pack', 'theme', 'branding', 'logo', 'badge', 'photos', 'videos', 'settings']
@@ -136,7 +137,8 @@ def devices():
 
 def profile(args, size):
     paths = {str(Path(args.renderer).resolve()), str(Path(args.worker).resolve()), str(Path(__file__).resolve()),
-             str(Path(__file__).resolve().parents[1]/'screensafe_runtime.py'), sandbox_binary(), media_launcher(),
+             str(Path(__file__).resolve().parents[1]/'screensafe_runtime.py'),
+             str(Path(__file__).resolve().parents[1]/'screensafe_gpu.py'), sandbox_binary(), media_launcher(),
              str(Path(sys.executable).resolve()), '/usr/bin/ffmpeg', '/usr/bin/ffprobe'}
     # Include actual dynamically loaded graphics/codec code, beyond package names.
     for executable in [str(args.worker), sandbox_binary()]:
@@ -162,14 +164,7 @@ def profile(args, size):
 
 
 def identity(base, device, decoder):
-    p = Path('/sys/class/drm', device.name, 'device')
-    ids = {}
-    for name in ['vendor', 'device', 'revision']:
-        try:
-            ids[name] = (p/name).read_text().strip()
-        except OSError:
-            ids[name] = ''
-    return dict(base, device=str(device), gpu=ids, decoder=decoder)
+    return dict(base, **device.profile(), decoder=decoder)
 
 
 def cache_key(plan, profile):
@@ -250,8 +245,8 @@ def sandbox(args, command, *, media=None, device=None, output=None, policy=None)
         os.lseek(media, 0, os.SEEK_SET)
         a += ['--ro-bind-data', str(media), '/input.mp4']
     if device is not None:
-        a += ['--dev-bind', str(device), '/dev/dri/renderD128', '--ro-bind', '/sys', '/sys',
-              '--ro-bind', str(args.worker), '/worker']
+        a += device.mounts() + ['--ro-bind', str(args.worker), '/worker']
+        command = device.command(command)
     if output is not None:
         a += ['--bind', str(output), '/output']
     if policy is not None:
@@ -321,12 +316,12 @@ def capture(args, fd, device, decoder, size, frames, directory, label):
     Hashes compare both loops and candidate decoder modes byte for byte.
     """
     w, h = size
-    command = ['/worker', 'verify', str(w), str(h), str(frames), '24', decoder]
+    command = ['/worker', 'verify', str(w), str(h), str(frames), '24', decoder, str(device.path)]
     # No bulk pixels pass through Python. Rust consumes the worker pipe directly,
     # checks both full loops and returns only a bounded verdict and pixel digest.
     errors = bytearray()
     with tempfile.TemporaryFile() as verdict_file:
-        p = subprocess.Popen(sandbox(args, command, media=fd, device=device), pass_fds=(fd,),
+        p = subprocess.Popen(sandbox(args, command, media=fd, device=device), pass_fds=(fd,*device.pass_fds),
             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
         def drain_errors():
             while block := p.stderr.read(4096):
@@ -369,23 +364,34 @@ def available(args):
             all(Path(p).is_file() for p in ['/usr/bin/ffmpeg', '/usr/bin/hyprctl']) and bool(devices()))
 
 
+def has_approval(directory):
+    # A miss can fall back without parsing packs or hashing runtime libraries.
+    # Presence only authorizes the usual full lookup, never playback itself.
+    with os.scandir(directory) as entries:
+        return any(re.fullmatch(r'[a-f0-9]{64}\.json', e.name) and e.is_file(follow_symlinks=False) for e in entries)
+
+
 def lookup(args, p, base, directory):
-    for device in devices():
-        for decoder in ['copy', 'software']:
-            ident = identity(base, device, decoder); key = cache_key(p, ident)
-            try:
-                record = read_record(directory, key)
-                verdict = record.get('verdict')
-                expected_frames = math.ceil(p['seconds']*24)
-                if (record.get('version') != VERSION or record.get('source') != p or record.get('profile') != ident or
-                        not isinstance(verdict, dict) or verdict.get('approved') is not True or
-                        record.get('fps') != 24 or record.get('frames') != expected_frames or
-                        verdict.get('frames') != expected_frames or verdict.get('tested_rate') != 64 or
-                        not re.fullmatch('[a-f0-9]{64}', record.get('sha256', ''))):
-                    continue
-                return key, record, device, decoder
-            except (OSError, ValueError, KeyError, TypeError):
-                pass
+    for path in devices():
+        try:
+            with RenderNode(path) as device:
+                for decoder in ['copy', 'software']:
+                    ident = identity(base, device, decoder); key = cache_key(p, ident)
+                    try:
+                        record = read_record(directory, key)
+                        verdict = record.get('verdict')
+                        expected_frames = math.ceil(p['seconds']*24)
+                        if (record.get('version') != VERSION or record.get('source') != p or record.get('profile') != ident or
+                                not isinstance(verdict, dict) or verdict.get('approved') is not True or
+                                record.get('fps') != 24 or record.get('frames') != expected_frames or
+                                verdict.get('frames') != expected_frames or verdict.get('tested_rate') != 64 or
+                                not re.fullmatch('[a-f0-9]{64}', record.get('sha256', ''))):
+                            continue
+                        return key, record, path, decoder
+                    except (OSError, ValueError, KeyError, TypeError):
+                        pass
+        except (OSError, ValueError):
+            continue
     return None
 
 
@@ -423,10 +429,11 @@ def prepare(args):
                 # edits may cancel a build, never approve it under an old key.
                 if plan(args) != p or geometry() != size:
                     raise ValueError('screensaver or display changed during preparation')
-                with snapshot(work/'video.mp4') as (fd, media_sha, length):
+                with snapshot(work/'video.mp4') as (fd, media_sha, length), contextlib.ExitStack() as authorities:
                     chosen = None
-                    for device in devices():
+                    for path in devices():
                         try:
+                            device = authorities.enter_context(RenderNode(path))
                             reference, verdict = capture(args, fd, device, 'software', size, frames, work, 'reference')
                             chosen = (device, 'software', verdict)
                             try:
@@ -463,8 +470,10 @@ def status(args):
     if p['eligible'] is not True:
         return {'state': 'ineligible'}
     with store(args.root) as directory:
-        found = lookup(args, p, profile(args, geometry()), directory)
         total = sum(q.stat().st_size for q in args.root.glob('*.mp4') if not q.is_symlink())
+        if not has_approval(directory):
+            return {'state': 'empty', 'bytes': total}
+        found = lookup(args, p, profile(args, geometry()), directory)
         return {'state': 'ready' if found else 'empty', 'bytes': total}
 
 
@@ -509,14 +518,19 @@ def run(args):
         live(args)
     if not available(args):
         live(args)
-    with store(args.root) as directory:
+    with store(args.root) as directory, contextlib.ExitStack() as authorities:
+        if not has_approval(directory):
+            live(args)
         p = plan(args)
         if not p['eligible']:
             live(args)
         base = profile(args, geometry()); found = lookup(args, p, base, directory)
         if not found:
             live(args)
-        key, record, device, decoder = found
+        key, record, path, decoder = found
+        device = authorities.enter_context(RenderNode(path))
+        if identity(base, device, decoder) != record['profile']:
+            live(args)
         with snapshot(args.root/(key+'.mp4')) as (fd, media_sha, length):
             if media_sha != record['sha256'] or length != record['bytes']:
                 live(args)
@@ -527,8 +541,8 @@ def run(args):
                 '--fps', '24', '--role', args.role]
             if args.exit_after is not None:
                 renderer_cmd += ['--exit-after', str(args.exit_after)]
-            worker_cmd = ['/worker', 'serve', str(w), str(h), str(frames), '24', decoder]
-            worker = subprocess.Popen(sandbox(args, worker_cmd, media=fd, device=device), pass_fds=(fd,),
+            worker_cmd = ['/worker', 'serve', str(w), str(h), str(frames), '24', decoder, str(device.path)]
+            worker = subprocess.Popen(sandbox(args, worker_cmd, media=fd, device=device), pass_fds=(fd,*device.pass_fds),
                 stdin=b, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
             try:
                 renderer = subprocess.Popen(renderer_cmd, stdin=a, start_new_session=True)

@@ -93,6 +93,55 @@ class BoundaryTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 m.wait_preparation([p], float('inf'))
 
+    def test_empty_cache_uses_live_without_starting_identity_helpers(self):
+        args=SimpleNamespace(root=self.root/'cache',battery_only=0,overlay='enabled=0')
+        class Fallback(Exception):pass
+        with patch.object(m,'available',return_value=True), patch.object(m,'live',side_effect=Fallback), \
+                patch.object(m,'plan',side_effect=AssertionError('cache miss parsed a pack')), \
+                patch.object(m,'profile',side_effect=AssertionError('cache miss hashed libraries')):
+            with self.assertRaises(Fallback):m.run(args)
+
+    def test_empty_status_preserves_orphan_storage_without_hashing(self):
+        cache=self.root/'cache';cache.mkdir(mode=0o700)
+        (cache/('a'*64+'.mp4')).write_bytes(b'orphan')
+        with patch.object(m,'available',return_value=True), patch.object(m,'plan',return_value={'eligible':True}), \
+                patch.object(m,'profile',side_effect=AssertionError('empty status hashed libraries')):
+            self.assertEqual(m.status(SimpleNamespace(root=cache)),{'state':'empty','bytes':6})
+
+    def test_possible_approval_still_requires_full_lookup(self):
+        cache=self.root/'cache';cache.mkdir(mode=0o700)
+        (cache/('a'*64+'.json')).write_text('{}')
+        args=SimpleNamespace(root=cache,battery_only=0,overlay='enabled=0')
+        class Fallback(Exception):pass
+        with patch.object(m,'available',return_value=True), patch.object(m,'plan',return_value={'eligible':True}), \
+                patch.object(m,'geometry',return_value=[16,16]), patch.object(m,'profile',return_value={'size':[16,16]}) as profile, \
+                patch.object(m,'lookup',return_value=None) as lookup, patch.object(m,'live',side_effect=Fallback):
+            with self.assertRaises(Fallback):m.run(args)
+            profile.assert_called_once();lookup.assert_called_once()
+
+    def test_reopened_device_must_match_the_approved_profile_before_decode(self):
+        cache=self.root/'cache';cache.mkdir(mode=0o700);key='a'*64
+        (cache/(key+'.json')).write_text('{}')
+        args=SimpleNamespace(root=cache,battery_only=0,overlay='enabled=0')
+        gpu=SimpleNamespace(profile=lambda:{'device':'new GPU'})
+        found=(key,{'profile':{'device':'old GPU'}},Path('/dev/dri/renderD128'),'software')
+        class Fallback(Exception):pass
+        with patch.object(m,'available',return_value=True), patch.object(m,'plan',return_value={'eligible':True}), \
+                patch.object(m,'geometry',return_value=[16,16]), patch.object(m,'profile',return_value={}), \
+                patch.object(m,'lookup',return_value=found), patch.object(m,'RenderNode',return_value=contextlib.nullcontext(gpu)), \
+                patch.object(m,'snapshot',side_effect=AssertionError('changed GPU reached media')), patch.object(m,'live',side_effect=Fallback):
+            with self.assertRaises(Fallback):m.run(args)
+
+    def test_approval_presence_ignores_links_special_files_and_other_names(self):
+        with m.store(self.root/'cache') as directory:
+            cache=self.root/'cache';outside=self.root/'outside';outside.write_text('{}')
+            (cache/('a'*64+'.json')).symlink_to(outside)
+            os.mkfifo(cache/('b'*64+'.json'))
+            (cache/'notes.json').write_text('{}')
+            self.assertFalse(m.has_approval(directory))
+            (cache/('c'*64+'.json')).write_text('{}')
+            self.assertTrue(m.has_approval(directory))
+
 
 if __name__ == '__main__':
     unittest.main()

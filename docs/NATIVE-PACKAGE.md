@@ -9,7 +9,7 @@ ScreenSafe includes all application executables for both x86-64 and ARM64. A sta
 | `screensafe-sandbox-$ARCH` | Unprivileged namespace isolation | System libcap and glibc | Bubblewrap LGPL-2.1-or-later |
 | `screensafe-media-$ARCH` | Resource limits before entering the import sandbox | Static musl | MIT, musl notices |
 
-`$ARCH` is `x86_64` or `aarch64`. The ARM glibc helpers also use the standard `ld-linux-aarch64.so.1` loader. No helper has a private RPATH, setuid permission or file capability. All are ordinary user executables. GPU access is limited to one render node inside the separate worker cage; neither Quickshell nor the Rust renderer loads native media libraries.
+`$ARCH` is `x86_64` or `aarch64`. The ARM glibc helpers also use the standard `ld-linux-aarch64.so.1` loader. No helper has a private RPATH, setuid permission or file capability. All are ordinary user executables. GPU access is limited to one retained, identity-checked PCI render node and eight pinned read-only metadata files inside the separate worker cage; neither Quickshell nor the Rust renderer loads native media libraries.
 
 ## Omarchy supplies the media and graphics stack
 
@@ -17,7 +17,7 @@ The [Omarchy base package list](https://github.com/omacom/omarchy/blob/quattro/i
 
 These system libraries and hardware drivers are deliberately left with the distribution. Bundling a second Mesa/VAAPI/driver stack would duplicate security updates and risk driver mismatches. The helpers target stable SONAMEs and glibc 2.34 or newer. The build-only Ubuntu ABI libraries listed in the input lock are not copied into the installed plugin.
 
-MPV's client API version is checked by `screensafe-cache-$ARCH --self-test`; CI runs this on native x86-64 and ARM64 runners. Actual GPU output is checked locally during preparation, including software/hardware-copy equality and two repeat loops. A missing/incompatible library, unsupported display or failing GPU profile selects normal guarded rendering. This is conditional platform support, not a claim that every GPU has been tested.
+MPV's client API version and all-thread execution/socket policy are checked by `screensafe-cache-$ARCH --self-test`; CI runs this on native x86-64 and ARM64 runners. The test creates a thread before policy installation and another afterwards, verifies that both refuse new sockets, and checks that inherited IPC still works. The controller checks the mounted GPU identity before the worker starts, and no whole sysfs tree is mounted. Actual GPU output is checked locally during preparation, including software/hardware-copy equality and two repeat loops. A missing/incompatible library, unsupported display or failing GPU profile selects normal guarded rendering. This is conditional platform support, not a claim that every GPU has been tested.
 
 ## Sources, licenses and exact build inputs
 

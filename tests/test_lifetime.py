@@ -43,12 +43,17 @@ class LifetimeTests(unittest.TestCase):
 import sys,hashlib,json,time,os
 sys.path.insert(0,sys.argv[1]);import manager as m
 r=Path(sys.argv[2]);mode=sys.argv[3]
-store=r/'store';store.mkdir(mode=0o700);key='a'*64;(store/(key+'.mp4')).write_bytes(b'x')
+store=r/'store';store.mkdir(mode=0o700);key='a'*64;(store/(key+'.mp4')).write_bytes(b'x');(store/(key+'.json')).write_text('{}')
 m.available=lambda a:True
 m.plan=lambda a:{'eligible':True}
 m.geometry=lambda:[16,16]
 m.profile=lambda a,b:{'size':[16,16]}
-m.lookup=lambda *a:(key,{'sha256':hashlib.sha256(b'x').hexdigest(),'bytes':1,'frames':1},Path('/dev/null'),'software')
+m.lookup=lambda *a:(key,{'sha256':hashlib.sha256(b'x').hexdigest(),'bytes':1,'frames':1,'profile':{}},Path('/dev/null'),'software')
+class FakeGPU:
+ def __init__(self,path):self.path=path;self.pass_fds=()
+ def __enter__(self):return self
+ def __exit__(self,*unused):pass
+m.RenderNode=FakeGPU;m.identity=lambda *a:{}
 m.sandbox=lambda *a,**kw:['/bin/sleep','60']
 def prepare(a):
  (r/'ready').touch()
