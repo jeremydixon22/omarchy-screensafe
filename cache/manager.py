@@ -7,6 +7,7 @@ connects to Wayland. Live playback is the default and every failure's fallback.
 """
 import argparse
 import contextlib
+from concurrent.futures import ThreadPoolExecutor
 import fcntl
 import hashlib
 import json
@@ -98,7 +99,10 @@ def small_output(command, timeout=10):
                     raise InterruptedError('ScreenSafe helper interrupted')
                 if time.monotonic() >= deadline:
                     raise subprocess.TimeoutExpired(command, timeout)
-                time.sleep(.05)
+                try:
+                    p.wait(timeout=min(.05, max(0.001, deadline-time.monotonic())))
+                except subprocess.TimeoutExpired:
+                    pass
             out.seek(0); data = out.read(65537)
             if p.returncode or len(data) > 65536:
                 raise ValueError('bounded helper failed')
@@ -158,7 +162,12 @@ def profile(args, size):
             if word.startswith('/') and Path(word).is_file():
                 paths.add(str(Path(word).resolve()))
     packages = small_output(['/usr/bin/pacman', '-Q', 'mpv', 'ffmpeg', 'mesa', 'libva', 'wayland', 'libseccomp', 'libcap', 'python']).decode()
-    return {'version': VERSION, 'files': {p: sha(p) for p in sorted(paths)},
+    ordered = sorted(paths)
+    # Every file is still hashed in full on every lookup. Bounded parallel
+    # reads overlap independent libraries without trusting metadata caches.
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        hashes = dict(zip(ordered, pool.map(sha, ordered)))
+    return {'version': VERSION, 'files': hashes,
             'packages': packages, 'kernel': os.uname().release, 'size': size,
             'cadence': 'ordered/no-catch-up/24fps/64Hz-approval', 'composition': 'opaque/fixed/no-overlay',
             'imageOrigin': 'top-left'}
