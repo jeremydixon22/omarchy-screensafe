@@ -1162,7 +1162,7 @@ Panel {
             font.pixelSize: Style.font.caption
           }
           Repeater {
-            model: [{ row: "performance:prepare", title: root.svc && root.svc.preparing ? "Cancel preparation" : "Prepare selected screensaver", detail: "Build a local loop for the current theme and settings" }, { row: "performance:clear", title: "Clear prepared loops", detail: "Keep screensavers and their settings" }]
+            model: [{ row: "performance:prepare", title: root.svc && root.svc.preparing ? "Cancel preparation" : "Rebuild selected screensaver", detail: "Rebuild the loop for the current theme and settings" }, { row: "performance:clear", title: "Clear prepared loops", detail: "Keep screensavers and their settings" }]
             CursorSurface {
               required property var modelData
               width: performancePage.width

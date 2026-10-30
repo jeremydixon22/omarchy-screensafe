@@ -30,6 +30,7 @@ mod flash;
 mod overlay;
 mod pack;
 mod palette;
+mod preparation_ui;
 mod prepared;
 mod raster;
 mod safefs;
@@ -247,7 +248,23 @@ fn load_with(dir: &Path, args: &Args, chosen: &[(String, f64)], photo_seed: Opti
 const PACK_UNUSABLE: u8 = 3;
 
 fn run(args: &Args) -> Result<Result<(), String>, String> {
-    args.only(&["overlay", "pack", "theme", "branding", "logo", "badge", "photos", "videos", "settings", "seed", "max-fps", "exit-after", "start", "role"])?;
+    args.only(&[
+        "overlay",
+        "pack",
+        "theme",
+        "branding",
+        "logo",
+        "badge",
+        "photos",
+        "videos",
+        "settings",
+        "seed",
+        "max-fps",
+        "exit-after",
+        "start",
+        "role",
+        "preparation-ui",
+    ])?;
     let dir = args.path("pack").ok_or(USAGE)?;
     let seed = match args.number("seed")? {
         Some(s) => s as u64,
@@ -259,6 +276,11 @@ fn run(args: &Args) -> Result<Result<(), String>, String> {
     let clock = clock::Clock::local(&mut clock_warnings).starting_at(start);
     let options = wayland::Options {
         seed,
+        preparation: match args.get("preparation-ui") {
+            None | Some("0") => false,
+            Some("1") => true,
+            _ => return Err("invalid preparation UI flag".into()),
+        },
         exit_after: args.number("exit-after")?.map(|s| Duration::from_secs_f64(s.clamp(0.0, 86400.0))),
         max_fps: args.number("max-fps")?.unwrap_or(pack::MAX_FPS).clamp(1.0, pack::MAX_FPS),
         start,
@@ -306,6 +328,7 @@ fn live_preview(args: &Args) -> Result<(), String> {
     let pack = load(&dir, args)?;
     let options = wayland::Options {
         seed: args.number("seed")?.map(|s| s as u64).unwrap_or(1),
+        preparation: false,
         exit_after: None,
         max_fps: pack::MAX_FPS,
         start: 0.0,

@@ -110,7 +110,7 @@ pub fn record(args: &Args) -> Result<(), String> {
 /// display refresh. Holds are allowed; dropped/reordered/modified frames are
 /// outside the experimental profile. No failing frame is silently filtered.
 pub fn certify(args: &Args) -> Result<(), String> {
-    args.only(&["size", "frames"])?;
+    args.only(&["size", "frames", "progress"])?;
     let (w, h) = dimensions(args)?;
     let total: usize = args.get("frames").ok_or("approve-frames needs --frames")?.parse().map_err(|_| "frames must be an integer")?;
     // Cells, rather than full frames, are retained: at most about 40 MiB.
@@ -121,6 +121,12 @@ pub fn certify(args: &Args) -> Result<(), String> {
     let mut input = std::io::stdin().lock();
     let mut pixels = vec![0; w as usize * h as usize * 4];
     let mut cycle = Vec::with_capacity(total);
+    let report = match args.get("progress") {
+        None | Some("0") => false,
+        Some("1") => true,
+        _ => return Err("invalid approval progress flag".into()),
+    };
+    let mut reported = Instant::now();
     let mut original = blake3::Hasher::new();
     for i in 0..total {
         input.read_exact(&mut pixels).map_err(|e| format!("frame {i}: {e}"))?;
@@ -129,6 +135,10 @@ pub fn certify(args: &Args) -> Result<(), String> {
         }
         original.update(&pixels);
         cycle.push(flash::measure(&pixels, w as usize, h as usize, w as usize * 4, false));
+        if report && reported.elapsed().as_millis() >= 400 {
+            tell!("{{\"verifiedFrames\":{},\"totalFrames\":{}}}", i + 1, total * 2);
+            reported = Instant::now();
+        }
     }
     // Verify the decoder's actual second loop, then establish the flash
     // guard's periodic state over the measured cycle. A fast portable hash
@@ -137,6 +147,10 @@ pub fn certify(args: &Args) -> Result<(), String> {
     for i in 0..total {
         input.read_exact(&mut pixels).map_err(|e| format!("repeat frame {i}: {e}"))?;
         repeated.update(&pixels);
+        if report && (reported.elapsed().as_millis() >= 400 || i + 1 == total) {
+            tell!("{{\"verifiedFrames\":{},\"totalFrames\":{}}}", total + i + 1, total * 2);
+            reported = Instant::now();
+        }
     }
     let pixel_hash = original.finalize();
     if pixel_hash != repeated.finalize() {

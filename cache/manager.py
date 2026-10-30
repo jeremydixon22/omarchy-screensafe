@@ -30,11 +30,13 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from screensafe_runtime import ParentLifetime, sandbox_binary, media_launcher, media_process_filter
 from screensafe_gpu import RenderNode
+from progress import Reader
 
 MAGIC = 0x31435053
 VERSION = 2
 MAX_VIDEO = 128 << 20
 STOP = False
+PREPARATION = threading.local()
 COMMON = ['pack', 'theme', 'branding', 'logo', 'badge', 'photos', 'videos', 'settings']
 
 
@@ -61,7 +63,8 @@ def ac_power():
                 external.append((p/'online').read_text().strip() == '1')
         except OSError:
             pass
-    return any(external) or bool(batteries and all(s in ['Charging', 'Full'] for s in batteries))
+    if external:return any(external)
+    return bool(batteries and any(s=='Charging' for s in batteries) and all(s in ['Charging','Full'] for s in batteries))
 
 
 def on_battery():
@@ -142,7 +145,9 @@ def devices():
 def profile(args, size):
     paths = {str(Path(args.renderer).resolve()), str(Path(args.worker).resolve()), str(Path(__file__).resolve()),
              str(Path(__file__).resolve().parents[1]/'screensafe_runtime.py'),
-             str(Path(__file__).resolve().parents[1]/'screensafe_gpu.py'), sandbox_binary(), media_launcher(),
+             str(Path(__file__).resolve().parents[1]/'screensafe_gpu.py'),
+             str(Path(__file__).with_name('automatic.py').resolve()), str(Path(__file__).with_name('progress.py').resolve()),
+             sandbox_binary(), media_launcher(),
              str(Path(sys.executable).resolve()), '/usr/bin/ffmpeg', '/usr/bin/ffprobe'}
     # Include actual dynamically loaded graphics/codec code, beyond package names.
     for executable in [str(args.worker), sandbox_binary()]:
@@ -267,20 +272,25 @@ def sandbox(args, command, *, media=None, device=None, output=None, policy=None)
 def terminate(p):
     if p.poll() is None:
         try:
-            os.killpg(p.pid, signal.SIGTERM)
+            try:os.killpg(p.pid, signal.SIGTERM)
+            except ProcessLookupError:pass
             p.wait(timeout=3)
         except subprocess.TimeoutExpired:
-            os.killpg(p.pid, signal.SIGKILL); p.wait(timeout=3)
+            try:os.killpg(p.pid, signal.SIGKILL)
+            except ProcessLookupError:pass
+            p.wait(timeout=3)
 
 
 def check_preparation():
-    if STOP or not ac_power():
+    cancelled=getattr(PREPARATION,"cancel",None)
+    if STOP or (cancelled is not None and cancelled.is_set()) or not ac_power():
         raise ValueError('preparation cancelled or external power disconnected')
 
 
-def wait_preparation(processes, deadline):
+def wait_preparation(processes, deadline, reader=None):
     while any(p.poll() is None for p in processes):
         check_preparation()
+        if reader is not None and reader.error:raise ValueError("invalid preparation progress") from reader.error
         if time.monotonic() > deadline:
             raise ValueError('preparation deadline exceeded')
         time.sleep(0.1)
@@ -288,7 +298,7 @@ def wait_preparation(processes, deadline):
         raise ValueError('preparation helper failed')
 
 
-def encode(args, directory, size, seconds, source_digest):
+def encode(args, directory, size, seconds, source_digest, progress=None):
     w, h = size; frames = math.ceil(seconds*24)
     source = arguments(args, 'prepare-frames') + ['--seed', '1', '--size', f'{w}x{h}',
         '--fps', '24', '--seconds', str(seconds)]
@@ -298,20 +308,24 @@ def encode(args, directory, size, seconds, source_digest):
         '-frames:v', str(frames), '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18',
         '-pix_fmt', 'yuv420p', '-threads', '2', '-bf', '0', '-g', '24', '-movflags', '+faststart',
         '-fs', str(MAX_VIDEO), '-f', 'mp4', '/output/video.mp4']
+    if progress:ff[1:1]=['-progress','pipe:1','-stats_period','0.5']
     with (directory/'source.log').open('wb') as e1, (directory/'encoder.log').open('wb') as e2:
         a = subprocess.Popen(source, stdout=subprocess.PIPE, stderr=e1, stdin=subprocess.DEVNULL, start_new_session=True)
-        b = None
+        b = None;reader=None
         try:
             with media_process_filter() as policy:
                 b = subprocess.Popen([media_launcher()] + sandbox(args, ff, output=directory, policy=policy),
-                    pass_fds=(policy,), stdin=a.stdout, stdout=subprocess.DEVNULL, stderr=e2, start_new_session=True)
+                    pass_fds=(policy,), stdin=a.stdout, stdout=subprocess.PIPE if progress else subprocess.DEVNULL, stderr=e2, start_new_session=True)
             a.stdout.close()
-            wait_preparation([a, b], time.monotonic()+300)
+            if progress:reader=Reader(b.stdout,progress,total=frames,stage='recording',start=0.02,end=0.4,ffmpeg=True)
+            wait_preparation([a, b], time.monotonic()+300,reader)
+            if reader:reader.finish()
         finally:
             a.stdout.close()
             terminate(a)
             if b is not None:
                 terminate(b)
+            if reader:reader.thread.join(timeout=2)
     with (directory/'source.log').open('rb') as log:
         metadata = log.read(4097)
     if len(metadata) > 4096 or json.loads(metadata.splitlines()[-1]).get('sourceDigest') != source_digest:
@@ -319,7 +333,7 @@ def encode(args, directory, size, seconds, source_digest):
     return frames
 
 
-def capture(args, fd, device, decoder, size, frames, directory, label):
+def capture(args, fd, device, decoder, size, frames, directory, label, progress=None):
     """Verify the same exported framebuffer used in playback, over two loops.
 
     A software-decoded GPU reference also detects decoder fidelity problems.
@@ -329,7 +343,7 @@ def capture(args, fd, device, decoder, size, frames, directory, label):
     command = ['/worker', 'verify', str(w), str(h), str(frames), '24', decoder, str(device.path)]
     # No bulk pixels pass through Python. Rust consumes the worker pipe directly,
     # checks both full loops and returns only a bounded verdict and pixel digest.
-    errors = bytearray()
+    errors = bytearray();progress_reader=None;guard_log=None
     with tempfile.TemporaryFile() as verdict_file:
         p = subprocess.Popen(sandbox(args, command, media=fd, device=device), pass_fds=(fd,*device.pass_fds),
             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
@@ -342,14 +356,21 @@ def capture(args, fd, device, decoder, size, frames, directory, label):
         reader = threading.Thread(target=drain_errors, daemon=True)
         reader.start()
         try:
-            guard = subprocess.Popen([str(args.renderer), 'approve-frames', '--size', f'{w}x{h}', '--frames', str(frames)],
-                stdin=p.stdout, stdout=verdict_file, stderr=(directory/(label+'-guard.log')).open('wb'), start_new_session=True)
+            guard_log=(directory/(label+'-guard.log')).open('wb')
+            command=[str(args.renderer),'approve-frames','--size',f'{w}x{h}','--frames',str(frames)]
+            if progress:command+=['--progress','1']
+            guard=subprocess.Popen(command,stdin=p.stdout,stdout=verdict_file,stderr=subprocess.PIPE if progress else guard_log,start_new_session=True)
+            if progress:
+                start,end=(0.4,0.65) if decoder=='software' else (0.65,0.9)
+                progress_reader=Reader(guard.stderr,progress,total=frames*2,stage='software' if decoder=='software' else 'hardware',start=start,end=end,log=guard_log)
             p.stdout.close()
         except BaseException:
             terminate(p); reader.join(timeout=2)
+            if guard_log:guard_log.close()
             raise
         try:
-            wait_preparation([p, guard], time.monotonic()+600)
+            wait_preparation([p, guard], time.monotonic()+600,progress_reader)
+            if progress_reader:progress_reader.finish()
             verdict_file.seek(0); result = verdict_file.read(4097)
             reader.join(timeout=2)
             if len(result) > 4096 or len(errors) > 65536:
@@ -363,6 +384,8 @@ def capture(args, fd, device, decoder, size, frames, directory, label):
             terminate(p); terminate(guard)
             reader.join(timeout=2)
             (directory/(label+'-gpu.log')).write_bytes(errors[:65536])
+            if progress_reader:progress_reader.thread.join(timeout=2)
+            guard_log.close()
 
 
 def available(args):
@@ -418,8 +441,16 @@ def evict(args, needed=0):
         raise ValueError('prepared storage limit exceeded')
 
 
-def prepare(args):
+def prepare(args, progress=None):
+    PREPARATION.cancel=getattr(args,"cancel_event",None)
+    try:return _prepare(args,progress)
+    finally:PREPARATION.cancel=None
+
+
+def _prepare(args, progress=None):
     check_preparation()
+    report=progress or (lambda *_:None)
+    report(0,'planning')
     if not available(args):
         raise ValueError('prepared playback is unavailable on this installation')
     with store(args.root) as directory:
@@ -434,7 +465,7 @@ def prepare(args):
             if shutil.disk_usage(args.root).free < 256 << 20:
                 raise ValueError("insufficient free space for bounded preparation")
             with tempfile.TemporaryDirectory(prefix='.prepare-', dir=args.root) as work:
-                work = Path(work); frames = encode(args, work, size, p['seconds'], p['fingerprint'])
+                work = Path(work); frames = encode(args, work, size, p['seconds'], p['fingerprint'],progress)
                 # Recheck source and display before issuing approval. Concurrent
                 # edits may cancel a build, never approve it under an old key.
                 if plan(args) != p or geometry() != size:
@@ -444,10 +475,10 @@ def prepare(args):
                     for path in devices():
                         try:
                             device = authorities.enter_context(RenderNode(path))
-                            reference, verdict = capture(args, fd, device, 'software', size, frames, work, 'reference')
+                            reference, verdict = capture(args, fd, device, 'software', size, frames, work, 'reference',progress)
                             chosen = (device, 'software', verdict)
                             try:
-                                candidate, candidate_verdict = capture(args, fd, device, 'copy', size, frames, work, 'copy')
+                                candidate, candidate_verdict = capture(args, fd, device, 'copy', size, frames, work, 'copy',progress)
                                 if candidate == reference:
                                     chosen = (device, 'copy', candidate_verdict)
                             except (OSError, ValueError, subprocess.SubprocessError):
@@ -457,6 +488,7 @@ def prepare(args):
                             check_preparation()
                     if chosen is None:
                         raise ValueError('no GPU profile passed verification')
+                    report(0.92,'finishing')
                     check_preparation()
                     if plan(args) != p or geometry() != size or profile(args, size) != base:
                         raise ValueError('preparation inputs changed')
@@ -468,7 +500,8 @@ def prepare(args):
                     (work/'approval.json').write_bytes(encoded(record)); os.chmod(work/'approval.json', 0o600)
                     os.replace(work/'video.mp4', args.root/(key+'.mp4'))
                     os.replace(work/'approval.json', args.root/(key+'.json'))
-            print(json.dumps({'state': 'ready', 'bytes': length, 'decoder': decoder}))
+            report(1,'ready')
+            return {'state': 'ready', 'bytes': length, 'decoder': decoder}
         finally:
             os.close(lock)
 
@@ -484,6 +517,12 @@ def status(args):
         if not has_approval(directory):
             return {'state': 'empty', 'bytes': total}
         found = lookup(args, p, profile(args, geometry()), directory)
+        if found:
+            key,record,_,_=found
+            try:
+                with snapshot(args.root/(key+'.mp4')) as (_,media_sha,length):
+                    found=media_sha==record['sha256'] and length==record['bytes']
+            except (OSError,ValueError):found=None
         return {'state': 'ready' if found else 'empty', 'bytes': total}
 
 
@@ -496,7 +535,7 @@ def clear(args, remove_all=True):
                 evict(args)
                 return
             for p in args.root.iterdir():
-                if re.fullmatch(r'[a-f0-9]{64}\.(mp4|json)', p.name) and p.is_file() and not p.is_symlink():
+                if re.fullmatch(r'(?:[a-f0-9]{64}\.(?:mp4|json)|\.auto-failure-[a-f0-9]{64}\.json)', p.name) and p.is_file() and not p.is_symlink():
                     p.unlink()
         finally:
             os.close(lock)
@@ -524,26 +563,34 @@ def overlay_enabled(value):
 
 
 def run(args):
-    if (args.battery_only and not on_battery()) or overlay_enabled(args.overlay):
+    automatic=bool(getattr(args,'automatic',False)) and ac_power() and not overlay_enabled(args.overlay)
+    def miss():
+        if automatic:
+            import automatic as controller
+            return controller.run(args,sys.modules[__name__])
         live(args)
+    if overlay_enabled(args.overlay):live(args)
+    if args.battery_only and not on_battery():return miss()
     if not available(args):
         live(args)
     with store(args.root) as directory, contextlib.ExitStack() as authorities:
         if not has_approval(directory):
-            live(args)
+            return miss()
         p = plan(args)
         if not p['eligible']:
             live(args)
         base = profile(args, geometry()); found = lookup(args, p, base, directory)
         if not found:
-            live(args)
+            return miss()
         key, record, path, decoder = found
         device = authorities.enter_context(RenderNode(path))
         if identity(base, device, decoder) != record['profile']:
             live(args)
-        with snapshot(args.root/(key+'.mp4')) as (fd, media_sha, length):
+        with contextlib.ExitStack() as media_snapshot:
+            fd,media_sha,length=media_snapshot.enter_context(snapshot(args.root/(key+'.mp4')))
             if media_sha != record['sha256'] or length != record['bytes']:
-                live(args)
+                media_snapshot.close();authorities.close()
+                return miss()
             os.utime(args.root/(key+'.mp4'), None, follow_symlinks=False)
             a, b = socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET)
             w, h = base['size']; frames = record['frames']
@@ -623,6 +670,7 @@ def main():
     parser.add_argument('--limit', type=int, choices=[256, 512, 1024, 2048], default=512)
     parser.add_argument('--battery-only', type=int, choices=[0, 1], default=1)
     parser.add_argument('--exit-after', type=float)
+    parser.add_argument('--automatic', type=int, choices=[0,1], default=0)
     parser.add_argument('--managed', action='store_true', help='end playback when the shell control pipe closes')
     args = parser.parse_args()
     def stop(*unused):
@@ -637,11 +685,16 @@ def main():
                 return run(args)
             except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
                 if not STOP:
+                    if args.automatic and ac_power() and not overlay_enabled(args.overlay):
+                        try:
+                            import automatic
+                            return automatic.run(args,sys.modules[__name__])
+                        except (OSError,ValueError,KeyError,TypeError,subprocess.SubprocessError):pass
                     live(args)
                 return 143
         if args.action == 'prepare':
             os.nice(10)
-            prepare(args)
+            print(json.dumps(prepare(args)))
         elif args.action in ['clear', 'trim']:
             clear(args, args.action == 'clear')
             print('{"state":"empty"}')

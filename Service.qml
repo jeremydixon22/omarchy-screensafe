@@ -210,21 +210,23 @@ Item {
   readonly property string cacheWorker: root.pluginDir + "/bin/screensafe-cache-" + root.arch
   readonly property string cacheRoot: root.home + "/.cache/omarchy/screensafe/prepared"
   property string performanceState: "unknown"
-  readonly property bool preparing: cacheWorkProc.running && cacheWorkProc.action === "prepare"
+  property bool automaticPreparing: false
+  readonly property bool preparing: (cacheWorkProc.running && cacheWorkProc.action === "prepare") || (root.automaticPreparing && rendererProc.running)
   readonly property string performanceDetail: {
     if (root.preparing) return "Preparing and checking a local loop. You can cancel at any time."
     if (root.overlayValues.enabled === 1) return "Overlay is on. Normal playback is used so the combined picture remains guarded."
     if (root.performanceState === "ready") return "A prepared loop is ready for this screensaver, theme and display."
-    if (root.performanceState === "empty") return "No matching loop is prepared. Normal playback is used."
+    if (root.performanceState === "empty") return "A loop will be prepared automatically on external power."
     if (root.performanceState === "ineligible") return "This screensaver needs live playback."
     if (root.performanceState === "cancelled") return "Preparation cancelled. Normal playback is available."
     if (root.performanceState === "unavailable") return "Prepared playback is unavailable for this setup. Normal playback is available."
-    return "Prepare a loop on external power to make it available later."
+    return "Enable prepared playback to prepare eligible screensavers automatically on external power."
   }
   function setPerformance(name, value) {
     if (!PerformanceModel.declarations.some(function(d) { return d.name === name })) return
     saveSettings({ performance: PerformanceModel.changed(root.entry.performance, name, value) })
     if (name === "videoHardware") { root.videoDecoderState = "idle"; root.stopLive(); return }
+    if (name === "enabled" && root.performanceValues.enabled !== 1 && rendererProc.running) rendererProc.write("cancel-preparation\n")
     if (name === "maxMiB") root.trimPrepared()
     else root.refreshPerformance()
   }
@@ -242,7 +244,7 @@ Item {
       "--pack", path, "--theme", root.themeDir, "--branding", root.branding, "--logo", root.logo,
       "--badge", root.badge, "--photos", root.photos, "--videos", root.videos,
       "--settings", root.settingsArg(path), "--overlay", root.overlayArgument]
-    if (action === "run") command.push("--managed")
+    if (action === "run") command.push("--managed", "--automatic", "1")
     return command
   }
   function refreshPerformance() {
@@ -252,6 +254,7 @@ Item {
     root.begin(cacheStatusProc)
   }
   function prepareSelected() {
+    if (root.automaticPreparing && rendererProc.running) { rendererProc.write("cancel-preparation\n"); return }
     if (cacheWorkProc.running) { cacheWorkProc.cancelled = true; cacheWorkProc.running = false; root.performanceState = "cancelled"; return }
     cacheWorkProc.action = "prepare"
     cacheWorkProc.command = root.cacheCommand("prepare", root.resolvedPack())
@@ -261,7 +264,14 @@ Item {
   property string pendingCacheAction: ""
   function clearPrepared() { root.cacheMaintenance("clear") }
   function trimPrepared() { root.cacheMaintenance("trim") }
+  onAutomaticPreparingChanged: {
+    if (!root.automaticPreparing && root.pendingCacheAction !== "" && !cacheWorkProc.running) {
+      var pending = root.pendingCacheAction; root.pendingCacheAction = ""
+      Qt.callLater(function() { root.cacheMaintenance(pending) })
+    }
+  }
   function cacheMaintenance(action) {
+    if (root.automaticPreparing && rendererProc.running) { root.pendingCacheAction = action; rendererProc.write("cancel-preparation\n"); return }
     if (cacheWorkProc.running) { root.pendingCacheAction = action; cacheWorkProc.cancelled = true; cacheWorkProc.running = false; return }
     cacheWorkProc.action = action
     cacheWorkProc.command = root.cacheCommand(action, root.resolvedPack())
@@ -797,7 +807,21 @@ Item {
     if (lastLine(out) === "false") launch(!root.fromIdle && root.previewPath !== "" ? root.previewPath : root.resolvedPack())
   }
 
+  function observePreparationOutput(text) {
+    var lines = String(text || "").slice(-4096).split("\n")
+    for (var i = lines.length - 1; i >= 0; i--) {
+      if (lines[i].indexOf('{"screensafePreparation":') !== 0) continue
+      try {
+        var value = JSON.parse(lines[i]).screensafePreparation
+        if (["checking", "preparing"].indexOf(value.state) >= 0) { root.automaticPreparing = true; return }
+        if (["ready", "empty", "ineligible", "unavailable", "cancelled"].indexOf(value.state) >= 0) {
+          root.automaticPreparing = false; if (root.launching === root.resolvedPack()) root.performanceState = value.state; return
+        }
+      } catch (e) {}
+    }
+  }
   function launch(packPath) {
+    root.automaticPreparing = false
     root.launching = packPath
     root.stoppedForLock = false
     var args = ["run", "--pack", packPath, "--theme", root.themeDir, "--branding", root.branding, "--logo", root.logo, "--badge", root.badge, "--photos", root.photos, "--videos", root.videos, "--settings", root.settingsArg(packPath), "--role", "org.omarchy.screensaver", "--overlay", root.overlayArgument]
@@ -811,6 +835,7 @@ Item {
   }
 
   function rendererExited(code, errors) {
+    root.automaticPreparing = false
     if (code !== 0 && root.videosOf(root.launching) >= 0) root.videoDecoderState = "unavailable"
     if (code === 3 && root.launching !== root.defaultPack) {
       // The pack can't be used: say so, and show the built-in one instead.
@@ -1000,7 +1025,7 @@ Item {
     id: rendererProc
     stdinEnabled: true
     clearEnvironment: true
-    stdout: BoundedOutput { id: rendererOut; limit: 4096 }
+    stdout: BoundedOutput { id: rendererOut; limit: 4096; onTextChanged: root.observePreparationOutput(text) }
     // Only its last line is shown, when it fails; a renderer that says more is cut off, but keeps running.
     stderr: BoundedOutput { id: rendererErr; limit: 65536; onTextChanged: root.observeVideoOutput(text) }
     onExited: function(code) { root.rendererExited(code, rendererErr.text) }

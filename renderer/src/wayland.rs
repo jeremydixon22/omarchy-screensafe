@@ -78,6 +78,7 @@ impl Region {
 }
 
 pub struct Options {
+    pub preparation: bool,
     pub seed: u64,
     pub exit_after: Option<Duration>,
     pub max_fps: f64,
@@ -160,6 +161,7 @@ struct Globals {
 }
 
 struct State {
+    preparation: Option<crate::preparation_ui::Preparation>,
     linear_xrgb: bool,
     globals: Globals,
     overlay: Option<crate::overlay::Overlay>,
@@ -361,9 +363,15 @@ impl State {
             }
             let Some(pixmap) = s.pixmap.as_mut() else { return Err(format!("can't draw a {w} x {h} screen")) };
             let view = View::new(w, h, pack.stage);
+            let began_work = Instant::now();
+            let replacing = self.preparation.as_ref().is_some_and(|ui| ui.replacement(time));
             let (media_time, warming) = if pack.uses_videos { s.video_start.clock(time) } else { (time, false) };
             eval.set_pixel_scale(physical_scale);
-            let mut frame = eval.frame(pack, media_time, view.aspect());
+            let mut frame = if replacing {
+                Frame { background: crate::preparation_ui::background(pack.foreground, 1.0), items: Vec::new(), scene: 0, fps: 4.0 }
+            } else {
+                eval.frame(pack, media_time, view.aspect())
+            };
             let surround_ready = !pack.uses_videos || raster.video_surround_ready(pack, &frame, view);
             if warming || !surround_ready {
                 // Keep the device and its black glass; don't queue or reveal the picture yet.
@@ -371,6 +379,9 @@ impl State {
             }
             if let Some(overlay) = &self.overlay {
                 overlay.append(&mut frame, time, view, physical_scale, pack.foreground, raster.metrics()[0]);
+            }
+            if let Some(ui) = &self.preparation {
+                ui.append(&mut frame, time, view, pack.foreground, raster.metrics()[0], &pack.meta.name);
             }
             if s.shown.as_ref() == Some(&frame) && !arrived {
                 // Nothing has changed: keep what's on screen, and spend nothing on it.
@@ -423,7 +434,11 @@ impl State {
                 s.video_start.presented(time, surround_ready);
             }
             s.waiting = true;
+            let fps = frame.fps;
             s.shown = Some(frame);
+            if let Some(ui) = &mut self.preparation {
+                ui.observe(time, began_work.elapsed().as_secs_f64(), fps);
+            }
         }
         Ok(())
     }
@@ -483,6 +498,7 @@ fn connect_to(region: Option<Region>) -> Result<Display, String> {
     let fractional = globals.bind::<WpFractionalScaleManagerV1, _, _>(&qh, 1..=1, ()).ok();
     let dmabuf = globals.bind::<ZwpLinuxDmabufV1, _, _>(&qh, 3..=3, ()).ok();
     let mut state = State {
+        preparation: None,
         linear_xrgb: false,
         overlay: None,
         globals: Globals { compositor, shm, layer_shell, viewporter, fractional, dmabuf },
@@ -665,6 +681,9 @@ impl Display {
 
     /// Shows the pack until input dismisses it, returning why it closed.
     pub fn run(mut self, pack: &Pack, options: &Options, raster: &mut Raster, input: std::fs::File) -> Result<&'static str, String> {
+        if options.preparation {
+            self.state.preparation = Some(crate::preparation_ui::Preparation::new());
+        }
         let qh = self.queue.handle();
         self.state.overlay = Some(crate::overlay::Overlay::new(options.overlay.clone(), options.clock.clone().unwrap_or_else(crate::clock::Clock::fixed)));
         let mut control = crate::overlay::Input::new(input);
@@ -692,11 +711,17 @@ impl Display {
                 if line.trim() == "quit" {
                     return Ok("asked to stop");
                 }
+                if let Some(ui) = &mut self.state.preparation {
+                    ui.control(&line, options.start + start.elapsed().as_secs_f64());
+                }
                 if let Some(overlay) = &mut self.state.overlay {
                     overlay.control(&line, options.start + start.elapsed().as_secs_f64());
                 }
             }
-            if now >= looked_ahead && pack.prefetches_images() {
+            if now >= looked_ahead
+                && pack.prefetches_images()
+                && !self.state.preparation.as_ref().is_some_and(|ui| ui.replacement(options.start + start.elapsed().as_secs_f64()))
+            {
                 // Start decoding and resampling the images the pack will show a little later, so they're ready in time.
                 let ahead = options.start + start.elapsed().as_secs_f64() + LOOK_AHEAD;
                 let frame = eval.frame(pack, ahead, 16.0 / 9.0);
@@ -707,7 +732,11 @@ impl Display {
                 let time = options.start + start.elapsed().as_secs_f64();
                 self.state.draw(pack, &mut eval, raster, time, false, &qh)?;
                 let (scene, _, _) = Evaluator::locate(pack, time);
-                let fps = pack.scenes[scene].fps.min(options.max_fps).max(1.0);
+                let fps = if self.state.preparation.as_ref().is_some_and(|ui| ui.replacement(time)) {
+                    4.0
+                } else {
+                    pack.scenes[scene].fps.min(options.max_fps).max(1.0)
+                };
                 next += Duration::from_secs_f64(1.0 / fps);
                 if next < now {
                     next = now + Duration::from_secs_f64(1.0 / fps);
