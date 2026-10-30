@@ -147,13 +147,13 @@ Removing the plugin switches Omarchy's screensaver back on if ScreenSafe had swi
 
 ## What's inside
 
-- `Service.qml`, `Panel.qml` and `ShieldMark.qml`: the plugin. Normal playback starts ScreenSafe's renderer and Omarchy's `omarchy-shell`. Optional prepared playback also uses the trusted local controller and a confined codec/GPU worker.
+- `Service.qml`, `Panel.qml` and `ShieldMark.qml`: the plugin. Procedural playback starts ScreenSafe's renderer and Omarchy's `omarchy-shell`. Compressed Videos uses a separate trusted broker, and optional prepared playback uses its own controller and confined codec/GPU worker.
 - `bin/screensafe-x86_64` and `bin/screensafe-aarch64`: the renderer, static Linux executables built reproducibly from [`renderer/`](renderer). The plugin runs the one for your machine.
 - `bin/screensafe-cache-*`, `screensafe-sandbox-*` and `screensafe-media-*`: the included GPU worker, sandbox launcher and media resource-limit launcher for each architecture. Their sources and pinned rebuild inputs are included.
 - `packs/`: the built-in packs, and `tools/`: the generators for the larger ones.
 - `skills/screensafe-packs/`: instructions for coding agents that make packs. The plugin doesn't install or read them.
 
-The renderer embeds [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) (SIL Open Font License 1.1) and uses the Rust libraries listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Normal playback uses the static renderer. Videos import and optional prepared playback use Python, FFmpeg/ffprobe, MPV and graphics/runtime libraries already supplied by standard Omarchy. Bubblewrap and ScreenSafe's own helpers are bundled. There is no installer, package installation, compiler requirement or download at run time. The controller uses a read-only package-version query for cache identity. The GPU worker connects to one render node; it has no compositor socket, home directory or network access.
+The renderer embeds [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) (SIL Open Font License 1.1) and uses the Rust libraries listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Procedural and JPEG playback use the static renderer. Catalog/thumbnails and compressed Videos also use the bundled Python broker; compressed decoding uses system FFmpeg. Import and optional prepared playback use FFmpeg/ffprobe, MPV and graphics/runtime libraries already supplied by standard Omarchy. Bubblewrap and ScreenSafe's own helpers are bundled. There is no installer, package installation, compiler requirement or download at run time. The controller uses a read-only package-version query for cache identity. The GPU worker connects to one render node; it has no compositor socket, home directory or network access.
 
 The expression language borrows ideas and a few function names from MilkDrop's preset equations, but no code; [Expressions](docs/EXPRESSIONS.md#compared-with-milkdrop) describes how they differ.
 
@@ -173,7 +173,7 @@ python3 scripts/build-native.py /tmp/screensafe-native
 scripts/verify-native
 ```
 
-Prepared playback supports a single, unrotated display up to 4096 × 2160 and 64 Hz when its driver exports linear XRGB buffers. Preparation checks both software and hardware-copy decoding and uses a passing profile; direct hardware interop is excluded. Updates to relevant binaries, graphics/codec libraries, kernel, theme, settings or display invalidate reuse. Previews stay live. Unsupported setups automatically use normal playback.
+Prepared playback supports a single, unrotated display up to 4096 × 2160 and 64 Hz when its driver exports linear XRGB buffers. Preparation checks both software and hardware-copy decoding and uses a passing profile; direct hardware interop is excluded. Updates to relevant binaries, graphics/codec libraries, kernel, theme, settings or display invalidate reuse. The small settings preview stays live. Full-screen Preview follows the prepared-playback choice and may reuse an approved loop; it never creates one. Choose **Prepare selected screensaver** to generate and approve a loop on external power. Unsupported setups automatically use normal playback.
 
 Prepared playback can reduce power for demanding effects. Simple screensavers may cost less to draw live than to decode and present as video; preparation is manual so you can choose which packs use this path. The prepared segment repeats, while live playback can continue generating new variations.
 

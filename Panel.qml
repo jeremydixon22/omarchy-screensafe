@@ -260,7 +260,7 @@ Panel {
     root.setScroll(Math.max(0, Math.min(Math.max(0, scroller.contentHeight - scroller.height), to)))
   }
   // Keep list and settings views equally tall; expanded cards no longer need row-cut sizing.
-  function panelHeight() { return panel.fittedContentHeight(Style.space(620), Style.space(620)) }
+  function panelHeight() { return panel.fittedContentHeight(Style.space(700), Style.space(700)) }
 
   function durationText(s) {
     if (s < 60) return s + " s"
