@@ -2222,7 +2222,9 @@ pub(crate) mod tests {
     use super::*;
 
     pub fn temp_pack(name: &str, manifest: &str, files: &[(&str, &[u8])]) -> std::path::PathBuf {
-        let dir = std::env::temp_dir().join(format!("screensafe-pack-{name}-{}", std::process::id()));
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let unique = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!("screensafe-pack-{name}-{}-{unique}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join(MANIFEST), manifest).unwrap();
