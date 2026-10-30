@@ -129,7 +129,10 @@ static void draw(unsigned index,unsigned slot) {
             if(mpv_render_context_get_info(render,query)<0)fail("frame query failed");
             if(info.flags&MPV_RENDER_FRAME_INFO_PRESENT) {
                 mpv_opengl_fbo fbo={(int)buffers[slot].fbo,(int)width,(int)height,GL_RGBA8};
-                int flip=1,block=0;mpv_render_param p[]={{MPV_RENDER_PARAM_OPENGL_FBO,&fbo},
+                /* This is an offscreen GBM target, not a flipped default
+                 * window framebuffer. Readback and DMA-BUF consumers must
+                 * receive the same upright image. */
+                int flip=0,block=0;mpv_render_param p[]={{MPV_RENDER_PARAM_OPENGL_FBO,&fbo},
                     {MPV_RENDER_PARAM_FLIP_Y,&flip},{MPV_RENDER_PARAM_BLOCK_FOR_TARGET_TIME,&block},{0,NULL}};
                 glBindFramebuffer(GL_FRAMEBUFFER,0);
                 if(mpv_render_context_render(render,p)<0)fail("GPU draw failed");

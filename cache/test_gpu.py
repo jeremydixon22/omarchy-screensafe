@@ -1,9 +1,14 @@
 """Pinned GPU identity and real prepared-cage scope checks."""
 import errno
+import array
+import fcntl
 import json
+import mmap
 import os
 from pathlib import Path
 import subprocess
+import socket
+import struct
 import sys
 import tempfile
 from types import SimpleNamespace
@@ -72,6 +77,69 @@ print(json.dumps(r))
 
 @unittest.skipUnless(os.environ.get('SCREENSAFE_TEST_RENDER_NODE'),'explicit physical GPU required')
 class CageTests(unittest.TestCase):
+    def test_readback_and_linear_buffer_preserve_asymmetric_video_orientation(self):
+        width,height=320,200
+        colors=[(220,30,40),(30,180,60),(40,65,220),(230,200,30)]
+        rgb=b''.join(bytes(colors[(y>=height//2)*2+(x>=width//2)]) for y in range(height) for x in range(width))
+        args=SimpleNamespace(worker=ROOT/'bin'/('screensafe-cache-'+os.uname().machine))
+        def corners(data,stride,bgra=False):
+            result=[]
+            for x,y in [(width//4,height//4),(3*width//4,height//4),(width//4,3*height//4),(3*width//4,3*height//4)]:
+                pixel=list(data[y*stride+x*4:y*stride+x*4+3])
+                result.append(pixel[::-1] if bgra else pixel)
+            return result
+        def upright(actual):
+            for got,want in zip(actual,colors):
+                self.assertLess(max(abs(a-b) for a,b in zip(got,want)),32,(actual,colors))
+        with tempfile.TemporaryDirectory() as directory, RenderNode(os.environ['SCREENSAFE_TEST_RENDER_NODE']) as gpu:
+            media=Path(directory)/'corners.mp4'
+            encode=['/usr/bin/ffmpeg','-v','error','-f','rawvideo','-pixel_format','rgb24','-video_size',f'{width}x{height}',
+                    '-framerate','24','-i','pipe:0','-frames:v','24','-an','-c:v','libx264','-preset','veryfast',
+                    '-pix_fmt','yuv420p','-threads','2','-bf','0','-g','24',str(media)]
+            subprocess.run(encode,input=rgb*24,check=True,capture_output=True,timeout=15)
+            with manager.snapshot(media) as (fd,_,_):
+                for decoder in ['software','copy']:
+                    with self.subTest(decoder=decoder):
+                        command=['/worker','capture',str(width),str(height),'1','24',decoder,str(gpu.path)]
+                        p=subprocess.run(manager.sandbox(args,command,media=fd,device=gpu),
+                            pass_fds=(fd,*gpu.pass_fds),capture_output=True,timeout=15)
+                        self.assertEqual(p.returncode,0,p.stderr)
+                        self.assertEqual(len(p.stdout),width*height*4)
+                        readback=corners(p.stdout,width*4);upright(readback)
+                        channel,other=socket.socketpair(socket.AF_UNIX,socket.SOCK_SEQPACKET)
+                        channel.settimeout(10);buffers=[];headers=[]
+                        command=['/worker','serve',str(width),str(height),'24','24',decoder,str(gpu.path)]
+                        p=subprocess.Popen(manager.sandbox(args,command,media=fd,device=gpu),
+                            pass_fds=(fd,*gpu.pass_fds),stdin=other,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,start_new_session=True)
+                        other.close()
+                        try:
+                            for index in range(3):
+                                data,anc,flags,_=channel.recvmsg(32,256)
+                                self.assertEqual(len(data),32);self.assertEqual(flags,0)
+                                header=struct.unpack('<8I',data);headers.append(header)
+                                self.assertEqual(header[:5],(manager.MAGIC,1,index,width,height))
+                                rights=array.array('i')
+                                self.assertEqual(len(anc),1)
+                                self.assertEqual(anc[0][:2],(socket.SOL_SOCKET,socket.SCM_RIGHTS))
+                                rights.frombytes(anc[0][2]);buffers.extend(rights);self.assertEqual(len(rights),1)
+                            channel.send(struct.pack('<4I',manager.MAGIC,2,0,0))
+                            self.assertEqual(struct.unpack('<4I',channel.recv(32)),(manager.MAGIC,3,0,0))
+                            stride=headers[0][5]
+                            # Synchronize CPU reads of the actual linear buffer
+                            # sent to Wayland, independently of GL readback.
+                            fcntl.ioctl(buffers[0],0x40086200,struct.pack('Q',1))
+                            try:
+                                with mmap.mmap(buffers[0],stride*height,flags=mmap.MAP_SHARED,prot=mmap.PROT_READ) as pixels:
+                                    displayed=corners(pixels,stride,True)
+                            finally:fcntl.ioctl(buffers[0],0x40086200,struct.pack('Q',5))
+                            upright(displayed);self.assertEqual(displayed,readback)
+                        finally:
+                            channel.close()
+                            try:manager.terminate(p)
+                            except ProcessLookupError:p.wait(timeout=3)
+                            p.stderr.close()
+                            for buffer in buffers:os.close(buffer)
+
     def test_prepared_cage_exposes_only_pinned_gpu_metadata(self):
         args=SimpleNamespace(worker=ROOT/'bin'/('screensafe-cache-'+os.uname().machine))
         with tempfile.TemporaryDirectory() as directory, RenderNode(os.environ['SCREENSAFE_TEST_RENDER_NODE']) as gpu:

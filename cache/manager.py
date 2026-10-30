@@ -160,7 +160,8 @@ def profile(args, size):
     packages = small_output(['/usr/bin/pacman', '-Q', 'mpv', 'ffmpeg', 'mesa', 'libva', 'wayland', 'libseccomp', 'libcap', 'python']).decode()
     return {'version': VERSION, 'files': {p: sha(p) for p in sorted(paths)},
             'packages': packages, 'kernel': os.uname().release, 'size': size,
-            'cadence': 'ordered/no-catch-up/24fps/64Hz-approval', 'composition': 'opaque/fixed/no-overlay'}
+            'cadence': 'ordered/no-catch-up/24fps/64Hz-approval', 'composition': 'opaque/fixed/no-overlay',
+            'imageOrigin': 'top-left'}
 
 
 def identity(base, device, decoder):
