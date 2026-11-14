@@ -65,7 +65,7 @@ def run(args,m):
     command=m.arguments(args,'run')+['--preparation-ui','1']
     viewer=subprocess.Popen(command,stdin=subprocess.PIPE,stdout=subprocess.PIPE,start_new_session=True)
     display=Display(viewer.stdin);os.set_blocking(viewer.stdout.fileno(),False)
-    cancel=threading.Event();decided=threading.Event();done=threading.Event();result={}
+    cancel=threading.Event();feedback=threading.Event();done=threading.Event();result={}
     work_args=SimpleNamespace(**vars(args));work_args.cancel_event=cancel
     def work():
         try:
@@ -77,7 +77,7 @@ def run(args,m):
             if m.status(work_args)['state']=='ready':
                 display(0,'idle');result['state']='ready';return
             notify({'state':'preparing'});display(0,'planning')
-            if not decided.wait(3):display(0,'exclusive')
+            if not feedback.wait(3):raise ValueError('preparation feedback did not appear')
             if cancel.is_set():
                 result['state']='cancelled';display(0,'cancelled');return
             result.update(m.prepare(work_args,display))
@@ -113,8 +113,8 @@ def run(args,m):
                         line,_,output=output.partition(b'\n')
                         try:
                             value=json.loads(line).get('screensafePreparation',{}).get('mode')
-                            if value in ['overlay','replacement']:
-                                decided.set();notify({'mode':value})
+                            if value in ['checking','overlay','replacement']:
+                                feedback.set();notify({'mode':value})
                         except (ValueError,AttributeError):pass
                 else:
                     control.extend(data)
@@ -123,7 +123,7 @@ def run(args,m):
                         line,_,control=control.partition(b'\n')
                         if line==b'quit':return 0
                         if line==b'cancel-preparation':
-                            cancel.set();decided.set();display(0,'cancelled');continue
+                            cancel.set();feedback.set();display(0,'cancelled');continue
                         if line.startswith(b'overlay ') and line[8:].decode('ascii')!=args.overlay:
                             # A changed live composition invalidates this build;
                             # retain the ordinary viewer's overlay handling.
@@ -133,7 +133,7 @@ def run(args,m):
                             except (OSError,BlockingIOError):pass
         return 143 if m.STOP else viewer.returncode
     finally:
-        cancel.set();decided.set();selector.close()
+        cancel.set();feedback.set();selector.close()
         try:
             if viewer.poll() is None:
                 try:os.write(viewer.stdin.fileno(),b'quit\n');viewer.wait(timeout=1)

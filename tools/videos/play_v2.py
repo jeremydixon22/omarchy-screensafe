@@ -19,6 +19,7 @@ import stat
 import struct
 import subprocess
 import time
+import unicodedata
 
 import ssv2
 from hardware import RenderNode, select_node
@@ -29,6 +30,67 @@ RESPONSE = struct.Struct('<8I')
 SEALS = fcntl.F_SEAL_SEAL | fcntl.F_SEAL_WRITE | fcntl.F_SEAL_GROW | fcntl.F_SEAL_SHRINK
 CACHE_FRAMES = 12
 FRAME_DEADLINE = 5
+DEFAULT_VIDEOS = Path(__file__).resolve().parents[2] / 'packs/videos/examples'
+LIBRARY_SCAN_LIMIT = 4096
+
+
+def library_has_videos(folder):
+    """Bounded filename/type inspection only; codec parsing remains in the cage.
+
+    Uncertain or over-budget libraries retain the caller's directory. Individual
+    files are opened and validated later by the confined renderer, as before.
+    """
+    try:
+        with os.scandir(folder) as entries:
+            for index, entry in enumerate(entries):
+                if index >= LIBRARY_SCAN_LIMIT:
+                    return True
+                name = entry.name
+                try:
+                    valid = (not name.startswith('.') and len(name.encode('utf-8')) <= 255
+                             and not any(unicodedata.category(c) == 'Cc' for c in name))
+                except UnicodeEncodeError:
+                    continue
+                if valid and name.lower().endswith('.ssv') and entry.is_file(follow_symlinks=False):
+                    return True
+    except (FileNotFoundError, NotADirectoryError):
+        return False
+    except OSError:
+        return True
+    return False
+
+
+def default_video_source(command):
+    """Use the fixed bundled library when the personal .ssv library is empty.
+
+    This only selects the existing --videos input directory. Packs supply no
+    paths or commands to this policy, and decoder/device policy is unchanged.
+    """
+    command = list(command)
+    if not command or command[0] not in ['run', 'preview', 'check', 'render', 'thumbnail', 'catalog']:
+        return command
+    positions = [i for i, word in enumerate(command) if word == '--videos']
+    at = positions[-1] if positions else None
+    if at is not None:
+        if at + 1 >= len(command):
+            return command
+        folder = command[at + 1]
+    else:
+        home = os.environ.get('HOME')
+        if not home:
+            return command
+        folder = Path(home) / 'Videos/Screensaver'
+    try:
+        example = (DEFAULT_VIDEOS / 'omarchy-ad-loop.ssv').lstat()
+    except OSError:
+        return command
+    if not stat.S_ISREG(example.st_mode) or not 0 < example.st_size <= ssv2.MAX_ARCHIVE or library_has_videos(folder):
+        return command
+    if at is None:
+        command += ['--videos', str(DEFAULT_VIDEOS)]
+    else:
+        command[at + 1] = str(DEFAULT_VIDEOS)
+    return command
 
 
 def stamp(fd):
@@ -263,6 +325,7 @@ def serve(channel, renderer, delivery='pipe', hardware=None):
 
 def launch(renderer, command, delivery, hardware):
     """Launch only after the trusted caller has selected and pinned authority."""
+    command=default_video_source(command)
     server,client=socket.socketpair(socket.AF_UNIX,socket.SOCK_SEQPACKET)
     server.setsockopt(socket.SOL_SOCKET,socket.SO_SNDTIMEO,struct.pack('@ll',2,0))
     child=None;control_input=None

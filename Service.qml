@@ -794,17 +794,19 @@ Item {
     root.begin(lockProc)
   }
 
-  function lockResult(out, purpose) {
-    var locked = lastLine(out) === "true"
+  function lockResult(out, purpose, code) {
+    var unlocked = code === 0 && lastLine(out) === "false"
     if (purpose === "watch") {
-      if (locked) {
+      // An unknown lock state must also end the viewer and its automatic
+      // preparation. Mark it as a lock stop so Preview cannot reopen the panel.
+      if (!unlocked) {
         root.stoppedForLock = true
         rendererProc.running = false
       }
       return
     }
     // Shown only when Omarchy plainly says the session isn't locked; any other answer, or none, keeps it hidden.
-    if (lastLine(out) === "false") launch(!root.fromIdle && root.previewPath !== "" ? root.previewPath : root.resolvedPack())
+    if (unlocked) launch(!root.fromIdle && root.previewPath !== "" ? root.previewPath : root.resolvedPack())
   }
 
   function observePreparationOutput(text) {
@@ -979,7 +981,7 @@ Item {
     property real startedAt: 0
     clearEnvironment: true
     stdout: BoundedOutput { id: lockOut; limit: 4096; process: lockProc }
-    onExited: function() { root.lockResult(lockOut.over ? "" : lockOut.text, lockProc.purpose) }
+    onExited: function(code) { root.lockResult(lockOut.over ? "" : lockOut.text, lockProc.purpose, code) }
   }
 
   Process {

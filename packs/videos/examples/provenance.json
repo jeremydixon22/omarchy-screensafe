@@ -1,0 +1,59 @@
+{
+  "asset": "omarchy-ad-loop.ssv",
+  "sha256": "220d85c84d3f60cb9e99f1faf95c49278f79ee19f4f4de27ae977bfbe2e4ceae",
+  "bytes": 49506764,
+  "width": 1280,
+  "height": 720,
+  "fps": 24,
+  "frames": 1132,
+  "codec": "H.264",
+  "crf": 16.8,
+  "sourceSha256": "56178aec6c893e69bc54bebed4d919aee0768b88e2a2e2f2f27849bd38ef0024",
+  "flashPolicySource": "renderer/src/flash.rs",
+  "flashPolicySha256": "e7b3189e7a7a30b1ec341a9da421acd7c188e157ed6e19b6e2a579d65eb5fc17",
+  "preparation": {
+    "frames": 1132,
+    "heldFrames": 0,
+    "method": "Ordinary confined H.264 SSVv2 import; no frame replacement or temporal smoothing."
+  },
+  "runtimeGuard": true,
+  "license": "MIT",
+  "origin": "Original ScreenSafe announcement animation; project-owner-approved parody; no third-party footage or audio.",
+  "checkedProfiles": [
+    {
+      "style": "Full screen",
+      "value": 0,
+      "size": "1152x720"
+    },
+    {
+      "style": "Whole",
+      "value": 1,
+      "size": "1152x720"
+    },
+    {
+      "style": "Film",
+      "value": 2,
+      "size": "1152x720"
+    },
+    {
+      "style": "CRT Box",
+      "value": 3,
+      "size": "1152x720"
+    },
+    {
+      "style": "Flatscreen",
+      "value": 4,
+      "size": "1152x720"
+    },
+    {
+      "style": "CRT Fit",
+      "value": 5,
+      "size": "1152x720"
+    },
+    {
+      "style": "Full screen",
+      "value": 0,
+      "size": "1280x720"
+    }
+  ]
+}

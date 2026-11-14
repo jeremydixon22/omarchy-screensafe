@@ -69,11 +69,12 @@ class LifecycleTests(unittest.TestCase):
     def test_managed_control_eof_cancels_preparation_and_reaps_the_viewer(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);renderer=root/'viewer';marker=root/'viewer-started'
-            renderer.write_text('#!/usr/bin/python3\nimport json,sys,time\nfrom pathlib import Path\nPath('+repr(str(marker))+').write_text("started")\nprint(json.dumps({"screensafePreparation":{"mode":"overlay"}}),flush=True)\nfor line in sys.stdin:\n if line.strip()=="quit":break\n')
+            renderer.write_text('#!/usr/bin/python3\nimport json,sys,time\nfrom pathlib import Path\ntime.sleep(.15)\nPath('+repr(str(marker))+').write_text("feedback")\nprint(json.dumps({"screensafePreparation":{"mode":"checking"}}),flush=True)\nfor line in sys.stdin:\n if line.strip()=="quit":break\n')
             renderer.chmod(0o755);worker=root/'worker';worker.touch();cache=root/'cache'
             args=SimpleNamespace(renderer=renderer,worker=worker,root=cache,overlay='enabled=0',role='org.omarchy.screensaver',exit_after=None,managed=True,pack=str(root),battery_only=0)
             began=threading.Event();cancelled=threading.Event()
             def prepare(job_args,progress):
+                self.assertTrue(marker.exists(),'background work began before initial feedback')
                 began.set()
                 while not job_args.cancel_event.wait(.01):pass
                 cancelled.set();raise ValueError('cancelled')

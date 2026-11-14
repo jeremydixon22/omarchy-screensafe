@@ -23,10 +23,12 @@ Panel {
   readonly property var packs: svc && Array.isArray(svc.packs) ? svc.packs : []
   readonly property var favorites: svc && Array.isArray(svc.favorites) ? svc.favorites : []
   function isFavorite(path) { return root.favorites.indexOf(path) >= 0 }
-  // The starred packs, by name, then the rest in the order they're listed.
-  readonly property var favoritePacks: root.packs.filter(function(p) { return root.isFavorite(p.path) })
+  // Snapshot grouping on each opening. Stars update immediately, but cards
+  // keep their places for the rest of this visit.
+  property var orderingFavorites: []
+  readonly property var favoritePacks: root.packs.filter(function(p) { return root.orderingFavorites.indexOf(p.path) >= 0 })
     .sort(function(a, b) { return String(a.name).toLowerCase().localeCompare(String(b.name).toLowerCase()) })
-  readonly property var otherPacks: root.packs.filter(function(p) { return !root.isFavorite(p.path) })
+  readonly property var otherPacks: root.packs.filter(function(p) { return root.orderingFavorites.indexOf(p.path) < 0 })
   readonly property int idleSeconds: svc ? svc.idleSeconds : 150
   readonly property int ownSeconds: svc ? svc.ownSeconds : 0
   readonly property int omarchySeconds: svc ? svc.screensaverSeconds : 150
@@ -176,8 +178,8 @@ Panel {
   property bool liveSettled: false
   Timer {
     id: liveSettle
-    interval: 350
-    onTriggered: root.liveSettled = true
+    interval: Math.max(350, Style.duration(240))
+    onTriggered: root.liveSettled = root.opened && root.settingsPath !== ""
   }
   readonly property bool liveWanted: root.opened && root.tab === "screensaver" && root.settingsPath !== "" && root.liveOn
     && root.liveSettled
@@ -298,7 +300,7 @@ Panel {
 
   function toggleOnIdle() { if (svc) svc.setOnIdle(!root.onIdle) }
 
-  // Stars or unstars a pack; the cursor stays on it as it moves in the list.
+  // Stars or unstars a pack without changing its position during this visit.
   function toggleFavorite(row) {
     if (!svc || row.indexOf("pack:") !== 0 || row === "pack:auto") return
     svc.toggleFavorite(row.slice(5))
@@ -452,26 +454,34 @@ Panel {
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
-  onOpenedChanged: if (opened) {
-    reopenAfterPreview = false
-    // A settings page stays only for the panel coming back from a preview started on it.
-    if (!keepSettingsPage) settingsPath = ""
-    keepSettingsPage = false
-    cursorActive = false
-    // Where the cursor was last; or the chosen pack; or the top.
-    var chosenRow = root.pack === "auto" ? "pack:auto" : "pack:" + root.pack
-    openRow = rows.indexOf(lastRow) >= 0 ? lastRow : rows.indexOf(chosenRow) >= 0 ? chosenRow : rows[0]
-    cursor = rows.indexOf(openRow)
-    cursorRow = openRow
-    // Show the chosen card immediately without resizing neighboring rows.
-    cursorActive = true
-    pointerSeen = false
-    keyMoved = false
-    root.setScroll(0)
-    showChosen = true
-    Qt.callLater(root.scrollToChosen)
-    if (svc) svc.refresh()
-    Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+  onOpenedChanged: {
+    // A standalone live surface must not map against the popup's animated
+    // opening transform. This also applies when returning from fullscreen.
+    root.liveSettled = false
+    liveSettle.stop()
+    if (opened) {
+      root.orderingFavorites = root.favorites.slice()
+      reopenAfterPreview = false
+      // A settings page stays only for the panel coming back from a preview started on it.
+      if (!keepSettingsPage) settingsPath = ""
+      keepSettingsPage = false
+      if (root.settingsPath !== "") liveSettle.restart()
+      cursorActive = false
+      // Where the cursor was last; or the chosen pack; or the top.
+      var chosenRow = root.pack === "auto" ? "pack:auto" : "pack:" + root.pack
+      openRow = rows.indexOf(lastRow) >= 0 ? lastRow : rows.indexOf(chosenRow) >= 0 ? chosenRow : rows[0]
+      cursor = rows.indexOf(openRow)
+      cursorRow = openRow
+      // Show the chosen card immediately without resizing neighboring rows.
+      cursorActive = true
+      pointerSeen = false
+      keyMoved = false
+      root.setScroll(0)
+      showChosen = true
+      Qt.callLater(root.scrollToChosen)
+      if (svc) svc.refresh()
+      Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+    }
   }
 
   Timer {

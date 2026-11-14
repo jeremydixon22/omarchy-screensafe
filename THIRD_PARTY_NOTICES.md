@@ -5075,3 +5075,11 @@ freely, subject to the following restrictions:
    misrepresented as being the original software.
 3. This notice may not be removed or altered from any source distribution.
 ```
+
+## Photosensitivity test fixtures
+
+`renderer/tests/data/flash-temporal.txt` contains temporal RGB sequences and
+labels from Trace RERC's `pse-test-media` project, distributed under BSD-3-Clause.
+The source revision, scope of the adapted fixtures and full license are included
+in `renderer/tests/data/README.md` and `LICENSE-pse-test-media`. These fixtures are
+used for maintainer tests and add no runtime dependency.

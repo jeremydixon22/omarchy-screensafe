@@ -1,12 +1,12 @@
 {
   "binaries": {
     "screensafe-cache-aarch64": {
-      "bytes": 24888,
-      "sha256": "c3b0a948e70f329f04de83a8a43e7e36106e672eb7d5a8aa523907c73010d08d"
+      "bytes": 24840,
+      "sha256": "dcb5b207ba778338be7e9dcf2f5bf767f1a02f0abe02e029b1dfdcda306847f2"
     },
     "screensafe-cache-x86_64": {
-      "bytes": 25424,
-      "sha256": "fffab9c6d625783c8da0558a331714b82ef45fc00ccf24aa1fc92c7aff0ef3a8"
+      "bytes": 25376,
+      "sha256": "a4695f82a31ab6c99495b5ec6234820cf3d8e87872365a16b7835183f90b1c31"
     },
     "screensafe-media-aarch64": {
       "bytes": 12328,
@@ -30,6 +30,6 @@
   "glibc_minimum": "2.34",
   "inputs_sha256": "e3186f50482a885a7c7a96acee7b3e6437881438e4963d63f365f5d537251e2d",
   "media_launcher_source_sha256": "aca37c915aab3ed525b02bc14c77a6b16baf6834cbbab154b5c85c28899e758e",
-  "worker_source_sha256": "f460da3f8383c598596de767a026d7e9456b1bd87ec18d32892212bc304d976a",
+  "worker_source_sha256": "084ecf59e1e59b55bfff5fd9ef006636168f5835f1bfbd707ab5d9c95dfc80d0",
   "zig_version": "0.15.2"
 }

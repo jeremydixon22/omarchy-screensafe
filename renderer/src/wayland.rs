@@ -364,9 +364,19 @@ impl State {
             let Some(pixmap) = s.pixmap.as_mut() else { return Err(format!("can't draw a {w} x {h} screen")) };
             let view = View::new(w, h, pack.stage);
             let began_work = Instant::now();
+            let probing = self.preparation.as_ref().is_some_and(|ui| ui.probing(time));
             let replacing = self.preparation.as_ref().is_some_and(|ui| ui.replacement(time));
             let (media_time, warming) = if pack.uses_videos { s.video_start.clock(time) } else { (time, false) };
             eval.set_pixel_scale(physical_scale);
+            let mut sampled_fps = None;
+            if probing {
+                // Render the real workload into the existing scratch pixmap.
+                // The feedback frame below clears it completely before any
+                // pixels reach flash admission or the compositor.
+                let hidden = eval.frame(pack, media_time, view.aspect());
+                raster.draw(pack, &hidden, &mut pixmap.as_mut(), view);
+                sampled_fps = Some(hidden.fps);
+            }
             let mut frame = if replacing {
                 Frame { background: crate::preparation_ui::background(pack.foreground, 1.0), items: Vec::new(), scene: 0, fps: 4.0 }
             } else {
@@ -437,7 +447,7 @@ impl State {
             let fps = frame.fps;
             s.shown = Some(frame);
             if let Some(ui) = &mut self.preparation {
-                ui.observe(time, began_work.elapsed().as_secs_f64(), fps);
+                ui.observe(time, began_work.elapsed().as_secs_f64(), sampled_fps.unwrap_or(fps), probing);
             }
         }
         Ok(())
@@ -732,7 +742,7 @@ impl Display {
                 let time = options.start + start.elapsed().as_secs_f64();
                 self.state.draw(pack, &mut eval, raster, time, false, &qh)?;
                 let (scene, _, _) = Evaluator::locate(pack, time);
-                let fps = if self.state.preparation.as_ref().is_some_and(|ui| ui.replacement(time)) {
+                let fps = if self.state.preparation.as_ref().is_some_and(|ui| ui.replacement(time) && !ui.sample_pending(time)) {
                     4.0
                 } else {
                     pack.scenes[scene].fps.min(options.max_fps).max(1.0)

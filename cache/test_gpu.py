@@ -77,6 +77,31 @@ print(json.dumps(r))
 
 @unittest.skipUnless(os.environ.get('SCREENSAFE_TEST_RENDER_NODE'),'explicit physical GPU required')
 class CageTests(unittest.TestCase):
+    def test_copy_decoder_refuses_unavailable_hardware_before_emitting_pixels(self):
+        width,height=128,72
+        args=SimpleNamespace(worker=ROOT/'bin'/('screensafe-cache-'+os.uname().machine))
+        with tempfile.TemporaryDirectory() as directory, RenderNode(os.environ['SCREENSAFE_TEST_RENDER_NODE']) as gpu:
+            media=Path(directory)/'solid.mp4'
+            subprocess.run(['/usr/bin/ffmpeg','-v','error','-nostdin','-f','lavfi','-i',
+                f'color=c=0x405060:size={width}x{height}:rate=24','-frames:v','24','-an','-c:v','libx264',
+                '-pix_fmt','yuv420p','-threads','2','-bf','0','-g','24',str(media)],
+                check=True,capture_output=True,timeout=15)
+            with manager.snapshot(media) as (fd,_,_):
+                for unavailable in [False,True]:
+                    with self.subTest(hardware_unavailable=unavailable):
+                        command=manager.sandbox(args,['/worker','capture',str(width),str(height),'1','24','copy',str(gpu.path)],media=fd,device=gpu)
+                        if unavailable:
+                            at=command.index('--clearenv')+1
+                            command[at:at]=['--setenv','LIBVA_DRIVER_NAME','screensafe-no-such-driver']
+                        p=subprocess.run(command,pass_fds=(fd,*gpu.pass_fds),capture_output=True,timeout=15)
+                        if unavailable:
+                            self.assertNotEqual(p.returncode,0,'software fallback acquired a copy profile')
+                            self.assertEqual(p.stdout,b'','unverified software pixels escaped capture')
+                            self.assertIn(b'approved decoder unavailable',p.stderr)
+                        else:
+                            self.assertEqual(p.returncode,0,p.stderr)
+                            self.assertEqual(len(p.stdout),width*height*4)
+
     def test_readback_and_linear_buffer_preserve_asymmetric_video_orientation(self):
         width,height=320,200
         colors=[(220,30,40),(30,180,60),(40,65,220),(230,200,30)]

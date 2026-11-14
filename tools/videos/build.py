@@ -122,6 +122,21 @@ element(2, kind='group', visible='time < 0.625', x=-0.099, y=-0.024,
         clip=['-0.455', '-max(0.002, opening * 0.3395)', '0.455', 'max(0.002, opening * 0.3395)'])
 video(3, visible='style == 3', w=0.91, h=0.679, fit='contain', curve=0.045, opacity='power * signal')
 video(3, visible='style == 5', w=0.91, h=0.679, fit='cover', curve=0.045, opacity='power * signal')
+# A low-level phosphor field makes the tube opening visible even when frame0
+# is black. Its outline matches the inverse-barrel aperture, and the existing
+# opening clip reveals it. The source frame and its start time stay intact.
+phosphor = []
+for edge in range(4):
+    for step in range(17):
+        t = -1 + 2 * step / 16
+        u, v = [(t, -1), (1, t), (-t, 1), (-1, -t)][edge]
+        q = 0.95
+        for _ in range(6):
+            q -= (q + 0.045 * (u*u + v*v) * q**3 - 1) / (1 + 0.135 * (u*u + v*v) * q*q)
+        phosphor.append([round(0.455 * u * q, 7), round(0.3395 * v * q, 7)])
+element(3, kind='lines', points=phosphor, closed=True, width=0,
+        fill='rgb(0.28, 0.32, 0.29)',
+        opacity='0.28 * smoothstep(0.12, 0.22, time) * (1 - smoothstep(0.4, 0.625, time))')
 element(3, kind='rect', visible='time > 0.08 && time < 0.3', w=0.83, h=0.003,
         color='rgb(0.32, 0.37, 0.34)', opacity='smoothstep(0.08, 0.15, time) * (1 - smoothstep(0.18, 0.3, time))')
 video(visible='style == 3 && time >= 0.625', w=0.91, h=0.679, x=-0.099, y=-0.024, fit='contain', curve=0.045, opacity='signal')

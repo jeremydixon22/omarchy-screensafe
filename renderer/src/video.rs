@@ -678,6 +678,44 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn crt_expansion_is_visible_even_when_the_source_starts_black() {
+        use crate::eval::Evaluator;
+        use crate::pack::{load, Environment};
+        use crate::raster::{Raster, View};
+        let archive = archive_colors(&[[0; 3]; 24]);
+        let dir = crate::pack::tests::temp_pack("crt-black-opening", "", &[("a.ssv", &archive)]);
+        for style in [3.0, 5.0] {
+            let settings = [("style".into(), style)];
+            let pack = load(
+                &Path::new(env!("CARGO_MANIFEST_DIR")).join("../packs/videos"),
+                &Environment { videos: Some(&dir), settings: &settings, ..Default::default() },
+            )
+            .unwrap();
+            let mut raster = Raster::new();
+            raster.largest = (800, 500);
+            let view = View::new(800, 500, pack.stage);
+            let mut eval = Evaluator::new(&pack, 1, raster.metrics());
+            let mut target = tiny_skia::Pixmap::new(800, 500).unwrap();
+            let mut lit = Vec::new();
+            let mut guard = crate::flash::Guard::new();
+            for n in 0..24 {
+                let time = n as f64 / 24.0;
+                raster.draw(&pack, &eval.frame(&pack, time, view.aspect()), &mut target.as_mut(), view);
+                let cells = crate::flash::measure(target.data(), 800, 500, 800 * 4, false);
+                assert!(guard.admit(&cells, time), "black-source startup exceeded the guard");
+                // The central column stays inside the curved aperture and away
+                // from the cabinet. Count visible tube pixels, not the bezel.
+                if [5, 8, 11, 23].contains(&n) {
+                    lit.push((100..375).filter(|y| target.pixel(350, *y).unwrap().green() > 8).count());
+                }
+            }
+            assert!(lit[0] > 1 && lit[1] > lit[0] * 2 && lit[2] > lit[1], "tube must visibly expand: {lit:?}");
+            assert_eq!(lit[3], 0, "the glow clears before ordinary playback");
+        }
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
     fn device_startup_and_repeated_channel_changes_pass_the_unchanged_flash_guard() {
         use crate::eval::Evaluator;
         use crate::pack::{load, Environment};

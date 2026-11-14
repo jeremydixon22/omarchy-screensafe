@@ -20,7 +20,7 @@
 
 A screensaver in ScreenSafe is a **pack**: a folder with a `screensafe.toml` and its art. A pack describes what to draw and how it moves, with small formulas like `sin(t * 2)` in a language that can't loop, read files or reach the network. ScreenSafe draws the pack itself, and nothing in a pack ever runs as a program, **so a pack from someone else can only describe pictures.**
 
-- **Sixteen packs built in**, from a harmonograph's glowing figures to a rainy Tokyo side street, your own photos, and local videos.
+- **Eighteen packs built in**, from a harmonograph's glowing figures to a rainy Tokyo side street, a landscape through the seasons, an intricate clockwork movement, your own photos, and local videos.
 - **Your theme, everywhere.** Packs draw in the current theme's palette, and a theme can bring a pack of its own.
 - **Sharp on every screen.** Native Wayland drawing; video uses a bounded canvas scaled by the compositor.
 - **Settings without code.** Packs can offer a speed, a density or a picture; change them in the panel and watch the pack update live.
@@ -39,8 +39,9 @@ The [SSVv2 boundary notes](docs/SSV2-PROTOTYPE.md) describe codec isolation, har
 | ![Starfield](docs/gallery/starfield.webp)<br>**Starfield**<br><sub>Flying through stars that streak past as they come close.</sub> | ![Cascade](docs/gallery/cascade.webp)<br>**Cascade**<br><sub>Columns of ever-changing digits falling down the screen.</sub> | ![Constellations](docs/gallery/constellations.webp)<br>**Constellations**<br><sub>Drifting stars, joined by faint lines whenever two pass close.</sub> |
 | ![Echoes](docs/gallery/echoes.webp)<br>**Echoes**<br><sub>Two shapes bouncing around the screen, trailing echoes of where they've been.</sub> | ![Orbits](docs/gallery/orbits.webp)<br>**Orbits**<br><sub>The Omarchy box turning in its orbits, then a slowly changing Lissajous figure.</sub> | ![Badge](docs/gallery/badge.webp)<br>**Badge**<br><sub>ScreenSafe's shield, the Omarchy mark or your own badge: bouncing, shattering, waving and in orbit, smoothly or as pixel art.</sub> |
 | ![Omarchy](docs/gallery/omarchy.webp)<br>**Omarchy**<br><sub>Your screensaver art from <i>Style › Screensaver</i>, revealed a different way each time.</sub> | ![Theme backgrounds](docs/gallery/backgrounds.webp)<br>**Theme backgrounds**<br><sub>Your theme's own backgrounds, one after another, drifting slowly across the screen.</sub> | ![Photos](docs/gallery/photos.webp)<br>**Photos**<br><sub>Your photos from <code>~/Pictures/Screensaver</code>, or sets of examples (nature, technology, aerospace, and astronomy from NASA): full screen, whole, or as prints or Polaroids, in their own tones or the theme's.</sub> |
+| ![Videos](docs/gallery/videos.webp)<br>**Videos**<br><sub>Your local videos or the included Omarchy ad, full screen or framed as film, a CRT or a flatscreen.</sub> | ![Seasons](docs/gallery/seasons.webp)<br>**Seasons**<br><sub>One quiet lakeside landscape through spring blossom, summer green, autumn gold and winter snow.</sub> | ![Clockwork](docs/gallery/clockwork.webp)<br>**Clockwork**<br><sub>A slow camera journey through interlocking gears, jeweled bearings and a breathing balance spring.</sub> |
 
-<sub>Frames from the renderer at each pack's own preview moment (Photos as prints, with its examples), in Tokyo Night, Omarchy's default theme, with its first background and Omarchy's own screensaver art. To show your own badge in Badge, put an image at <code>~/.config/omarchy/screensafe/badge.png</code> (or <code>.webp</code>, <code>.jpg</code> or <code>.jpeg</code>).</sub>
+<sub>Frames from the renderer at each pack's own preview moment, in Tokyo Night, Omarchy's default theme, with its first background and Omarchy's own screensaver art. Photos uses its examples as prints; Seasons is Spring in Natural tone, Clockwork is Brass, and Videos shows original ScreenSafe announcement art at 34 seconds in CRT Box. To show your own badge in Badge, put an image at <code>~/.config/omarchy/screensafe/badge.png</code> (or <code>.webp</code>, <code>.jpg</code> or <code>.jpeg</code>).</sub>
 
 ## Install
 
@@ -51,7 +52,7 @@ omarchy plugin enable io.github.jeremydixon22.screensafe
 
 ScreenSafe's shield appears in the bar, in your theme's accent. Nothing changes until you switch it on: Omarchy's own screensaver stays in use until then.
 
-ScreenSafe needs Omarchy 4 on an x86-64 or 64-bit ARM computer, and nothing else. It's tested on Omarchy 4.0.4 with Hyprland 0.56 and Quickshell 0.3.1 on x86-64; the ARM build is tested under emulation, drawing identical frames.
+ScreenSafe needs Omarchy 4 on an x86-64 or 64-bit ARM computer, with no separate runtime setup. The 0.6.0 candidate has been tested on an x86-64 Omarchy 4.5.x laptop. CI runs renderer tests and native-helper checks on both x86-64 and ARM64; physical ARM GPU playback has not been qualified. Prepared playback checks the local display and GPU profile and uses normal rendering when the setup is unsupported.
 
 ## Use
 

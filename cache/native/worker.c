@@ -96,7 +96,7 @@ static void init_gpu(void) {
     }
     glBindFramebuffer(GL_FRAMEBUFFER,0);glBindTexture(GL_TEXTURE_2D,0);
     player=mpv_create();if(!player)fail("player allocation failed");
-    const char *opts[][2]={{"vo","libmpv"},{"hwdec","no"},{"vaapi-device","/dev/dri/renderD128"},
+    const char *opts[][2]={{"vo","libmpv"},{"hwdec","no"},
         {"hwdec-extra-frames","6"},{"vd-queue-enable","no"},{"vd-lavc-threads","2"},{"hwdec-codecs","h264"},{"profile","fast"},{"config","no"},{"load-scripts","no"},
         {"audio","no"},{"sid","no"},{"sub-auto","no"},{"osc","no"},{"osd-level","0"},
         {"input-default-bindings","no"},{"input-terminal","no"},{"terminal","no"},{"cache","no"},
@@ -105,6 +105,7 @@ static void init_gpu(void) {
         {"deband","no"},{"interpolation","no"},{"target-prim","bt.709"},{"target-trc","srgb"},
         {"icc-profile-auto","no"},{"target-colorspace-hint","no"},{"fbo-format","rgba8"}};
     for(unsigned i=0;i<sizeof opts/sizeof opts[0];i++)option(opts[i][0],opts[i][1]);
+    option("vaapi-device",render_node);
     option("hwdec",decoder);
     if(mpv_initialize(player)<0)fail("player initialization failed");
     wake_fd=eventfd(0,EFD_CLOEXEC|EFD_NONBLOCK);if(wake_fd<0)fail("wakeup allocation failed");

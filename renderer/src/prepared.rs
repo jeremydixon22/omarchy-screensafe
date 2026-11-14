@@ -113,80 +113,114 @@ pub fn certify(args: &Args) -> Result<(), String> {
     args.only(&["size", "frames", "progress"])?;
     let (w, h) = dimensions(args)?;
     let total: usize = args.get("frames").ok_or("approve-frames needs --frames")?.parse().map_err(|_| "frames must be an integer")?;
-    // Cells, rather than full frames, are retained: at most about 40 MiB.
-    if !(1..=3600).contains(&total) {
-        return Err("frames must be 1..=3600".into());
+    // Verify both existing GPU-output loops as they arrive. No cycle-sized
+    // pixel/cell cache is retained. Two seconds at the test cadence covers all
+    // temporal memory; equality at both loop ends establishes periodic state.
+    if !(128..=3600).contains(&total) {
+        return Err("frames must be 128..=3600 for streaming approval".into());
     }
     sandbox::confine()?;
     let mut input = std::io::stdin().lock();
     let mut pixels = vec![0; w as usize * h as usize * 4];
-    let mut cycle = Vec::with_capacity(total);
     let report = match args.get("progress") {
         None | Some("0") => false,
         Some("1") => true,
         _ => return Err("invalid approval progress flag".into()),
     };
     let mut reported = Instant::now();
-    let mut original = blake3::Hasher::new();
-    for i in 0..total {
-        input.read_exact(&mut pixels).map_err(|e| format!("frame {i}: {e}"))?;
-        if pixels.chunks_exact(4).any(|p| p[3] != 255) {
-            return Err("approval requires opaque final pixels".into());
+    let mut verification = FlashApproval::new();
+    let mut first_state = None;
+    let mut hashes = Vec::new();
+    for round in 0..2 {
+        let mut hash = blake3::Hasher::new();
+        for i in 0..total {
+            input.read_exact(&mut pixels).map_err(|e| format!("cycle {} frame {i}: {e}", round + 1))?;
+            if pixels.chunks_exact(4).any(|p| p[3] != 255) {
+                return Err("approval requires opaque final pixels".into());
+            }
+            hash.update(&pixels);
+            let cells = flash::measure(&pixels, w as usize, h as usize, w as usize * 4, false);
+            verification.check(&cells).map_err(|e| format!("cycle {} frame {i}: {e}", round + 1))?;
+            if report && (reported.elapsed().as_millis() >= 400 || round == 1 && i + 1 == total) {
+                tell!("{{\"verifiedFrames\":{},\"totalFrames\":{}}}", round * total + i + 1, total * 2);
+                reported = Instant::now();
+            }
         }
-        original.update(&pixels);
-        cycle.push(flash::measure(&pixels, w as usize, h as usize, w as usize * 4, false));
-        if report && reported.elapsed().as_millis() >= 400 {
-            tell!("{{\"verifiedFrames\":{},\"totalFrames\":{}}}", i + 1, total * 2);
-            reported = Instant::now();
+        hashes.push(hash.finalize());
+        let state = verification.state();
+        if let Some(first) = &first_state {
+            if first != &state {
+                return Err("no periodic flash invariant across the two decoded loops".into());
+            }
+        } else {
+            first_state = Some(state);
         }
     }
-    // Verify the decoder's actual second loop, then establish the flash
-    // guard's periodic state over the measured cycle. A fast portable hash
-    // compares every output byte; media/authentication identities use SHA-256.
-    let mut repeated = blake3::Hasher::new();
-    for i in 0..total {
-        input.read_exact(&mut pixels).map_err(|e| format!("repeat frame {i}: {e}"))?;
-        repeated.update(&pixels);
-        if report && (reported.elapsed().as_millis() >= 400 || i + 1 == total) {
-            tell!("{{\"verifiedFrames\":{},\"totalFrames\":{}}}", total + i + 1, total * 2);
-            reported = Instant::now();
-        }
-    }
-    let pixel_hash = original.finalize();
-    if pixel_hash != repeated.finalize() {
+    if hashes[0] != hashes[1] {
         return Err("decoded loop changed on repeat".into());
     }
-    let pixels_hex = pixel_hash.to_hex();
     let mut extra = [0];
     if input.read(&mut extra).map_err(|e| e.to_string())? != 0 {
         return Err("unexpected trailing frame data".into());
     }
-    let loops = certify_cells(&cycle)?;
-    say!("{{\"approved\":true,\"frames\":{total},\"tested_rate\":64,\"periodic_after_cycles\":{loops},\"rejects\":0,\"pixelsBlake3\":\"{pixels_hex}\"}}");
+    let pixels_hex = hashes[0].to_hex();
+    say!("{{\"approved\":true,\"frames\":{total},\"tested_rate\":64,\"periodic_after_cycles\":2,\"rejects\":0,\"pixelsBlake3\":\"{pixels_hex}\"}}");
     Ok(())
 }
 
+struct FlashApproval {
+    guard: flash::Guard,
+    black: Vec<flash::Cell>,
+    tick: u64,
+    bound: flash::TimingBound,
+}
+
+impl FlashApproval {
+    fn new() -> Self {
+        let black = vec![flash::Cell::default(); flash::GRID_W * flash::GRID_H];
+        let mut guard = flash::Guard::new();
+        assert!(guard.admit(&black, 0.0));
+        let mut bound = flash::TimingBound::new();
+        let initial = bound.assess(&black);
+        bound.commit(&black, initial);
+        Self { guard, black, tick: 0, bound }
+    }
+    fn check(&mut self, cells: &[flash::Cell]) -> Result<(), String> {
+        let candidate = self.bound.assess(cells);
+        if candidate.over_limit {
+            return Err("prepared timing bound rejected picture".into());
+        }
+        self.bound.commit(cells, candidate);
+        if self.bound.assess(&self.black).over_limit {
+            return Err("prepared timing bound rejected black exit".into());
+        }
+        self.tick += 1;
+        if !self.guard.admit(cells, self.tick as f64 / 64.0) {
+            return Err("flash policy rejected picture".into());
+        }
+        if self.guard.assess(&self.black, (self.tick + 1) as f64 / 64.0).over_limit {
+            return Err("flash policy rejected black exit".into());
+        }
+        Ok(())
+    }
+    fn state(&self) -> Vec<i64> {
+        let mut state = self.guard.periodic_state(self.tick);
+        state.extend(self.bound.periodic_state());
+        state
+    }
+}
+
+#[cfg(test)]
 fn certify_cells(cycle: &[Vec<flash::Cell>]) -> Result<usize, String> {
-    let black = vec![flash::Cell::default(); flash::GRID_W * flash::GRID_H];
-    let mut guard = flash::Guard::new();
-    let mut tick = 0u64;
-    // A new playback starts from black; all other transitions require their own
-    // approval. Check ending in black at every possible stop point as well.
-    assert!(guard.admit(&black, 0.0));
+    let mut verification = FlashApproval::new();
     let mut seen = Vec::new();
     let warmup_cycles = 128usize.div_ceil(cycle.len());
     for round in 1..=warmup_cycles + 8 {
         for (index, cells) in cycle.iter().enumerate() {
-            tick += 1;
-            if !guard.admit(cells, tick as f64 / 64.0) {
-                return Err(format!("flash policy rejected cycle {round} frame {index}"));
-            }
-            if guard.clone().assess(&black, (tick + 1) as f64 / 64.0).over_limit {
-                return Err(format!("flash policy rejected black exit at cycle {round} frame {index}"));
-            }
+            verification.check(cells).map_err(|e| format!("{e} at cycle {round} frame {index}"))?;
         }
-        if tick >= 128 {
-            let state = guard.periodic_state(tick);
+        if verification.tick >= 128 {
+            let state = verification.state();
             if seen.contains(&state) {
                 return Ok(round);
             }
@@ -293,12 +327,12 @@ pub fn run(args: &Args) -> Result<(), String> {
 mod tests {
     use super::*;
     fn cells(luminance: f32, red: f32) -> Vec<flash::Cell> {
-        vec![flash::Cell { luminance, red }; flash::GRID_W * flash::GRID_H]
+        vec![flash::Cell { luminance, u: if red > 0.0 { 0.45 } else { 0.1 }, v: 0.5, red: red > 0.0 }; flash::GRID_W * flash::GRID_H]
     }
     #[test]
     fn approval_rejects_repeat_seam_and_saturated_red() {
         let seam: Vec<_> = (0..6).map(|i| cells((i % 2) as f32, 0.0)).collect();
-        assert!(certify_cells(&seam).unwrap_err().contains("cycle 2"));
+        assert!(certify_cells(&seam).unwrap_err().contains("cycle"));
         let red: Vec<_> = (0..24).map(|i| cells(0.04, (i % 2) as f32 * 80.0)).collect();
         assert!(certify_cells(&red).is_err());
         assert!(certify_cells(&[cells(0.4, 0.0)]).is_ok());
