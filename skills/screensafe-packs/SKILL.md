@@ -38,13 +38,16 @@ screensafe=$plugin/bin/screensafe-$(uname -m)
    - Aim for `drawMsPerFrame` well under a frame's time (33 ms at 30 fps) at the user's screen size. Lower `fps` for slow motion.
    - Put one `glow` on a group that holds everything that glows, not on each element or on a group with a `count`.
    - Keep image `zoom` and `scale` fixed and move images with `pan_x`/`pan_y`, which costs far less.
-6. **Never work around the flash limit.** If `check` reports flashes, slow or soften the change. Don't try to find what the measure misses.
-7. **Pick its best moment.** Set `preview` to the time, in seconds, that shows the pack best. The panel's thumbnail draws that frame. Look at that frame with `render` and the same `--time`.
-8. **Offer settings only where they matter.** A speed, a density, or a choice of picture can be `[[setting]]`s that people change in the panel (`docs/PACKS.md`, Settings). Keep the defaults as the pack looks best, check each value with `render --settings name=value`, and run `check` at the most demanding ones. A pack that tells a timed story is usually best without any.
+6. **Use the available controls.** Format 2 packs can declare a `kind = "color"` setting and `colorize` to expose theme swatches plus a custom color. Preserve light/dark contrast; use the existing built-in packs as examples. The global overlay and optional prepared playback are user settings, not files or commands supplied by a pack. Do not distribute cached clips, approval records or a separate compiler.
+7. **Never work around the flash limit.** If `check` reports flashes, slow or soften the change. Don't try to find what the measure misses.
+8. **Pick its best moment.** Set `preview` to the time, in seconds, that shows the pack best. The panel's thumbnail draws that frame. Look at that frame with `render` and the same `--time`.
+9. **Offer settings only where they matter.** A speed, a density, or a choice of picture can be `[[setting]]`s that people change in the panel (`docs/PACKS.md`, Settings). Keep the defaults as the pack looks best, check each value with `render --settings name=value`, and run `check` at the most demanding ones. A pack that tells a timed story is usually best without any.
 
 ### From a video or other existing art
 
-Packs can't play video. Adapt it instead:
+ScreenSafe 0.6.0 can play local `.ssv` videos through `source = "videos"` in a format 2 pack. Use the built-in Videos pack as a layout example and read `docs/VIDEO-PROTOTYPE.md` for the explicit importer and broker commands. Raw MP4s are not pack programs and are never converted automatically. The community catalog currently accepts procedural/image/font packs; it does not accept video archives or media-dependent layouts without broker-aware review fixtures.
+
+For a procedural adaptation instead:
 
 - **Stills:** take a few frames as images and move between them slowly. A median of several seconds of frames keeps a scene's background and drops fast-moving detail.
 - **Motion:** recreate the movement with lines, meshes and glow.

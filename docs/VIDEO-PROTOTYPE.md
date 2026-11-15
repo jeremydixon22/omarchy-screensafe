@@ -1,6 +1,6 @@
-# Videos (0.6.0 testing candidate)
+# Videos in ScreenSafe 0.6.0
 
-This candidate combines the retained compiler, prefetch and sprite optimizations, Photos-like Videos, colors, overlays and prepared procedural loops with compressed SSVv2 playback. It is not covered by the earlier 0.4.8 marketplace approval.
+This release combines the retained compiler, prefetch and sprite optimizations, Photos-like Videos, colors, overlays and prepared procedural loops with compressed SSVv2 playback. Marketplace verification is bound to an exact snapshot; check the listing for the currently reviewed version.
 
 Videos has Full screen, Whole, Film, CRT Fit, CRT Box and Flatscreen styles; Original, Greyscale, Sepia and Theme tones; shuffle/in-order selection; and a display interval or Full length. Loop is on by default and repeats the playlist. With Loop off, the playlist plays once, then holds the final video's frame at the end of the chosen interval (or the clip's end, if earlier). Full length uses the longest imported clip as a common interval; shorter clips hold their final frame until the next selection.
 

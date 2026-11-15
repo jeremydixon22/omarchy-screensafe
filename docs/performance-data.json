@@ -1,0 +1,115 @@
+{
+  "runtimeCommit": "3e197a7f82094f0daa41c56e8d27122da5161070",
+  "date": "2026-11-14",
+  "platform": "one x86-64 Omarchy4.5.0-3 laptop,2304x1440,external power",
+  "raw": {
+    "pack": "Laser Code",
+    "packCommit": "d902b19506d74301d5b48e5493762a7c161a8707",
+    "order": [
+      "0.4.8",
+      "0.6.0",
+      "0.6.0",
+      "0.4.8"
+    ],
+    "secondsPerRun": 30,
+    "framesPerRun": 720,
+    "drawingMs": {
+      "0.4.8": 32.485,
+      "0.6.0": 26.759999999999998
+    },
+    "drawingWorkReductionPercent": 17.62351854702171,
+    "completeCheckCpuSeconds": {
+      "0.4.8": 24.261110499999994,
+      "0.6.0": 34.443325
+    },
+    "completeCheckCpuIncreasePercent": 41.9692845469708,
+    "runs": [
+      {
+        "version": "0.4.8",
+        "drawingMs": 32.73,
+        "cpuSeconds": 24.441526,
+        "binarySha256": "af9a3d8d7eeff56d1b87d24d86d5b5f47e3ee146bce9fcdf3082a2709899a4ce"
+      },
+      {
+        "version": "0.6.0",
+        "drawingMs": 26.94,
+        "cpuSeconds": 34.644774,
+        "binarySha256": "9e4065fd3bc48d8aa28e385c0a6c962d45b555bb560c0103718be3697f915d03"
+      },
+      {
+        "version": "0.6.0",
+        "drawingMs": 26.58,
+        "cpuSeconds": 34.241876,
+        "binarySha256": "9e4065fd3bc48d8aa28e385c0a6c962d45b555bb560c0103718be3697f915d03"
+      },
+      {
+        "version": "0.4.8",
+        "drawingMs": 32.24,
+        "cpuSeconds": 24.080694999999984,
+        "binarySha256": "af9a3d8d7eeff56d1b87d24d86d5b5f47e3ee146bce9fcdf3082a2709899a4ce"
+      }
+    ]
+  },
+  "prepared": {
+    "pack": "Cascade",
+    "order": [
+      "live",
+      "prepared",
+      "prepared",
+      "live"
+    ],
+    "activationSeconds": 60,
+    "warmupSeconds": 15,
+    "steadyWindowEndsAtSeconds": 55,
+    "targetFps": 24,
+    "loopSeconds": 32,
+    "cpuPercentOneCoreAllProcesses": {
+      "live": 67.583073899379,
+      "prepared": 23.20565883794778
+    },
+    "cpuReductionPercent": 65.66350492950718,
+    "runs": [
+      {
+        "mode": "live",
+        "steadyWindowSeconds": 39.52916243998334,
+        "steadyCpuPercentOneCoreAllProcesses": 68.50638447276803,
+        "processCount": 1,
+        "submissionFps": 23.715791924477283
+      },
+      {
+        "mode": "prepared",
+        "steadyWindowSeconds": 39.625661793979816,
+        "steadyCpuPercentOneCoreAllProcesses": 23.192041681928966,
+        "processCount": 5,
+        "submissionFps": 23.89959137638522
+      },
+      {
+        "mode": "prepared",
+        "steadyWindowSeconds": 39.62225179799134,
+        "steadyCpuPercentOneCoreAllProcesses": 23.219275993966594,
+        "processCount": 5,
+        "submissionFps": 23.899451673667457
+      },
+      {
+        "mode": "live",
+        "steadyWindowSeconds": 39.529093241959345,
+        "steadyCpuPercentOneCoreAllProcesses": 66.65976332598999,
+        "processCount": 1,
+        "submissionFps": 24.00217331282172
+      }
+    ]
+  },
+  "historicalPower": {
+    "date": "2026-10-26",
+    "pack": "Harmonograph",
+    "livePackageWatts": [
+      7.76269013561905,
+      7.81298384304632
+    ],
+    "preparedPackageWatts": [
+      5.480564094906847,
+      5.584466231673329
+    ],
+    "scope": "earlier integrated player; processor-package energy counters; not fresh0.6.0 power,whole-system power or battery life"
+  }
+}

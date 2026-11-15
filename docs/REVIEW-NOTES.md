@@ -2,13 +2,13 @@
 
 A summary of what ScreenSafe does on a user's machine, for marketplace and other reviewers. [SECURITY.md](../SECURITY.md) has the full account.
 
-## 0.6.0 combined testing candidate
+## 0.6.0 update
 
 This retains 0.5.0's compiler/sprite optimizations, video art/startup/drift, colors, overlay and opt-in procedural loops. It integrates SSVv2 into catalog/thumbnail/live preview/full-screen Videos, with a software default and an explicit Hardware H.264 control. Videos bypass procedural cache routing. Imports default to H.264 SSVv2; JPEG remains readable and explicitly importable. V2 keeps 16-bit references, 65,535 frames, 720p/24 FPS and the 512 MiB file cap.
 
 For compressed Videos, the trusted broker selects codec/device policy; packs cannot request commands or devices. Hardware adds one identity-checked PCI render node and eight pinned read-only metadata files. No compositor socket, full sysfs or primary GPU node is exposed. New worker sockets are denied. Allocation/pixel limits constrain coded headers as well as the envelope. Hardware produces a complete snapshot before streaming, with no silent software downgrade. Copied owned pixels still pass final composition/runtime guarding.
 
-Fullscreen overlay/stats/Quit and preview settings/region/Quit use a separately retained inherited text pipe, preserving the private decoder packet channel and bounded control parsing. No named endpoint, unsafe Rust or additional native helper beyond the 0.5.0 set was added. Both decoder paths use the shared retained PCI render-node/eight-file metadata authority. The prepared worker independently denies new socket/connection/listener operations across all library threads after trusted graphics initialization and before media parsing. Its native self-test checks existing/new threads and retained IPC. Empty-cache fallback avoids runtime-library hashing; possible hits retain all approval checks. GPU kernel/driver authority, global GPU resource limits, physical ARM hardware and end-to-end power remain qualification items. Existing marketplace approval does not cover this candidate.
+Fullscreen overlay/stats/Quit and preview settings/region/Quit use a separately retained inherited text pipe, preserving the private decoder packet channel and bounded control parsing. No named endpoint, unsafe Rust or additional native helper beyond the 0.5.0 set was added. Both decoder paths use the shared retained PCI render-node/eight-file metadata authority. The prepared worker independently denies new socket/connection/listener operations across all library threads after trusted graphics initialization and before media parsing. Its native self-test checks existing/new threads and retained IPC. Empty-cache fallback avoids runtime-library hashing; possible hits retain all approval checks. GPU kernel/driver authority, global GPU resource limits, physical ARM hardware and end-to-end power remain qualification items. The 0.4.8 marketplace approval does not cover 0.6.0; verification is tied to the exact listed commit.
 
 Automatic preparation is opt-in through Prepared playback. On external power a missing eligible loop uses the existing deterministic recording/encoding and GPU verification paths, with trusted progress composed inside the normal flash-guarded renderer. Runtime cost selects an overlay or progress-only display. Progress never grants approval, codec counts are stage-bounded, and input/lock/unload cancellation ends work. Completed loops are reused on later activations. Battery-only controls reuse, not permission to generate on battery. No new native dependency or renderer filesystem authority is added.
 
@@ -20,7 +20,7 @@ Flash admission now averages every pixel on a finer grid and checks concurrent t
 
 ## Expected baseline result
 
-The 0.4.8 release's baseline was `review-required`, with no findings and one capability: `bundled-executable-binary`. The 0.6.0 candidate includes six native helper executables in addition to the two static Rust renderers, so a fresh exact-commit scan and human review are required. All eight binaries are included and have rebuild/attestation recipes; see [BINARY-PROVENANCE.md](BINARY-PROVENANCE.md) and [native packaging](NATIVE-PACKAGE.md). Installation never downloads dependencies, builds source or runs privileged setup. Omarchy supplies the existing media/graphics libraries.
+The 0.4.8 release's baseline was `review-required`, with no findings and one capability: `bundled-executable-binary`. The 0.6.0 update includes six native helper executables in addition to the two static Rust renderers, so a fresh exact-commit scan and human review are required. All eight binaries are included and have rebuild/attestation recipes; see [BINARY-PROVENANCE.md](BINARY-PROVENANCE.md) and [native packaging](NATIVE-PACKAGE.md). Installation never downloads dependencies, builds source or runs privileged setup. Omarchy supplies the existing media/graphics libraries.
 
 To reproduce the result, `tests/marketplace-baseline.mjs` runs the marketplace's own `runSecurityBaseline` on a commit of this repository, serving the files from the local Git store:
 
@@ -116,7 +116,7 @@ Omarchy's idle service keeps the lock timer and stay-awake.
 
 - **`skills/screensafe-packs/SKILL.md`:** instructions for a user's coding agent on making and sharing packs. It's documentation only: the plugin never installs, reads or runs it, and nothing is written to any agent's folders.
 
-## Optional trusted information overlay (0.5.0)
+## Optional trusted information overlay (0.6.0)
 
 The global overlay is off by default. Its clock/date and optional battery, CPU and memory readings are rendered by ScreenSafe after evaluating the pack and before the existing combined-frame flash guard. None of these system readings is inserted into pack expressions, pack settings, thumbnails, files or network messages. The overlay accepts only bounded, finite numeric controls from the service; unknown fields, duplicate keys and out-of-range values are rejected. Notification text, hostnames, window titles, network addresses and arbitrary strings are not accepted.
 
@@ -124,17 +124,17 @@ The service uses the shell's existing UPower module for a battery percentage. CP
 
 Only overlay display preferences are saved, in the plugin's own `shell.json` entry under `overlay`; readings are held in memory. Controls cover clock/date, three optional system readings, nine-position placement, size, opacity, colors and slow drift. Existing pack settings and their limits are unchanged.
 
-## Videos (0.5.0)
+## Videos (0.6.0)
 
 The fixed videos folder holds prepared `.ssv` files. Video is normalized by a separate, isolated importer; the shell never invokes a video decoder on a contributed pack or plays arbitrary URLs. The retained-descriptor reader, decode/cache limits, device art, CRT sampling and unchanged combined-frame flash guard are described in [VIDEO-PROTOTYPE.md](VIDEO-PROTOTYPE.md). Videos metadata and its fixed folder join the existing photo inputs; neither introduces system readings into pack expressions.
 
-## Theme/custom color controls (0.5.0)
+## Theme/custom color controls (0.6.0)
 
 Color controls use numeric theme IDs or an exact 24-bit RGB encoding; arbitrary strings, non-finite values and out-of-range codes are rejected. The palette's 27 validated names and hex swatches are included once in the existing bounded catalog response. The shared QML picker uses swatches, HSV geometry/sliders and a read-only hex label, with no text/clipboard input or external dialog. Drag changes are coalesced to at most one commit per 150 ms plus the final release; queued stale thumbnails for the same pack/size are replaced. Existing one-thumbnail-per-pack/size storage and native preview/decode limits remain.
 
 Recoloring is prepared at pack load, preserves each colored palette ink's relative luminance and alpha, and leaves backgrounds and black/white fixed. The existing theme image filter uses that palette; Original images are unaffected. This adds no filesystem paths, processes, network access, runtime dependencies or change to the combined-frame flash guard.
 
-## Optional prepared playback (0.5.0 development)
+## Optional prepared playback (0.6.0)
 
 The former Overlay tab is now **Settings**, with **Overlay** and **Performance** sub-tabs. Prepared playback is off by default, defaults to use on battery only when enabled, and never prepares automatically. The user starts preparation on known external power; it is cancellable. Storage choices are 256 MB, 512 MB (default), 1 GB and 2 GB, with oldest-used loops evicted and a clear button. Preferences stay in the plugin's `shell.json` entry under `performance`.
 
@@ -144,7 +144,7 @@ Preparation uses the confined Rust evaluator to supply bounded raw pixels to a n
 
 Live playback remains the default and fallback, including clock-dependent packs, Photos, Videos, overlays, unsupported displays, missing approvals and worker failures. Live previews continue through the ordinary guarded renderer. Both architecture helper sets are included; users do not compile or install a native component separately. Native ARM/x86 CI checks the worker API/seccomp and the controller/importer/settings tests, while actual GPU fidelity/eligibility is verified locally during preparation. A passing CI run is not a claim of universal GPU support.
 
-## 0.4.8 to 0.5.0 review focus
+## 0.4.8 to 0.6.0 review focus
 
 - Compiler/color/panel changes keep pack admission costs and data-only authoring. Generated expression branches only go forward. No contributed native code or shell command path was added.
 - Overlay reads only optional anonymous CPU/memory/battery aggregates outside pack expressions and remains before the runtime combined-frame flash guard.

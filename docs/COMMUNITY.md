@@ -29,6 +29,12 @@ they like, since nothing they push changes what people install. The checks list 
 approved commit, and the review covers those. Until the update is approved, the previous version stays listed. The
 approved commit must stay reachable in the maker's repository; a tag on it is the simplest way.
 
+## ScreenSafe 0.6.0 compatibility
+
+The catalog checks both declarative formats with a checksum-pinned 0.6.0 renderer. Format 1 listings retain their 0.4.8 minimum; format 2 listings advertise 0.6.0 and can use color controls and `colorize`. Compiler and sprite optimizations are automatic. Overlay and prepared playback remain user options; pack authors do not supply cached video or approval files.
+
+The catalog's file policy still accepts TOML, text, images and fonts. The built-in Videos player and personal `.ssv` library are supported by ScreenSafe, but raw video, `.ssv` archives and media-dependent community layouts are not catalog submissions yet. They need explicit broker-aware fixtures and rights review before this catalog can claim to verify them. See the catalog's current CONTRIBUTING.md for the exact policy.
+
 ## An entry
 
 ```toml

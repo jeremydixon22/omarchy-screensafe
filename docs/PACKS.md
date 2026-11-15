@@ -55,7 +55,7 @@ Sizes and line widths are in the same units, so `size = 0.05` is a twentieth of 
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `format` | required | `1`, or `2` for a pack that uses what ScreenSafe 0.5 added: videos, `color` settings, `colorize`. An older ScreenSafe then refuses the pack with a clear message instead of failing on a field it doesn't know. |
+| `format` | required | `1`, or `2` for video sources, `color` settings and `colorize` (available in the 0.6.0 release). An older ScreenSafe then refuses the pack with a clear message instead of failing on a field it doesn't know. |
 | `name` | required | Up to 60 characters. |
 | `author`, `license` | empty | Up to 60 and 40 characters. |
 | `description` | empty | Up to 300 characters. |
@@ -270,7 +270,7 @@ default = 400
 
 A value someone chose is always one the pack allows: a choice that isn't offered, or a number outside a range, gives the default, and a range's value is snapped to its steps. Settings are numbers and true/false values, worked out as the pack loads, so `count` and the like can't depend on them. Instead, give an element its largest `count` and hide the rest: `visible = "i < count"`. A setting can also choose a scene's `duration` or `hold`. Offer settings only where they change something people will care about. A pack that tells a timed story is usually best without any.
 
-ScreenSafe 0.5 reads pack formats 1 and 2. Existing packs can keep format 1; video sources, `color` settings and `colorize` require `format = 2` at the root. Older renderers reject format 2 clearly instead of ignoring a new feature.
+ScreenSafe 0.6.0 reads pack formats 1 and 2. Existing packs can keep format 1; video sources, `color` settings and `colorize` require `format = 2` at the root. Older renderers reject format 2 clearly instead of ignoring a new feature.
 
 A `color` setting offers the current theme's swatches and a custom HSV picker. For whole-palette recoloring, set `colorize` at the root, before any tables, to that setting's name:
 

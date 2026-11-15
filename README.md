@@ -16,7 +16,7 @@
   <img src="https://img.shields.io/badge/license-MIT-9ece6a" alt="MIT license">
 </p>
 
-![ScreenSafe's Harmonograph pack, and the ScreenSafe panel with Harmonograph chosen and open](preview.png)
+![Clockwork in ScreenSafe 0.6.0: brass gears, jeweled bearings and a balance spring](preview.png)
 
 A screensaver in ScreenSafe is a **pack**: a folder with a `screensafe.toml` and its art. A pack describes what to draw and how it moves, with small formulas like `sin(t * 2)` in a language that can't loop, read files or reach the network. ScreenSafe draws the pack itself, and nothing in a pack ever runs as a program, **so a pack from someone else can only describe pictures.**
 
@@ -24,11 +24,11 @@ A screensaver in ScreenSafe is a **pack**: a folder with a `screensafe.toml` and
 - **Your theme, everywhere.** Packs draw in the current theme's palette, and a theme can bring a pack of its own.
 - **Sharp on every screen.** Native Wayland drawing; video uses a bounded canvas scaled by the compositor.
 - **Settings without code.** Packs can offer a speed, a density or a picture; change them in the panel and watch the pack update live.
-- **Made to be safe.** A sandboxed renderer, a checked format, and a flash limit no pack can get past.
+- **Bounded and confined.** A checked data format, a confined renderer, and final-frame flash checks with [documented limits](SECURITY.md#flashing).
 
-**0.6.0 testing candidate:** combines the compiler and sprite optimizations, video styles, theme colors, trusted overlay and opt-in prepared loops with compressed SSVv2 videos. H.264 hardware decoding is an explicit control under Settings → Performance; the live preview and full-screen player use the same policy and final flash guard. All application helpers are included for x86-64 and ARM64; installation builds and downloads nothing else. See [the Videos guide](docs/VIDEO-PROTOTYPE.md). Marketplace approval of 0.4.8 does not cover this candidate; verify the exact commit and binary attestations as described below.
+**New in 0.6.0:** more efficient expression and sprite rendering, optional prepared playback, local videos with Film/CRT/Flatscreen styles, Seasons and Clockwork, theme swatches and custom colors, and an optional information overlay. [Performance measurements](docs/PERFORMANCE.md) separate drawing gains, cache savings and the cost of stronger flash analysis.
 
-The [SSVv2 boundary notes](docs/SSV2-PROTOTYPE.md) describe codec isolation, hardware authority and owned frame delivery. Existing JPEG clips remain supported, and final-composition flash guarding stays active in both video modes.
+All application helpers are included for x86-64 and ARM64; installation builds and downloads nothing else. [The Videos guide](docs/VIDEO-PROTOTYPE.md) covers local imports and playback. [The marketplace listing](https://omarchyplugins.com/plugin.html?id=io.github.jeremydixon22.screensafe) shows the currently reviewed snapshot: verification applies to that exact commit, not automatically to newer upstream code.
 
 ## The packs
 
@@ -52,7 +52,15 @@ omarchy plugin enable io.github.jeremydixon22.screensafe
 
 ScreenSafe's shield appears in the bar, in your theme's accent. Nothing changes until you switch it on: Omarchy's own screensaver stays in use until then.
 
-ScreenSafe needs Omarchy 4 on an x86-64 or 64-bit ARM computer, with no separate runtime setup. The 0.6.0 candidate has been tested on an x86-64 Omarchy 4.5.x laptop. CI runs renderer tests and native-helper checks on both x86-64 and ARM64; physical ARM GPU playback has not been qualified. Prepared playback checks the local display and GPU profile and uses normal rendering when the setup is unsupported.
+ScreenSafe needs Omarchy 4 on an x86-64 or 64-bit ARM computer, with no separate runtime setup. Version 0.6.0 has been tested on an x86-64 Omarchy 4.5.x laptop. CI runs renderer tests and native-helper checks on both x86-64 and ARM64; physical ARM GPU playback has not been qualified. Prepared playback checks the local display and GPU profile and uses normal rendering when the setup is unsupported.
+
+To update an existing Git-managed installation:
+
+```sh
+omarchy plugin update io.github.jeremydixon22.screensafe
+```
+
+Your chosen pack and settings are retained. Updates to playback code or graphics libraries require fresh approval before a prepared loop can be reused.
 
 ## Use
 
@@ -61,10 +69,11 @@ Click the shield in the bar.
 | | |
 |---|---|
 | **Settings → Overlay** | Optional clock, date, battery, CPU and memory over any pack. The position grid stays pinned while other options scroll. Choose one of nine positions, size, opacity and colors; slow drift is on by default. System readings are off until selected. Use Preview to try the result. |
-| **Settings → Performance** | Prepare a short loop of a supported screensaver on external power, then reuse it to reduce runtime work. Off by default; use on battery only or all the time, choose a storage limit, cancel preparation, or clear loops. Prepared loops repeat a segment. Clocks, Photos, Videos, the overlay, and unsupported displays use normal playback. |
+| **Settings → Performance** | Turn on **Prepared playback** to build eligible loops automatically on external power and reuse them on later activations. Preparation starts with fullscreen progress; lighter packs can appear with lower-third progress. Off by default. Choose battery-only or all-time reuse, a storage limit, cancellation or clear. Prepared loops repeat a 16–32 second segment; clocks, Photos, Videos, overlays and unsupported displays stay live. |
 | **Enable** | Show ScreenSafe instead of Omarchy's screensaver when you're idle. Right-clicking the shield does the same. |
 | **After … idle** | How long you're idle before it shows. It follows Omarchy's screensaver time until you choose your own with **−** and **+** (or the arrow keys), from 1 minute to an hour; step back below 1 minute to follow Omarchy's again. Point at it to see whose time it is and when Omarchy locks. |
-| **Pack** | Which screensaver to show. **Automatic** shows the current theme's pack if it has one, and the Omarchy pack otherwise. Every entry shows its thumbnail and description in a stable card. Press `f` or click ☆ to make it a favorite, listed first. |
+| **Pack** | Which screensaver to show. **Automatic** shows the current theme's pack if it has one, and the Omarchy pack otherwise. Every entry shows its thumbnail and description in a stable card. Press `f` or click ☆ to make it a favorite. The star updates immediately; favorites move to the top the next time the panel opens. |
+| **Hardware H.264 videos** | An independent, default-off control under Settings → Performance. Software decoding is the default. The hardware path must produce checked, renderer-owned pixels before final composition and flash checks; unsupported hardware is refused. |
 | **Color** | Theme-based packs offer theme swatches and a custom HSV picker, pinned below the scrolling options. Original theme colors remain the default. Tinting preserves light/dark detail; Photos and Videos show this control when **Tone → Theme** is selected. |
 | **⚙ Settings** | For a pack that has them: click ⚙, or press → or `s` on its row. The page shows the pack running live as you change them; turn **Live preview** off for a still thumbnail and the usual Preview. |
 | **Preview** | Show the chosen pack now. Any key, click, touch or mouse movement closes it. |
@@ -175,7 +184,7 @@ python3 scripts/build-native.py /tmp/screensafe-native
 scripts/verify-native
 ```
 
-Prepared playback supports a single, unrotated display up to 4096 × 2160 and 64 Hz when a PCI GPU fits the bounded metadata profile and its driver exports linear XRGB buffers. Preparation checks both software and hardware-copy decoding and uses a passing profile; direct hardware interop is excluded. Updates to relevant binaries, graphics/codec libraries, kernel, theme, settings or display invalidate reuse. The small settings preview stays live. With **Prepared playback** enabled, full-screen Preview and idle activation automatically prepare a missing eligible loop on known external power. A progress bar appears over live rendering when there is enough headroom, or replaces it while preparation is busy. Completion resumes live rendering; later activations may reuse the approved loop. **Use on battery only** controls reuse and still permits preparation on external power. Choose **Rebuild selected screensaver** to regenerate it explicitly. Unsupported setups use normal playback.
+Prepared playback supports a single, unrotated display up to 4096 × 2160 and 64 Hz when a PCI GPU fits the bounded metadata profile and its driver exports linear XRGB buffers. Preparation checks both software and hardware-copy decoding and uses a passing profile; direct hardware interop is excluded. Updates to relevant binaries, graphics/codec libraries, kernel, theme, settings or display invalidate reuse. The small settings preview stays live. With **Prepared playback** enabled, full-screen Preview and idle activation automatically prepare a missing eligible loop on known external power. Fullscreen progress appears first while rendering cost is tested out of sight. A pack with enough headroom is then revealed above lower-third progress; demanding packs keep the progress-only display. Completion resumes live rendering; later activations may reuse the approved loop. **Use on battery only** controls reuse and still permits preparation on external power. Choose **Rebuild selected screensaver** to regenerate it explicitly. Unsupported setups use normal playback.
 
 Prepared playback can reduce power for demanding effects. Simple screensavers may cost less to draw live than to decode and present as video; prepared playback remains off by default. The prepared segment repeats, while live playback can continue generating new variations. On battery, an empty cache falls back without hashing the runtime libraries. Automatic generation runs only on external power, and input, lock or shell exit cancels unfinished work. Existing approvals still receive full identity and sealed-media verification; independent file hashes run in bounded parallel workers. Updated decoder/policy identities require fresh preparation.
 

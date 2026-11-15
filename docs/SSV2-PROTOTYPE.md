@@ -1,12 +1,12 @@
 # SSVv2 format and decoder boundary
 
-ScreenSafe 0.6.0's testing candidate integrates this path into Videos, thumbnails and live preview. It remains separate from prepared procedural playback and has not received marketplace approval. Bare renderer invocation still requires the trusted wrapper to read compressed files. Pack authors provide data, not commands or native code.
+ScreenSafe 0.6.0 integrates this path into Videos, thumbnails and live preview. It remains separate from prepared procedural playback and has not received marketplace approval. Bare renderer invocation still requires the trusted wrapper to read compressed files. Pack authors provide data, not commands or native code.
 
-The experiment keeps **16-bit frame references**. It permits up to **65,535 frames**, fixed **24 FPS**, even dimensions up to **1280 × 720**, and **512 MiB per file**. That is at most **45 minutes 30.625 seconds**, subject to storage and conversion budgets. JPEG SSV v1 keeps its existing five-minute, 7,200-frame limits. No renderer frame identifiers were widened.
+The format keeps **16-bit frame references**. It permits up to **65,535 frames**, fixed **24 FPS**, even dimensions up to **1280 × 720**, and **512 MiB per file**. That is at most **45 minutes 30.625 seconds**, subject to storage and conversion budgets. JPEG SSV v1 keeps its existing five-minute, 7,200-frame limits. No renderer frame identifiers were widened.
 
-## Use an isolated checkout
+## Import and explicit CLI playback
 
-Build the renderer normally with `scripts/build-release`. On a standard Omarchy system the remaining tools and libraries are already supplied by the base installation; there is no additional installer or runtime download. This prototype uses the existing bundled resource launcher and sandbox, and system FFmpeg. H.264 encoding needs FFmpeg's libx264; AV1 encoding uses libaom and decoding uses libdav1d. Missing support fails the operation rather than installing anything.
+The normal installation includes the renderer and helpers. Maintainers can rebuild the renderer with `scripts/build-release`. On a standard Omarchy system the remaining tools and libraries are already supplied by the base installation; there is no additional installer or runtime download. This path uses the existing bundled resource launcher and sandbox, and system FFmpeg. H.264 encoding needs FFmpeg's libx264; AV1 encoding uses libaom and decoding uses libdav1d. Missing support fails the operation rather than installing anything.
 
 ```sh
 python3 tools/videos/ssv2.py SOURCE.mp4 /tmp/ssv2-clips/clip.ssv --codec h264
@@ -16,11 +16,11 @@ python3 tools/videos/play_v2.py --renderer "$PWD/bin/screensafe-$(uname -m)" -- 
   run --pack "$PWD/packs/videos" --videos /tmp/ssv2-clips
 ```
 
-The wrapper supports `render`, `check`, `thumbnail`, `catalog` and `preview`. Preview retains a separate inherited text-input pipe before confinement; decoder packets keep their private stdin socket. Only a bounded pipe or regular control file is accepted, with no unsafe raw-FD construction or named listener. The default delivery streams pixels into renderer-owned buffers; `--delivery snapshot` selects sealed snapshots. Hardware startup first admits a complete snapshot so unavailable hardware cannot return a misleading stream. Direct CLI use changes no preferences. This candidate is not marketplace-approved or a finalized interchange standard.
+The wrapper supports `render`, `check`, `thumbnail`, `catalog` and `preview`. Preview retains a separate inherited text-input pipe before confinement; decoder packets keep their private stdin socket. Only a bounded pipe or regular control file is accepted, with no unsafe raw-FD construction or named listener. The default delivery streams pixels into renderer-owned buffers; `--delivery snapshot` selects sealed snapshots. Hardware startup first admits a complete snapshot so unavailable hardware cannot return a misleading stream. Direct CLI use changes no preferences. Marketplace verification applies only to the exact listed commit. SSVv2 remains a ScreenSafe-specific envelope, not a general interchange standard.
 
 ## Explicit H.264 hardware profile
 
-The default wrapper profile is software decoding. Hardware H.264 is an explicit R&D profile for PCI VAAPI render nodes:
+The default wrapper profile is software decoding. Hardware H.264 is an explicit, default-off profile for PCI VAAPI render nodes:
 
 ```sh
 python3 tools/videos/play_v2.py --decoder vaapi --device /dev/dri/renderD128 \
@@ -32,19 +32,19 @@ The caller selects the device; packs and decoder requests cannot supply one. Thi
 
 The broker retains the render-node identity and verifies it again inside the cage before codec startup. Symlinks, primary/card nodes and non-render devices are refused. The worker receives one render node and eight pinned read-only metadata files with the sysfs links needed by the driver. It receives no whole `/sys`, PCI resource/config/ROM files, other GPU devices or display socket. The parent-only device handle is not inherited, and setup descriptors are consumed before codec execution. New sockets and connections are denied by seccomp independently of network namespaces; normal threads remain available.
 
-This preserves final CPU composition and runtime guarding. No DMA-BUF or GPU-writable image is admitted to the renderer. Both direct delivery and sealed snapshots finish copying pixels before checking or displaying them. Render nodes exclude modesetting/DRM-master authority, but expose rendering ioctls and the kernel/driver attack surface; see the [kernel DRM documentation](https://docs.kernel.org/gpu/drm-uapi.html#render-nodes). CPU/address-space limits do not establish a global GPU-memory quota, guarantee recovery from a kernel/driver hang, or make arbitrary GPU ioctls harmless. This requires review before production routing.
+This preserves final CPU composition and runtime guarding. No DMA-BUF or GPU-writable image is admitted to the renderer. Both direct delivery and sealed snapshots finish copying pixels before checking or displaying them. Render nodes exclude modesetting/DRM-master authority, but expose rendering ioctls and the kernel/driver attack surface; see the [kernel DRM documentation](https://docs.kernel.org/gpu/drm-uapi.html#render-nodes). CPU/address-space limits do not establish a global GPU-memory quota, guarantee recovery from a kernel/driver hang, or make arbitrary GPU ioctls harmless. This is part of the 0.6.0 review surface, separately from the software default.
 
 Physical-GPU tests are opt-in: set `SCREENSAFE_TEST_RENDER_NODE` to an explicit accessible render node when running the importer/playback suite. Ordinary CI runs the software cage, protocol and failure tests and skips physical-GPU cases. Actual laptop tests cover hardware-required composition in all six styles, flash rejection, seeks, neighbors, loops, immutable delivery and parent-death cleanup. These are functional/security checks, not a new power or endurance result. Native ARM display/hardware qualification and other hardware APIs remain open.
 
 ## Encode and validate
 
-The explicit importer accepts a retained, no-follow regular MP4 descriptor of at most 2 GiB. It normalizes one video stream to fixed 8-bit YUV420, dimensions and cadence, with no audio, subtitles or variable resolution. HDR transfer functions are refused. The profiles use closed one-second GOPs without frame reordering. H.264 uses CRF 16.8 (chosen so a 47-second grain-heavy 720p clip stays under 50 MB; 16.0 measured 51.9 MiB at SSIM 0.980, 16.8 measured 46.9 MiB at 0.979 with slightly lower decode CPU), x264's `fastdecode` tuning, and disabled B-frames and scene-cut keyframes. The tuning disables CABAC, deblocking and weighted prediction to reduce software decode work; see the [x264 implementation](https://github.com/mirror/x264/blob/master/common/base.c). AV1 uses libaom CRF 24, no lag/alternate-reference frames, and fixed keyframe spacing. These are experiment profiles, not a claim of equivalent quality between codecs.
+The explicit importer accepts a retained, no-follow regular MP4 descriptor of at most 2 GiB. It normalizes one video stream to fixed 8-bit YUV420, dimensions and cadence, with no audio, subtitles or variable resolution. HDR transfer functions are refused. The profiles use closed one-second GOPs without frame reordering. H.264 uses CRF 16.8 (chosen so a 47-second grain-heavy 720p clip stays under 50 MB; 16.0 measured 51.9 MiB at SSIM 0.980, 16.8 measured 46.9 MiB at 0.979 with slightly lower decode CPU), x264's `fastdecode` tuning, and disabled B-frames and scene-cut keyframes. The tuning disables CABAC, deblocking and weighted prediction to reduce software decode work; see the [x264 implementation](https://github.com/mirror/x264/blob/master/common/base.c). AV1 uses libaom CRF 24, no lag/alternate-reference frames, and fixed keyframe spacing. These are ScreenSafe import profiles, not a claim of equivalent quality between codecs.
 
 Encoder jobs cover 30 seconds for H.264 and 4 seconds for AV1. A confined full decode of each job checks actual dimensions, pixel format, frame count and keyframe spacing. Jobs retain the existing 180 CPU-second, 2 GiB address-space, 64-descriptor, 128 MiB regular-file and 64 MiB scratch limits. Encoder/validation wall deadlines are at most 90 seconds each, with a 30-minute overall codec-pipeline budget. Complexity can exhaust a budget before reaching the format ceiling; no partial archive is published.
 
 The parent streams output into private temporary files. Assembly temporarily needs up to twice the compressed file size, plus a bounded index. Publication never replaces an existing destination, including a racing symlink. Cancellation, changed input or failed profile checks remove staging. No video bytes are downloaded.
 
-## File layout (experimental)
+## File layout
 
 All integer fields are little-endian. The 64-byte header is `8s, 14×u32`:
 
@@ -73,7 +73,7 @@ Skipped neighboring frames can use a bounded sealed-memfd cache in the broker, a
 
 The ordinary rasterizer applies crop, tone, curvature, device/Film art and optional overlay. The existing runtime flash guard remains after final composition. This path does **not** use the procedural cache's offline GPU approval or assume that a media hash constrains decoder output. A compromised codec still has its confined syscall/kernel surface; isolation is not a promise that bugs are impossible.
 
-There is no idle broker polling timer: renderer EOF and the parent's pidfd end the work. Codec death, invalid metadata, incomplete frames, expired deadlines or input mutation refuse the video. A well-formed refusal allows subsequent clips; a broken transport closes the prototype session. Shutdown cleans up the decoder and renderer.
+There is no idle broker polling timer: renderer EOF and the parent's pidfd end the work. Codec death, invalid metadata, incomplete frames, expired deadlines or input mutation refuse the video. A well-formed refusal allows subsequent clips; a broken transport closes the playback session. Shutdown cleans up the decoder and renderer.
 
 ## Evidence and remaining qualification
 
@@ -85,4 +85,4 @@ The tested device styles and loop transitions completed without broker failures.
 
 Earlier laptop power tests found guarded software H.264 delivery used less package power than hardware decode with CPU readback in that pipeline. Later owned-pixel work also reduced JPEG cost, so those results are not a fresh comparison of this combined implementation. AV1 has no corresponding watt measurement. New imports default to H.264 for storage, duration and the hardware target; JPEG remains an explicit compatibility option. Hardware selection stays opt-in pending broader power/security qualification. File size, CPU, image quality and watts are distinct measurements; no new battery-runtime percentage is claimed.
 
-Before production routing or a marketplace update: extend laptop endurance and native ARM playback qualification, compare quality on more representative inputs, review the new trusted broker and codec-at-playback surface, and decide whether these profiles and envelope are ready to freeze. GitHub attestations cover the committed application executables; they do not certify codec correctness, encoded-media quality or battery savings.
+Remaining qualification includes more laptop endurance trials, physical ARM playback, other GPUs and more representative clips. The trusted broker and codec-at-playback surface are included in the 0.6.0 review; hardware selection remains explicit and default-off. Future envelope/profile changes require versioned compatibility and fresh validation. GitHub attestations cover the committed application executables; they do not certify codec correctness, encoded-media quality or battery savings.
