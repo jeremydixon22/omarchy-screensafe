@@ -54,6 +54,7 @@ struct Client {
     channel: UnixStream,
     sequence: u32,
     failed: bool,
+    failure_reason: Option<String>,
     pipe: bool,
     cache: VecDeque<(u64, u16, Vec<u8>)>,
     pixel_deadline: Duration,
@@ -78,15 +79,20 @@ pub fn initialize() -> Result<(), String> {
     channel.set_write_timeout(Some(Duration::from_secs(2))).map_err(|e| e.to_string())?;
     let pipe = std::env::var("SCREENSAFE_SSV2_PIPE").as_deref() == Ok("1");
     CLIENT
-        .set(Mutex::new(Client { channel, sequence: 0, failed: false, pipe, cache: VecDeque::new(), pixel_deadline: Duration::from_secs(5) }))
+        .set(Mutex::new(Client {
+            channel,
+            sequence: 0,
+            failed: false,
+            failure_reason: None,
+            pipe,
+            cache: VecDeque::new(),
+            pixel_deadline: Duration::from_secs(5),
+        }))
         .map_err(|_| "duplicate SSVv2 channel".to_string())
 }
 
 pub fn frame(file: &File, frame: u16, width: u32, height: u32, identity: u64) -> Result<Vec<u8>, String> {
     let mut client = CLIENT.get().ok_or("SSVv2 requires the explicit prototype decoder wrapper")?.lock().map_err(|_| "SSVv2 channel poisoned")?;
-    if client.failed {
-        return Err("SSVv2 channel is closed after a protocol failure".into());
-    }
     let result = client.frame(file, frame, width, height, identity);
     if client.failed {
         let _ = client.channel.shutdown(std::net::Shutdown::Both);
@@ -96,6 +102,20 @@ pub fn frame(file: &File, frame: u16, width: u32, height: u32, identity: u64) ->
 
 impl Client {
     fn frame(&mut self, file: &File, frame: u16, width: u32, height: u32, identity: u64) -> Result<Vec<u8>, String> {
+        if let Some(error) = &self.failure_reason {
+            return Err(error.clone());
+        }
+        let result = self.request(file, frame, width, height, identity);
+        if self.failed {
+            let cause = result.as_ref().err().map(String::as_str).unwrap_or("decoder transport failed");
+            let error = format!("SSVv2 frame {frame}: {}", cause.chars().take(500).collect::<String>());
+            self.failure_reason = Some(error.clone());
+            return Err(error);
+        }
+        result
+    }
+
+    fn request(&mut self, file: &File, frame: u16, width: u32, height: u32, identity: u64) -> Result<Vec<u8>, String> {
         use rustix::net::{
             recvmsg, sendmsg, RecvAncillaryBuffer, RecvAncillaryMessage, RecvFlags, ReturnFlags, SendAncillaryBuffer, SendAncillaryMessage, SendFlags,
         };
@@ -215,7 +235,18 @@ mod tests {
             rustix::net::socketpair(rustix::net::AddressFamily::UNIX, rustix::net::SocketType::SEQPACKET, rustix::net::SocketFlags::CLOEXEC, None).unwrap();
         let channel = UnixStream::from(a);
         channel.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
-        (Client { channel, sequence: 0, failed: false, pipe: false, cache: VecDeque::new(), pixel_deadline: Duration::from_millis(50) }, UnixStream::from(b))
+        (
+            Client {
+                channel,
+                sequence: 0,
+                failed: false,
+                failure_reason: None,
+                pipe: false,
+                cache: VecDeque::new(),
+                pixel_deadline: Duration::from_millis(50),
+            },
+            UnixStream::from(b),
+        )
     }
 
     fn respond(peer: UnixStream, sealed: bool, frame: u32, refusal: bool) {
@@ -291,6 +322,12 @@ mod tests {
             let source = File::open("/dev/null").unwrap();
             let result = client.frame(&source, 7, 2, 2, 99);
             assert_eq!(result.is_err(), partial);
+            if partial {
+                let error = result.as_ref().unwrap_err().clone();
+                let sequence = client.sequence;
+                assert_eq!(client.frame(&source, 8, 2, 2, 99).unwrap_err(), error, "prefetch fallout must retain the original failure");
+                assert_eq!(client.sequence, sequence, "a failed transport is never retried");
+            }
             if let Ok(mut owned) = result {
                 assert_eq!(owned, vec![127; 16]);
                 owned[0] = 0;

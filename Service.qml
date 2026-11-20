@@ -121,6 +121,59 @@ Item {
     return lines[lines.length - 1]
   }
 
+  // Rare lifecycle events only. A separate, deadline-bounded writer owns the
+  // fixed private log directory; the renderer/codec gain no filesystem access.
+  property var diagnosticQueue: []
+  property string diagnosticPending: ""
+  property string diagnosticsState: "idle"
+  property int diagnosticSerial: 0
+  property string rendererSession: ""
+  property real rendererStartedAt: 0
+  property string rendererRoute: "renderer"
+  property string rendererOrigin: "preview"
+  property bool usingFallback: false
+  property string liveSession: ""
+  property real liveStartedAt: 0
+  property string liveRoute: "renderer"
+  property string liveDiagnosticPack: ""
+  readonly property string diagnosticsDirectory: (root.stateHome.charAt(0) === "/" ? root.stateHome : root.home + "/.local/state") + "/screensafe/diagnostics"
+
+  function recordDiagnostic(event, mode, path, session, began, code, errors, overflow, route, origin) {
+    var output = String(errors || "")
+    var record = JSON.stringify({ event: event, mode: mode, pack: String(path).slice(0, 4096),
+      session: session, durationMs: Math.max(0, Math.min(604800000, Math.round(Date.now() - began))),
+      timeMs: Date.now(), route: route, origin: origin,
+      code: code, head: output.slice(0, 1024), tail: output.slice(-4096), overflow: !!overflow })
+    // Do not let a burst of panel previews grow the shell's memory or block it.
+    root.diagnosticQueue = root.diagnosticQueue.slice(-7).concat([record])
+    root.nextDiagnostic()
+  }
+  function nextDiagnostic() {
+    if (diagnosticProc.running || root.diagnosticQueue.length === 0) return
+    root.diagnosticPending = root.diagnosticQueue[0]
+    root.diagnosticQueue = root.diagnosticQueue.slice(1)
+    diagnosticProc.command = ["/usr/bin/python3", root.pluginDir + "/screensafe_diagnostics.py"]
+    diagnosticProc.environment = root.environment(false)
+    root.begin(diagnosticProc)
+  }
+  function failureReason(errors) {
+    var lines = String(errors || "").split("\n")
+    for (var first = 0; first < lines.length; first++) {
+      if (/^screensafe: video frame \d+ failed: /.test(lines[first]))
+        return lines[first].replace(/^screensafe: /, "").slice(0, 500)
+    }
+    // Preserve the first concrete failure, even when broker counters follow it.
+    for (var i = 0; i < lines.length; i++) {
+      if (/^screensafe(?:-video)?: .*?(?:failed|error|refused|deadline|timed out|ended early|took more|disconnected|can't)/i.test(lines[i]))
+        return lines[i].replace(/^screensafe(?:-video)?: /, "").slice(0, 500)
+    }
+    for (var j = lines.length - 1; j >= 0; j--) {
+      var line = lines[j].trim()
+      if (line && line[0] !== "{") return line.replace(/^screensafe(?:-video)?: /, "").slice(0, 500)
+    }
+    return "the player stopped without an error message"
+  }
+
   // ---- settings
 
   function saveSettings(change) {
@@ -482,6 +535,11 @@ Item {
     livePreviewProc.environment = root.environment(false)
     liveErr.reset()
     root.liveStopping = false
+    root.liveDiagnosticPack = path
+    root.liveSession = root.token + "-" + (++root.diagnosticSerial)
+    root.liveStartedAt = Date.now()
+    root.liveRoute = root.videosOf(path) >= 0 ? (root.performanceValues.videoHardware === 1 ? "video-hardware" : "video-software") : "renderer"
+    root.recordDiagnostic("start", "live-preview", path, root.liveSession, root.liveStartedAt, 0, "", false, root.liveRoute, "settings")
     livePreviewProc.running = true
   }
   function stopLive() {
@@ -764,6 +822,7 @@ Item {
     if (!root.supported) return "unsupported"
     if (rendererProc.running || statusProc.running || lockProc.running) return "already starting"
     root.fromIdle = !!idle
+    root.usingFallback = false
     runShort(statusProc, ["takeover", "status"])
     return "starting"
   }
@@ -828,24 +887,32 @@ Item {
     root.stoppedForLock = false
     var args = ["run", "--pack", packPath, "--theme", root.themeDir, "--branding", root.branding, "--logo", root.logo, "--badge", root.badge, "--photos", root.photos, "--videos", root.videos, "--settings", root.settingsArg(packPath), "--role", "org.omarchy.screensaver", "--overlay", root.overlayArgument]
     var video = root.videosOf(packPath) >= 0
-    var prepared = root.performanceValues.enabled === 1 && !video
+    var prepared = root.performanceValues.enabled === 1 && !video && !root.usingFallback
     rendererProc.command = video ? root.videoCommand(args, root.performanceValues.videoHardware === 1) : prepared ? root.cacheCommand("run", packPath) : [root.renderer].concat(args)
     rendererProc.environment = prepared ? root.cacheEnvironment() : root.environment(false)
     rendererOut.reset()
     rendererErr.reset()
+    root.rendererSession = root.token + "-" + (++root.diagnosticSerial)
+    root.rendererStartedAt = Date.now()
+    root.rendererRoute = video ? (root.performanceValues.videoHardware === 1 ? "video-hardware" : "video-software") : prepared ? "prepared" : "renderer"
+    root.rendererOrigin = root.usingFallback ? "fallback" : root.fromIdle ? "idle" : "preview"
+    root.recordDiagnostic("start", "fullscreen", packPath, root.rendererSession, root.rendererStartedAt, 0, "", false, root.rendererRoute, root.rendererOrigin)
     rendererProc.running = true
   }
 
   function rendererExited(code, errors) {
     root.automaticPreparing = false
+    root.recordDiagnostic("exit", "fullscreen", root.launching, root.rendererSession, root.rendererStartedAt, code, errors, rendererErr.over, root.rendererRoute, root.rendererOrigin)
     if (code !== 0 && root.videosOf(root.launching) >= 0) root.videoDecoderState = "unavailable"
-    if (code === 3 && root.launching !== root.defaultPack) {
+    var failed = code !== 0 && code !== 143 && code !== 15 && code !== 130
+    if (failed && (code === 3 || root.videosOf(root.launching) >= 0) && root.launching !== root.defaultPack) {
       // The pack can't be used: say so, and show the built-in one instead.
-      root.problem = root.nameOf(root.launching) + " can't be used: " + lastLine(errors).replace(/^screensafe: /, "")
+      root.problem = root.nameOf(root.launching) + " can't be used: " + root.failureReason(errors)
+      root.usingFallback = true
       root.launch(root.defaultPack)
       return
-    } else if (code !== 0 && code !== 143 && code !== 15) {
-      root.problem = "Couldn't show the screensaver: " + lastLine(errors).replace(/^screensafe: /, "")
+    } else if (failed) {
+      root.problem = "Couldn't show the screensaver: " + root.failureReason(errors)
     } else if (root.launching === root.resolvedPack()) {
       root.problem = ""
     }
@@ -866,6 +933,7 @@ Item {
       omarchyLockSeconds: root.lockSeconds,
       packs: root.packs.length,
       arch: root.arch,
+      diagnostics: { state: root.diagnosticsState, directory: root.diagnosticsDirectory },
       problem: root.problem
     })
   }
@@ -908,6 +976,7 @@ Item {
   component BoundedOutput: SplitParser {
     property int limit: 4096
     property var process: null
+    property bool retainOnOverflow: false
     property string text: ""
     property bool over: false
     function reset() { text = ""; over = false }
@@ -916,12 +985,32 @@ Item {
       if (over) return
       if (text.length + data.length > limit) {
         over = true
-        text = ""
+        text = retainOnOverflow ? text + data.slice(0, Math.max(0, limit - text.length)) : ""
         if (process) process.running = false
         return
       }
       text += data
     }
+  }
+
+  Process {
+    id: diagnosticProc
+    property real startedAt: 0
+    clearEnvironment: true
+    stdinEnabled: true
+    stdout: BoundedOutput { id: diagnosticOut; limit: 1024; process: diagnosticProc }
+    stderr: BoundedOutput { limit: 1024; process: diagnosticProc }
+    onStarted: diagnosticProc.write(root.diagnosticPending + "\n")
+    onExited: function(code) {
+      root.diagnosticsState = code === 0 && diagnosticOut.text.trim() === '{"ok":true}' ? "ready" : "unavailable"
+      root.diagnosticPending = ""
+      Qt.callLater(root.nextDiagnostic)
+    }
+  }
+  Timer {
+    interval: 3000
+    running: diagnosticProc.running
+    onTriggered: { root.diagnosticsState = "unavailable"; diagnosticProc.running = false }
   }
 
   Process {
@@ -1011,9 +1100,10 @@ Item {
     clearEnvironment: true
     stdinEnabled: true
     stdout: BoundedOutput { id: liveOut; limit: 4096 }
-    stderr: BoundedOutput { id: liveErr; limit: 16384; onTextChanged: root.observeVideoOutput(text) }
+    stderr: BoundedOutput { id: liveErr; limit: 16384; retainOnOverflow: true; onTextChanged: root.observeVideoOutput(text) }
     // The one that was running has gone: start the one waiting, if any, now that it's safe to.
     onExited: function(code) {
+      root.recordDiagnostic("exit", "live-preview", root.liveDiagnosticPack, root.liveSession, root.liveStartedAt, code, liveErr.text, liveErr.over, root.liveRoute, "settings")
       if (!root.liveStopping && code !== 0 && root.livePath !== "") root.liveFailed = root.livePath
       root.liveStopping = false
       var next = root.livePending
@@ -1029,7 +1119,7 @@ Item {
     clearEnvironment: true
     stdout: BoundedOutput { id: rendererOut; limit: 4096; onTextChanged: root.observePreparationOutput(text) }
     // Only its last line is shown, when it fails; a renderer that says more is cut off, but keeps running.
-    stderr: BoundedOutput { id: rendererErr; limit: 65536; onTextChanged: root.observeVideoOutput(text) }
+    stderr: BoundedOutput { id: rendererErr; limit: 65536; retainOnOverflow: true; onTextChanged: root.observeVideoOutput(text) }
     onExited: function(code) { root.rendererExited(code, rendererErr.text) }
   }
 

@@ -330,6 +330,7 @@ pub struct Raster {
     /// couldn't be decoded.
     sheets: HashMap<usize, Option<Arc<Pixmap>>>,
     video_failed: Vec<usize>,
+    video_error: Option<String>,
     crt: crate::crt::Cache,
     /// The canvas that pixel art is drawn on before it's scaled up to the screen.
     canvas: Option<Pixmap>,
@@ -372,6 +373,7 @@ impl Raster {
             arrivals: Vec::new(),
             sheets: HashMap::new(),
             video_failed: Vec::new(),
+            video_error: None,
             crt: crate::crt::Cache::default(),
             canvas: None,
             background_decoding: false,
@@ -461,7 +463,7 @@ impl Raster {
             match decode_video(clip, frame, source.crop, source.filter) {
                 Ok(pixels) => self.keep(source, pixels),
                 Err(e) => {
-                    self.video_failed.push(video);
+                    self.note_video_failure(source, &e);
                     self.warnings.push(format!("video: {e}"));
                     return None;
                 }
@@ -661,16 +663,12 @@ impl Raster {
                     match result {
                         Ok(Ok(pixmap)) => self.keep(source, pixmap),
                         Ok(Err(e)) => {
-                            if let ImageSrc::Video { video, .. } = source.src {
-                                self.video_failed.push(video as usize);
-                            }
+                            self.note_video_failure(source, &e);
                             self.warnings.push(e);
                             self.failed.push(source);
                         }
                         Err(_) => {
-                            if let ImageSrc::Video { video, .. } = source.src {
-                                self.video_failed.push(video as usize);
-                            }
+                            self.note_video_failure(source, "decoder worker ended without pixels");
                             self.failed.push(source);
                         }
                     }
@@ -689,6 +687,26 @@ impl Raster {
                     }
                 }
             }
+        }
+    }
+
+    fn note_video_failure(&mut self, source: ImageRef, error: &str) {
+        if let ImageSrc::Video { video, frame } = source.src {
+            if !self.video_failed.contains(&(video as usize)) {
+                self.video_failed.push(video as usize);
+            }
+            if self.video_error.is_none() {
+                self.video_error = Some(format!("video frame {frame} failed: {}", error.chars().take(500).collect::<String>()));
+            }
+        }
+    }
+
+    /// A broken video must leave the live loop promptly, not silently retain
+    /// a dead image while its broker waits for a renderer that never exits.
+    pub fn video_status(&self) -> Result<(), String> {
+        match &self.video_error {
+            Some(error) => Err(error.clone()),
+            None => Ok(()),
         }
     }
 
@@ -2523,6 +2541,24 @@ pub(crate) mod tests {
         assert_eq!(pixel(&pixmap, 151, 100)[0], 255);
         assert_eq!(pixel(&pixmap, 152, 97)[0], 0, "round, not square, at the end");
         assert_eq!(pixel(&pixmap, 155, 100)[0], 0);
+    }
+
+    #[test]
+    fn asynchronous_video_failure_preserves_first_cause_for_the_live_loop() {
+        let mut raster = Raster::new();
+        let source = |frame| ImageRef { src: ImageSrc::Video { video: 0, frame }, crop: 0, limit: 0, filter: Filter::None };
+        let (sender, receiver) = mpsc::channel();
+        raster.pending.push((source(17), receiver));
+        sender.send(Err("SSVv2 pixel stream ended early".into())).unwrap();
+        raster.poll_images();
+        let error = raster.video_status().unwrap_err();
+        assert_eq!(error, "video frame 17 failed: SSVv2 pixel stream ended early");
+        let (sender, receiver) = mpsc::channel();
+        raster.pending.push((source(18), receiver));
+        drop(sender);
+        raster.poll_images();
+        assert_eq!(raster.video_status().unwrap_err(), error, "later closed-channel fallout cannot replace the first cause");
+        assert_eq!(raster.video_failed, vec![0]);
     }
 
     #[test]

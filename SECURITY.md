@@ -1,5 +1,11 @@
 # Security
 
+## Local playback diagnostics (0.6.1 development)
+
+The trusted service sends bounded start/exit records over stdin to the bundled Python diagnostic writer. The writer runs outside renderer/codec confinement and accepts one fixed-schema record, no commands or destination paths. It writes only under the fixed `screensafe/diagnostics` directory beneath the user's state home. Directories must be user-owned mode 0700; files must be regular, singly linked, user-owned mode 0600. Symlinks and unsafe existing entries are refused. Descriptor-relative operations, a nonblocking lock, input/record/file limits and an independent two-second deadline bound the operation. The service's queue is bounded and its writer has a separate three-second deadline. Logging failure leaves playback available.
+
+Three JSONL files retain at most 3 MiB of content. Records contain timestamps, version, session/mode, bounded numeric exit/duration/counter fields, a builtin pack ID or hash of a custom path, and bounded sanitized stderr excerpts. Full command dumps, environment variables and custom path names are not recorded. Error excerpts remain untrusted diagnostic text, not instructions. There is no per-frame logging or network transmission. Renderer/codec filesystem, process, device and network authority is unchanged. A streamed video failure leaves the live loop promptly and uses the existing pack-failure fallback; its first cause is retained instead of a later renderer-wait traceback.
+
 ## Reporting a problem
 
 Please report a security problem privately, through this repository's [private vulnerability reporting](https://github.com/jeremydixon22/omarchy-screensafe/security/advisories/new), rather than in a public issue. Include the ScreenSafe version, what you saw, and a pack or steps that show it, if you have them.

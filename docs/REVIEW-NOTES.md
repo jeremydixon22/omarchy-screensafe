@@ -1,5 +1,11 @@
 # Notes for reviewers
 
+## 0.6.1 development diagnostics
+
+The 0.6.1-dev.1 laptop test build is separate from the published 0.6.0 snapshot. It adds a trusted, fixed-purpose Python writer invoked asynchronously by the service for bounded start/exit records. The fixed private state directory, three-file/3 MiB rotation, schema/input/output bounds, nonblocking lock, independent deadlines, permission/link checks and redaction are documented in SECURITY.md. It does not change renderer/codec confinement or add runtime dependencies, installers or downloads.
+
+Rust retains the first decoder transport error across queued requests and leaves the live rendering loop on video failure. The broker preserves renderer exit codes, bounds abnormal disconnect cleanup, and recovers bounded codec stderr/exit status. The service selects the actionable failure rather than trailing counters, uses live fallback without automatic preparation, and keeps deliberate cancellation quiet. Changing Rust bytes invalidates earlier prepared approvals. Rebuilt renderer binaries and exact-commit CI/provenance must accompany this development build; the six native helpers are unchanged.
+
 A summary of what ScreenSafe does on a user's machine, for marketplace and other reviewers. [SECURITY.md](../SECURITY.md) has the full account.
 
 ## 0.6.0 update

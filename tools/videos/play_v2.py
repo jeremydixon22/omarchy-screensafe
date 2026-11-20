@@ -98,6 +98,20 @@ def stamp(fd):
     return (s.st_dev,s.st_ino,s.st_size,s.st_mtime_ns,s.st_ctime_ns)
 
 
+def stop_process(process, label):
+    """Bound cleanup without replacing an earlier cause with a wait traceback."""
+    if process.poll() is not None:return
+    try:process.terminate()
+    except ProcessLookupError:return
+    try:process.wait(timeout=1)
+    except subprocess.TimeoutExpired:
+        try:process.kill()
+        except ProcessLookupError:return
+        try:process.wait(timeout=1)
+        except subprocess.TimeoutExpired:
+            print(f'screensafe-video: {label} did not stop within cleanup budget',file=__import__('sys').stderr,flush=True)
+
+
 class Decoder:
     """One bounded subprocess, lazily consumed through pipe backpressure."""
     def __init__(self, fd, info, start, direct=False, first=None, hardware=None):
@@ -173,11 +187,26 @@ class Decoder:
         return data
 
     def close(self):
+        if getattr(self,'closed',False):return
+        self.closed=True
         self.selector.close()
-        if self.proc.poll() is None:
-            self.proc.terminate()
-            try:self.proc.wait(timeout=1)
-            except subprocess.TimeoutExpired:self.proc.kill();self.proc.wait(timeout=1)
+        ended = self.proc.poll()
+        if ended is None:
+            stop_process(self.proc, 'decoder')
+        # Direct pixel delivery is consumed by Rust, so its stderr pipe has no
+        # steady-state Python reader. Recover bounded codec detail before close,
+        # including natural exit signals/resource failures, without polling.
+        os.set_blocking(self.proc.stderr.fileno(),False)
+        while len(self.errors)<65536:
+            try:block=os.read(self.proc.stderr.fileno(),min(4096,65536-len(self.errors)))
+            except BlockingIOError:break
+            if not block:break
+            self.errors.extend(block)
+        detail=self.errors.decode(errors='replace')[-2048:].strip()
+        if ended is not None and ended!=0:
+            print(f'screensafe-video: decoder exited with status {ended}'+(': '+detail if detail else ''),file=__import__('sys').stderr,flush=True)
+        elif detail:
+            print('screensafe-video: decoder detail: '+detail,file=__import__('sys').stderr,flush=True)
         self.output.close();self.proc.stderr.close()
 
 
@@ -229,7 +258,8 @@ class Frames:
             return self.cache[target]
         if (self.decoder is None or target<self.decoder.next or target-self.decoder.next>=ssv2.GOP
                 or self.decoder.cpu_seconds()>100):
-            if self.decoder is not None:self.decoder.close()
+            if self.decoder is not None:
+                previous,self.decoder=self.decoder,None;previous.close()
             self.decoder=Decoder(self.fd,self.info,target//ssv2.GOP*ssv2.GOP,hardware=self.hardware);self.starts+=1
         deadline=time.monotonic()+FRAME_DEADLINE
         # A cold/random request decodes no more than one fixed GOP. Sequential
@@ -257,7 +287,8 @@ class StreamFrames(Frames):
             return self.cache[target]
         if (self.decoder is None or target<self.decoder.next or target-self.decoder.next>=ssv2.GOP
                 or self.decoder.cpu_seconds()>100):
-            if self.decoder is not None:self.decoder.close()
+            if self.decoder is not None:
+                previous,self.decoder=self.decoder,None;previous.close()
             base=target//ssv2.GOP*ssv2.GOP
             self.decoder=Decoder(self.fd,self.info,base,direct=True,first=target,hardware=self.hardware)
             self.decodes+=target-base;self.starts+=1
@@ -343,14 +374,19 @@ def launch(renderer, command, delivery, hardware):
             env['SCREENSAFE_CONTROL_INPUT_FD']=str(control_input)
         child=subprocess.Popen([str(renderer)]+command,stdin=client,
             pass_fds=(() if control_input is None else (control_input,)),env=env)
-        client.close();serve(server,child,delivery,hardware);return child.wait(timeout=5)
+        client.close();serve(server,child,delivery,hardware)
+        try:
+            return child.wait(timeout=1)
+        except subprocess.TimeoutExpired:
+            # EOF may mean Rust rejected a pixel stream, not that it exited.
+            # Never replace the first cause with a command-dumping traceback.
+            print('screensafe-video: decoder channel disconnected before renderer exit',file=__import__('sys').stderr,flush=True)
+            return 3
     finally:
         client.close();server.close()
         if control_input is not None:os.close(control_input)
         if child is not None and child.poll() is None:
-            child.terminate()
-            try:child.wait(timeout=2)
-            except subprocess.TimeoutExpired:child.kill();child.wait(timeout=2)
+            stop_process(child, 'renderer')
 
 
 def main():

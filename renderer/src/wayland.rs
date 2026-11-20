@@ -331,6 +331,7 @@ impl State {
         let xbgr = self.xbgr;
         let shm = self.globals.shm.clone();
         raster.poll_images();
+        raster.video_status()?;
         let arrived = std::mem::take(&mut raster.images_arrived);
         for output in &mut self.outputs {
             let output_scale = output.scale;
@@ -398,6 +399,7 @@ impl State {
                 continue;
             }
             raster.draw(pack, &frame, &mut pixmap.as_mut(), view);
+            raster.video_status()?;
             let cells = flash::measure(pixmap.data(), w as usize, h as usize, w as usize * 4, false);
             if !s.guard.admit(&cells, time) {
                 // Keep the last frame up; ask to be told when the next one may be drawn.

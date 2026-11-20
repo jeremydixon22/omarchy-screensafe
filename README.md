@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/jeremydixon22/omarchy-screensafe/actions/workflows/ci.yml"><img src="https://github.com/jeremydixon22/omarchy-screensafe/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://img.shields.io/badge/version-0.6.0-9ece6a" alt="Version 0.6.0">
+  <img src="https://img.shields.io/badge/version-0.6.1--dev.1-9ece6a" alt="Version 0.6.1-dev.1">
   <img src="https://img.shields.io/badge/Omarchy-4-9ece6a" alt="Omarchy 4">
   <img src="https://img.shields.io/badge/license-MIT-9ece6a" alt="MIT license">
 </p>
@@ -27,6 +27,8 @@ A screensaver in ScreenSafe is a **pack**: a folder with a `screensafe.toml` and
 - **Bounded and confined.** A checked data format, a confined renderer, and final-frame flash checks with [documented limits](SECURITY.md#flashing).
 
 **New in 0.6.0:** more efficient expression and sprite rendering, optional prepared playback, local videos with Film/CRT/Flatscreen styles, Seasons and Clockwork, theme swatches and custom colors, and an optional information overlay. [Performance measurements](docs/PERFORMANCE.md) separate drawing gains, cache savings and the cost of stronger flash analysis.
+
+**0.6.1-dev.1 test build:** preserves video failure causes and records private, rotating playback diagnostics. The published 0.6.0 release and its marketplace submission are unchanged.
 
 All application helpers are included for x86-64 and ARM64; installation builds and downloads nothing else. [The Videos guide](docs/VIDEO-PROTOTYPE.md) covers local imports and playback. [The marketplace listing](https://omarchyplugins.com/plugin.html?id=io.github.jeremydixon22.screensafe) shows the currently reviewed snapshot: verification applies to that exact commit, not automatically to newer upstream code.
 
@@ -80,6 +82,8 @@ Click the shield in the bar.
 | **About** | Links to this page, to the [catalog of packs others have made](https://github.com/jeremydixon22/omarchy-screensafe-packs), and to guides for making and sharing your own. |
 
 If anything stops ScreenSafe showing, such as Omarchy locking first, a note at the bottom of the panel says so.
+
+Playback starts, stops and bounded error details are recorded locally in `~/.local/state/screensafe/diagnostics/` (or `$XDG_STATE_HOME/screensafe/diagnostics/`). `events.jsonl` and its two rotated files are capped at 1 MiB each, with a private directory and files. Records include timestamps, build version, decoder/counters when available, and a bounded error excerpt; full commands, environment variables and custom pack paths are omitted. There is no per-frame logging or upload. Logging failure does not stop playback. `omarchy-shell screensafe status` reports the diagnostic directory and whether the latest write succeeded. You can delete these files to clear the history.
 
 <details>
 <summary><b>From a terminal or a key binding</b></summary>

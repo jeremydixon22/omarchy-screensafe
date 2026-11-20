@@ -305,7 +305,11 @@ fn run(args: &Args) -> Result<Result<(), String>, String> {
     for w in &pack.warnings {
         tell!("screensafe: {w}");
     }
-    let why = display.run(&pack, &options, &mut raster, video_decoder::control_input()?)?;
+    let why = match display.run(&pack, &options, &mut raster, video_decoder::control_input()?) {
+        Ok(why) => why,
+        Err(error) if raster.video_status().is_err() => return Ok(Err(error)),
+        Err(error) => return Err(error),
+    };
     for w in &raster.warnings {
         tell!("screensafe: {w}");
     }
@@ -782,7 +786,13 @@ fn main() -> ExitCode {
         Some("render") => render(&args).map(|_| true),
         Some("catalog") => catalog(&args).map(|_| true),
         Some("thumbnail") => thumbnail(&args).map(|_| true),
-        Some("preview") => live_preview(&args).map(|_| true),
+        Some("preview") => match live_preview(&args) {
+            Err(error) => {
+                tell!("screensafe: {error}");
+                return ExitCode::from(PACK_UNUSABLE);
+            }
+            Ok(()) => Ok(true),
+        },
         Some("takeover") => takeover_command(&args).map(|_| true),
         Some("photos-folder") => media_folder(&args, pack::PHOTOS_FOLDER).map(|_| true),
         Some("sandbox-test") => sandbox_test(),
