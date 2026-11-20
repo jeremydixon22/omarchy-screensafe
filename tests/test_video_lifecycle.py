@@ -1,14 +1,17 @@
 """Actual broker entry point: early disconnect, exit codes and bounded cleanup."""
 import contextlib
+import array
 import io
 import os
 from pathlib import Path
 import selectors
+import socket
 import subprocess
 import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT/'tools/videos'))
@@ -64,6 +67,29 @@ class VideoLifecycleTests(unittest.TestCase):
         self.assertIn('driver decode fault', message.getvalue())
         self.assertTrue(decoder.proc.stderr.closed)
         decoder.close()  # A failed replacement must not lose its cause in double cleanup.
+
+    def test_renderer_closing_during_reply_does_not_replace_its_exit_with_broken_pipe(self):
+        for refusal in [False,True]:
+            with self.subTest(refusal=refusal):
+                fd=os.open('/dev/null',os.O_RDONLY)
+                class Channel:
+                    def recvmsg(self,*args):
+                        return play_v2.REQUEST.pack(play_v2.MAGIC,1,0,0),[(socket.SOL_SOCKET,socket.SCM_RIGHTS,array.array('i',[fd]).tobytes())],0,None
+                    def send(self,*args):raise BrokenPipeError('peer exited during refusal')
+                    def sendmsg(self,*args):raise BrokenPipeError('peer exited during pixels')
+                class Frames:
+                    starts=decodes=hits=delivery=0
+                    info={'width':2,'height':2}
+                    def __init__(self,*unused):pass
+                    def frame(self,*unused):
+                        if refusal:raise ValueError('original codec failure')
+                        return fd
+                    def close(self):pass
+                with patch.object(play_v2,'StreamFrames',Frames),contextlib.redirect_stderr(io.StringIO()) as message:
+                    play_v2.serve(Channel(),None)
+                self.assertNotIn('Broken pipe',message.getvalue())
+                if refusal:self.assertIn('original codec failure',message.getvalue())
+                with self.assertRaises(OSError):os.fstat(fd)
 
 
 if __name__ == '__main__':

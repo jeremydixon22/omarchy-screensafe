@@ -312,7 +312,8 @@ def serve(channel, renderer, delivery='pipe', hardware=None):
     frames=StreamFrames(hardware) if delivery=='pipe' else Frames(hardware);requests=0;failures=0;reported=None
     try:
         while True:
-            data,ancillary,flags,_=channel.recvmsg(REQUEST.size,socket.CMSG_SPACE(4*4),socket.MSG_CMSG_CLOEXEC)
+            try:data,ancillary,flags,_=channel.recvmsg(REQUEST.size,socket.CMSG_SPACE(4*4),socket.MSG_CMSG_CLOEXEC)
+            except ConnectionResetError:break
             descriptors=[]
             try:
                 unexpected=False
@@ -335,7 +336,8 @@ def serve(channel, renderer, delivery='pipe', hardware=None):
                         print(json.dumps({'screensafeVideo':{'decoder':profile}}),file=__import__('sys').stderr,flush=True)
                         reported=profile
                     response=RESPONSE.pack(MAGIC,sequence,target,info['width'],info['height'],info['width']*info['height']*4,0,frames.delivery)
-                    sent=channel.sendmsg([response],[(socket.SOL_SOCKET,socket.SCM_RIGHTS,array.array('i',[fd]))])
+                    try:sent=channel.sendmsg([response],[(socket.SOL_SOCKET,socket.SCM_RIGHTS,array.array('i',[fd]))])
+                    except (BrokenPipeError,ConnectionResetError):break
                 except InterruptedError:
                     raise
                 except (ValueError,OSError) as error:
@@ -344,7 +346,8 @@ def serve(channel, renderer, delivery='pipe', hardware=None):
                         print(json.dumps({'screensafeVideo':{'decoder':'unavailable'}}),file=__import__('sys').stderr,flush=True)
                         reported='unavailable'
                     print('screensafe-video: '+str(error),file=__import__('sys').stderr,flush=True)
-                    sent=channel.send(RESPONSE.pack(MAGIC,sequence,target,0,0,0,1,0))
+                    try:sent=channel.send(RESPONSE.pack(MAGIC,sequence,target,0,0,0,1,0))
+                    except (BrokenPipeError,ConnectionResetError):break
                 if sent!=RESPONSE.size:raise ValueError('short video response')
             finally:
                 for fd in descriptors:os.close(fd)

@@ -21,6 +21,8 @@ MPV's client API version and all-thread execution/socket policy are checked by `
 
 ## Sources, licenses and exact build inputs
 
+Ubuntu build-only ABI inputs use [Canonical's snapshot service](https://ubuntu.com/server/docs/how-to/software/snapshot-service/) at 14 November 2026. Their pinned package versions and SHA-256 values are unchanged; the snapshot avoids interactive/bot-protected archive endpoints. These packages are extracted for rebuilding, never installed or redistributed as the runtime stack.
+
 - ScreenSafe helper source: [`cache/native/`](../cache/native/), MIT under the root license. For distribution, the GPU worker is supplied under [GPL-2.0-or-later](../licenses/native-GPL-2.0.txt), compatible with MPV's default GPL build. System media libraries retain their own licenses and are not redistributed in this repository.
 - Bubblewrap 0.13.1: complete upstream source in [`vendor/bubblewrap-0.13.1/`](../vendor/bubblewrap-0.13.1/), including its [LGPL-2.1 license](../licenses/bubblewrap-LGPL-2.1.txt). Its code is unmodified. The two upstream license symlink aliases (`LICENSE`, `COPYING.LIB`) are identical regular copies of `COPYING` so Omarchy's plugin validator accepts the installation. The release archive SHA-256 is pinned; rebuilding compares every source file and both resolved license aliases to that archive before compilation.
 - Static media launcher: includes musl under its [copyright/license notices](../licenses/musl-COPYRIGHT.txt). Zig runtime support is covered by the [Zig MIT license](../licenses/zig-MIT.txt).
