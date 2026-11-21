@@ -346,7 +346,9 @@ def serve(channel, renderer, delivery='pipe', hardware=None):
                         # Discard old stream/cache/input references before a fresh
                         # cage. No simultaneous decoders, software downgrade or
                         # permission change; its first frame is a sealed snapshot.
+                        retired=frames.decoder
                         frames.close()
+                        if retired is None or retired.proc.poll() is None:raise ValueError('previous decoder did not stop; recovery refused')
                         if time.monotonic()>=recovery_deadline:raise ValueError('video recovery deadline exceeded')
                         fd=frames.frame(descriptors[0],target,recovery_deadline)
                         if frames.delivery!=0:raise ValueError('video recovery did not produce a complete snapshot')

@@ -160,7 +160,7 @@ impl Client {
         } else {
             0
         };
-        self.channel.set_write_timeout(Some(left)).map_err(|e| e.to_string())?;
+        self.channel.set_write_timeout(Some(left.min(Duration::from_secs(2)))).map_err(|e| e.to_string())?;
         self.sequence = self.sequence.wrapping_add(1);
         let request: Vec<u8> = [MAGIC, self.sequence, frame as u32, budget].iter().flat_map(|v| v.to_le_bytes()).collect();
         let rights = [file.as_fd()];
@@ -440,7 +440,7 @@ mod tests {
         let (mut client, peer) = pair();
         client.pipe = true;
         client.recovery_allowed = true;
-        client.pixel_deadline = Duration::from_secs(1);
+        client.pixel_deadline = Duration::from_secs(5);
         let worker = std::thread::spawn(move || {
             let first = request_words(&peer);
             assert_eq!(first[2..], [7, 0]);
@@ -448,7 +448,7 @@ mod tests {
             let retry = request_words(&peer);
             assert_eq!(retry[1], first[1] + 1);
             assert_eq!(retry[2], 7);
-            assert!((1..=1000).contains(&(retry[3] ^ RECOVERY)));
+            assert!((1..=5000).contains(&(retry[3] ^ RECOVERY)));
             snapshot(&peer, retry, "valid");
             let later = request_words(&peer);
             assert_eq!(later[2..], [8, 0]);
@@ -457,6 +457,7 @@ mod tests {
         let input = File::open("/dev/null").unwrap();
         assert_eq!(client.frame(&input, 7, 2, 2, 1).unwrap(), vec![127; 16]);
         assert!(client.recovery_used && !client.failed);
+        assert!(client.channel.write_timeout().unwrap().unwrap() <= Duration::from_secs(2), "the existing write cap must not grow");
         assert_eq!(client.frame(&input, 7, 2, 2, 1).unwrap(), vec![127; 16]);
         let error = client.frame(&input, 8, 2, 2, 1).unwrap_err();
         assert!(error.contains("ended early"));

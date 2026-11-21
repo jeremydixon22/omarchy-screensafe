@@ -8,6 +8,7 @@ from pathlib import Path
 import socket
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -16,7 +17,7 @@ import play_v2
 
 
 class VideoRecoveryTests(unittest.TestCase):
-    def exercise(self, requests, hardware=True, delivery='pipe', close_delay=0, cancel=False, recovery_delay=0):
+    def exercise(self, requests, hardware=True, delivery='pipe', close_delay=0, cancel=False, recovery_delay=0, stuck=False):
         """Use real received-FD ownership, but no codecs/devices in unit tests."""
         with tempfile.TemporaryDirectory() as directory:
             files=[]
@@ -41,6 +42,7 @@ class VideoRecoveryTests(unittest.TestCase):
                 def __init__(self,actual):
                     if actual is not authority:raise AssertionError('hardware authority changed')
                     self.closes=0
+                    self.decoder=SimpleNamespace(proc=SimpleNamespace(poll=lambda:None if stuck else 0))
                 def frame(self,fd,target,deadline=None):
                     calls.append(('frame',target,deadline))
                     self.starts+=1
@@ -116,6 +118,14 @@ class VideoRecoveryTests(unittest.TestCase):
         self.assertIsNone(r['error'])
         self.assertEqual(r['stats']['decoderStarts'],1)
         self.assertEqual(r['stats']['failures'],1)
+        self.assertEqual(r['replies'][-1][6],1)
+
+    def test_a_decoder_that_survives_bounded_cleanup_prevents_any_replacement(self):
+        r=self.exercise([(7,0,0),(7,play_v2.RECOVERY|5000,0)],stuck=True)
+        self.assertIsNone(r['error'])
+        self.assertEqual(r['stats']['decoderStarts'],1)
+        self.assertEqual(r['stats']['failures'],1)
+        self.assertIn('previous decoder did not stop; recovery refused',r['stderr'])
         self.assertEqual(r['replies'][-1][6],1)
 
 
