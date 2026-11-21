@@ -44,14 +44,14 @@ class DiagnosticsTests(unittest.TestCase):
     def test_actual_cli_writes_private_records_and_extracts_only_known_counters(self):
         output = 'screensafe: video frame 41 failed: SSVv2 pixel stream ended early\n'
         output += '{"screensafeVideo":{"decoder":"hardware"}}\n'
-        output += '{"ssv2":{"requests":42,"failures":0,"decodedFrames":41,"unknown":"secret"}}\n'
+        output += '{"ssv2":{"requests":42,"failures":0,"decodedFrames":41,"recoveryAttempts":1,"unknown":"secret"}}\n'
         p = self.cli(event(head=output, tail=output))
         self.assertEqual(p.returncode, 0, p.stderr)
         self.assertEqual(json.loads(p.stdout), {'ok':True})
         r = json.loads((self.logs/'events.jsonl').read_text())
         self.assertEqual(r['pack'], 'builtin:videos')
         self.assertEqual(r['decoder'], 'hardware')
-        self.assertEqual(r['videoCounters'], {'requests':42,'failures':0,'decodedFrames':41})
+        self.assertEqual(r['videoCounters'], {'requests':42,'failures':0,'decodedFrames':41,'recoveryAttempts':1})
         self.assertIn('pixel stream ended early', r['stderrHead'])
         self.assertEqual(stat.S_IMODE(self.logs.stat().st_mode), 0o700)
         for p in self.logs.iterdir():

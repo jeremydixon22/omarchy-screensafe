@@ -30,6 +30,7 @@ RESPONSE = struct.Struct('<8I')
 SEALS = fcntl.F_SEAL_SEAL | fcntl.F_SEAL_WRITE | fcntl.F_SEAL_GROW | fcntl.F_SEAL_SHRINK
 CACHE_FRAMES = 12
 FRAME_DEADLINE = 5
+RECOVERY = 0x80000000
 DEFAULT_VIDEOS = Path(__file__).resolve().parents[2] / 'packs/videos/examples'
 LIBRARY_SCAN_LIMIT = 4096
 
@@ -277,7 +278,8 @@ class StreamFrames(Frames):
     Only skipped neighboring frames need snapshots. A renderer-side raw cache
     covers already delivered frames and variations in crop/tone.
     """
-    def frame(self,fd,target):
+    def frame(self,fd,target,deadline=None):
+        deadline=min(time.monotonic()+FRAME_DEADLINE,deadline) if deadline is not None else time.monotonic()+FRAME_DEADLINE
         identity=self.activate(fd,target)
         for index in list(self.cache):
             distance=min((target-index)%self.info['frames'],(index-target)%self.info['frames'])
@@ -295,11 +297,10 @@ class StreamFrames(Frames):
             if self.hardware is not None:
                 # Establish actual hardware output before returning a stream.
                 # Startup failure is a normal refusal, not a partial pixel reply.
-                pixels=self.decoder.read(time.monotonic()+FRAME_DEADLINE);self.decodes+=1
+                pixels=self.decoder.read(deadline);self.decodes+=1
                 if stamp(self.fd)!=identity:raise ValueError('compressed video changed during startup')
                 self.remember(target,pixels);self.delivery=0
                 return self.cache[target]
-        deadline=time.monotonic()+FRAME_DEADLINE
         while self.decoder.next<target:
             index=self.decoder.next;pixels=self.decoder.read(deadline);self.decodes+=1
             if target-index<=8:self.remember(index,pixels)
@@ -310,6 +311,7 @@ class StreamFrames(Frames):
 
 def serve(channel, renderer, delivery='pipe', hardware=None):
     frames=StreamFrames(hardware) if delivery=='pipe' else Frames(hardware);requests=0;failures=0;reported=None
+    recovery_attempts=0;last_stream=None
     try:
         while True:
             try:data,ancillary,flags,_=channel.recvmsg(REQUEST.size,socket.CMSG_SPACE(4*4),socket.MSG_CMSG_CLOEXEC)
@@ -326,11 +328,31 @@ def serve(channel, renderer, delivery='pipe', hardware=None):
                 if unexpected or flags&(socket.MSG_TRUNC|socket.MSG_CTRUNC) or len(data)!=REQUEST.size or len(descriptors)!=1:
                     raise ValueError('invalid video request')
                 magic,sequence,target,reserved=REQUEST.unpack(data)
-                if magic!=MAGIC or reserved or target>=ssv2.MAX_FRAMES:
+                if magic!=MAGIC or target>=ssv2.MAX_FRAMES:
                     raise ValueError('invalid bounded video request')
+                recovery_deadline=None;request_deadline=time.monotonic()+FRAME_DEADLINE
+                previous_stream,last_stream=last_stream,None
+                if reserved:
+                    budget=reserved^RECOVERY
+                    if (not 1<=budget<=FRAME_DEADLINE*1000 or hardware is None or delivery!='pipe'
+                            or recovery_attempts or previous_stream is None or previous_stream[:2]!=(stamp(descriptors[0]),target)):
+                        raise ValueError('invalid bounded video recovery request')
+                    recovery_deadline=min(time.monotonic()+budget/1000,previous_stream[2])
+                    recovery_attempts+=1
+                    print(f'screensafe-video: one fresh confined hardware decoder attempt for frame {target}',file=__import__('sys').stderr,flush=True)
                 requests+=1
                 try:
-                    fd=frames.frame(descriptors[0],target);info=frames.info
+                    if recovery_deadline is not None:
+                        # Discard old stream/cache/input references before a fresh
+                        # cage. No simultaneous decoders, software downgrade or
+                        # permission change; its first frame is a sealed snapshot.
+                        frames.close()
+                        if time.monotonic()>=recovery_deadline:raise ValueError('video recovery deadline exceeded')
+                        fd=frames.frame(descriptors[0],target,recovery_deadline)
+                        if frames.delivery!=0:raise ValueError('video recovery did not produce a complete snapshot')
+                        if time.monotonic()>=recovery_deadline:raise ValueError('video recovery deadline exceeded')
+                    else:fd=frames.frame(descriptors[0],target)
+                    info=frames.info
                     profile='software' if hardware is None else 'hardware'
                     if profile!=reported:
                         print(json.dumps({'screensafeVideo':{'decoder':profile}}),file=__import__('sys').stderr,flush=True)
@@ -338,6 +360,7 @@ def serve(channel, renderer, delivery='pipe', hardware=None):
                     response=RESPONSE.pack(MAGIC,sequence,target,info['width'],info['height'],info['width']*info['height']*4,0,frames.delivery)
                     try:sent=channel.sendmsg([response],[(socket.SOL_SOCKET,socket.SCM_RIGHTS,array.array('i',[fd]))])
                     except (BrokenPipeError,ConnectionResetError):break
+                    if frames.delivery==1:last_stream=(stamp(descriptors[0]),target,request_deadline)
                 except InterruptedError:
                     raise
                 except (ValueError,OSError) as error:
@@ -353,7 +376,7 @@ def serve(channel, renderer, delivery='pipe', hardware=None):
                 for fd in descriptors:os.close(fd)
     finally:
         stats={'requests':requests,'failures':failures,'decoderStarts':frames.starts,'decodedFrames':frames.decodes,'cacheHits':frames.hits,
-            'decoderProfile':'software' if hardware is None else 'vaapi-required'}
+            'decoderProfile':'software' if hardware is None else 'vaapi-required','recoveryAttempts':recovery_attempts}
         frames.close();print(json.dumps({'ssv2':stats}),file=__import__('sys').stderr,flush=True)
 
 
@@ -366,6 +389,8 @@ def launch(renderer, command, delivery, hardware):
     try:
         env=dict(os.environ,SCREENSAFE_SSV2_WORKER='1',SCREENSAFE_SSV2_PIPE='1' if delivery=='pipe' else '0')
         env.pop('SCREENSAFE_CONTROL_INPUT_FD',None)
+        env.pop('SCREENSAFE_SSV2_RECOVERY',None)
+        if hardware is not None and delivery=='pipe':env['SCREENSAFE_SSV2_RECOVERY']='1'
         if command[0] in ['run','preview']:
             control_input=os.dup(0)
             kind=os.fstat(control_input).st_mode

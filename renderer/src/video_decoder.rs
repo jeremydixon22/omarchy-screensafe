@@ -13,6 +13,9 @@ use std::time::Duration;
 use std::time::Instant;
 
 const MAGIC: u32 = 0x32565353;
+// A recovery request retains the same input descriptor/frame and carries only
+// its remaining time budget. All other previously-reserved values stay invalid.
+const RECOVERY: u32 = 0x8000_0000;
 static CLIENT: OnceLock<Mutex<Client>> = OnceLock::new();
 static CONTROL_INPUT: OnceLock<File> = OnceLock::new();
 
@@ -56,6 +59,9 @@ struct Client {
     failed: bool,
     failure_reason: Option<String>,
     pipe: bool,
+    recovery_allowed: bool,
+    recovery_used: bool,
+    short_stream: bool,
     cache: VecDeque<(u64, u16, Vec<u8>)>,
     pixel_deadline: Duration,
 }
@@ -85,6 +91,9 @@ pub fn initialize() -> Result<(), String> {
             failed: false,
             failure_reason: None,
             pipe,
+            recovery_allowed: pipe && std::env::var("SCREENSAFE_SSV2_RECOVERY").as_deref() == Ok("1"),
+            recovery_used: false,
+            short_stream: false,
             cache: VecDeque::new(),
             pixel_deadline: Duration::from_secs(5),
         }))
@@ -105,7 +114,21 @@ impl Client {
         if let Some(error) = &self.failure_reason {
             return Err(error.clone());
         }
-        let result = self.request(file, frame, width, height, identity);
+        let deadline = Instant::now() + self.pixel_deadline;
+        self.short_stream = false;
+        let mut result = self.request(file, frame, width, height, identity, deadline, false);
+        if self.short_stream && self.recovery_allowed && !self.recovery_used {
+            self.recovery_used = true;
+            let first = result.as_ref().err().cloned().unwrap_or_else(|| "pixel stream ended early".into());
+            result = self.request(file, frame, width, height, identity, deadline, true);
+            match &result {
+                Ok(_) => tell!("screensafe: video frame {frame} recovered with a fresh confined hardware decoder"),
+                Err(error) => {
+                    self.failed = true;
+                    result = Err(format!("{first}; one decoder recovery failed: {}", error.chars().take(300).collect::<String>()));
+                }
+            }
+        }
         if self.failed {
             let cause = result.as_ref().err().map(String::as_str).unwrap_or("decoder transport failed");
             let error = format!("SSVv2 frame {frame}: {}", cause.chars().take(500).collect::<String>());
@@ -115,7 +138,8 @@ impl Client {
         result
     }
 
-    fn request(&mut self, file: &File, frame: u16, width: u32, height: u32, identity: u64) -> Result<Vec<u8>, String> {
+    #[allow(clippy::too_many_arguments)]
+    fn request(&mut self, file: &File, frame: u16, width: u32, height: u32, identity: u64, deadline: Instant, recovery: bool) -> Result<Vec<u8>, String> {
         use rustix::net::{
             recvmsg, sendmsg, RecvAncillaryBuffer, RecvAncillaryMessage, RecvFlags, ReturnFlags, SendAncillaryBuffer, SendAncillaryMessage, SendFlags,
         };
@@ -126,8 +150,19 @@ impl Client {
             return Ok(owned);
         }
         self.failed = true;
+        let left = remaining(deadline)?;
+        let budget = if recovery {
+            let millis = left.as_millis().min(5000) as u32;
+            if millis == 0 {
+                return Err("SSVv2 frame deadline exceeded before recovery".into());
+            }
+            RECOVERY | millis
+        } else {
+            0
+        };
+        self.channel.set_write_timeout(Some(left)).map_err(|e| e.to_string())?;
         self.sequence = self.sequence.wrapping_add(1);
-        let request: Vec<u8> = [MAGIC, self.sequence, frame as u32, 0].iter().flat_map(|v| v.to_le_bytes()).collect();
+        let request: Vec<u8> = [MAGIC, self.sequence, frame as u32, budget].iter().flat_map(|v| v.to_le_bytes()).collect();
         let rights = [file.as_fd()];
         let mut space = [MaybeUninit::uninit(); rustix::cmsg_space!(ScmRights(1))];
         let mut control = SendAncillaryBuffer::new(&mut space);
@@ -141,6 +176,7 @@ impl Client {
         let mut response = [0u8; 32];
         let mut space = [MaybeUninit::uninit(); rustix::cmsg_space!(ScmRights(4))];
         let mut control = RecvAncillaryBuffer::new(&mut space);
+        self.channel.set_read_timeout(Some(remaining(deadline)?)).map_err(|e| e.to_string())?;
         let received =
             recvmsg(&self.channel, &mut [std::io::IoSliceMut::new(&mut response)], &mut control, RecvFlags::CMSG_CLOEXEC).map_err(|e| e.to_string())?;
         let mut descriptors = Vec::new();
@@ -168,6 +204,9 @@ impl Client {
         if words[3..6] != [width, height, size] || descriptors.len() != 1 || size > 1280 * 720 * 4 {
             return Err("SSVv2 pixel dimensions/descriptor count changed".into());
         }
+        if recovery && words[7] != 0 {
+            return Err("SSVv2 recovery must return a sealed snapshot".into());
+        }
         let fd = descriptors.pop().unwrap();
         let mut owned = vec![0; size as usize];
         if words[7] == 0 {
@@ -185,19 +224,22 @@ impl Client {
                 return Err("SSVv2 pixel stream is not a private Unix stream".into());
             }
             let mut stream = UnixStream::from(fd);
-            let deadline = Instant::now() + self.pixel_deadline;
             let mut at = 0;
             while at < owned.len() {
-                let left = deadline.checked_duration_since(Instant::now()).ok_or("SSVv2 pixel deadline exceeded")?;
+                let left = remaining(deadline)?;
                 stream.set_read_timeout(Some(left)).map_err(|e| e.to_string())?;
                 match stream.read(&mut owned[at..]) {
-                    Ok(0) => return Err("SSVv2 pixel stream ended early".into()),
+                    Ok(0) => {
+                        self.short_stream = true;
+                        return Err("SSVv2 pixel stream ended early".into());
+                    }
                     Ok(n) => at += n,
                     Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
                     Err(e) => return Err(format!("SSVv2 pixel stream failed: {e}")),
                 }
             }
         }
+        remaining(deadline)?;
         if self.pipe {
             self.cache.push_back((identity, frame, owned.clone()));
             while self.cache.len() > 12 {
@@ -207,6 +249,10 @@ impl Client {
         self.failed = false;
         Ok(owned)
     }
+}
+
+fn remaining(deadline: Instant) -> Result<Duration, String> {
+    deadline.checked_duration_since(Instant::now()).filter(|left| !left.is_zero()).ok_or_else(|| "SSVv2 frame deadline exceeded".into())
 }
 
 #[cfg(test)]
@@ -242,6 +288,9 @@ mod tests {
                 failed: false,
                 failure_reason: None,
                 pipe: false,
+                recovery_allowed: false,
+                recovery_used: false,
+                short_stream: false,
                 cache: VecDeque::new(),
                 pixel_deadline: Duration::from_millis(50),
             },
@@ -300,6 +349,7 @@ mod tests {
         for partial in [false, true] {
             let (mut client, peer) = pair();
             client.pipe = true;
+            client.recovery_allowed = true;
             let worker = std::thread::spawn(move || {
                 let mut request = [0; 16];
                 (&peer).read_exact(&mut request).unwrap();
@@ -323,6 +373,7 @@ mod tests {
             let result = client.frame(&source, 7, 2, 2, 99);
             assert_eq!(result.is_err(), partial);
             if partial {
+                assert!(!client.recovery_used, "a timed-out stream must not be retried");
                 let error = result.as_ref().unwrap_err().clone();
                 let sequence = client.sequence;
                 assert_eq!(client.frame(&source, 8, 2, 2, 99).unwrap_err(), error, "prefetch fallout must retain the original failure");
@@ -335,6 +386,139 @@ mod tests {
             }
             worker.join().unwrap();
         }
+    }
+
+    fn request_words(mut peer: &UnixStream) -> [u32; 4] {
+        peer.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+        let mut bytes = [0; 16];
+        peer.read_exact(&mut bytes).unwrap();
+        std::array::from_fn(|i| u32::from_le_bytes(bytes[i * 4..i * 4 + 4].try_into().unwrap()))
+    }
+
+    fn packet(peer: &UnixStream, words: [u32; 8], fd: Option<std::os::fd::BorrowedFd<'_>>) {
+        use rustix::net::{sendmsg, SendAncillaryBuffer, SendAncillaryMessage, SendFlags};
+        let bytes: Vec<u8> = words.iter().flat_map(|v| v.to_le_bytes()).collect();
+        let mut space = [MaybeUninit::uninit(); rustix::cmsg_space!(ScmRights(1))];
+        let mut control = SendAncillaryBuffer::new(&mut space);
+        let rights: Vec<_> = fd.into_iter().collect();
+        if !rights.is_empty() {
+            assert!(control.push(SendAncillaryMessage::ScmRights(&rights)));
+        }
+        sendmsg(peer, &[std::io::IoSlice::new(&bytes)], &mut control, SendFlags::NOSIGNAL).unwrap();
+    }
+
+    fn truncated(peer: &UnixStream, request: [u32; 4], delay: Duration) {
+        let (reader, mut writer) = UnixStream::pair().unwrap();
+        packet(peer, [MAGIC, request[1], request[2], 2, 2, 16, 0, 1], Some(reader.as_fd()));
+        writer.write_all(&[33; 8]).unwrap();
+        std::thread::sleep(delay);
+    }
+
+    fn snapshot(peer: &UnixStream, request: [u32; 4], case: &str) {
+        let fd = rustix::fs::memfd_create("recovery-test", rustix::fs::MemfdFlags::CLOEXEC | rustix::fs::MemfdFlags::ALLOW_SEALING).unwrap();
+        let mut pixels = File::from(fd);
+        pixels.write_all(&[127; 16]).unwrap();
+        if case != "unsealed" {
+            rustix::fs::fcntl_add_seals(
+                &pixels,
+                rustix::fs::SealFlags::WRITE | rustix::fs::SealFlags::GROW | rustix::fs::SealFlags::SHRINK | rustix::fs::SealFlags::SEAL,
+            )
+            .unwrap();
+        }
+        let mut words = [MAGIC, request[1], request[2], 2, 2, 16, 0, 0];
+        match case {
+            "sequence" => words[1] += 1,
+            "stream" => words[7] = 1,
+            "refusal" => words[3..7].copy_from_slice(&[0, 0, 0, 1]),
+            _ => (),
+        }
+        packet(peer, words, if case == "refusal" { None } else { Some(pixels.as_fd()) });
+    }
+
+    #[test]
+    fn hardware_recovers_one_short_stream_only_and_never_caches_partial_pixels() {
+        let (mut client, peer) = pair();
+        client.pipe = true;
+        client.recovery_allowed = true;
+        client.pixel_deadline = Duration::from_secs(1);
+        let worker = std::thread::spawn(move || {
+            let first = request_words(&peer);
+            assert_eq!(first[2..], [7, 0]);
+            truncated(&peer, first, Duration::ZERO);
+            let retry = request_words(&peer);
+            assert_eq!(retry[1], first[1] + 1);
+            assert_eq!(retry[2], 7);
+            assert!((1..=1000).contains(&(retry[3] ^ RECOVERY)));
+            snapshot(&peer, retry, "valid");
+            let later = request_words(&peer);
+            assert_eq!(later[2..], [8, 0]);
+            truncated(&peer, later, Duration::ZERO);
+        });
+        let input = File::open("/dev/null").unwrap();
+        assert_eq!(client.frame(&input, 7, 2, 2, 1).unwrap(), vec![127; 16]);
+        assert!(client.recovery_used && !client.failed);
+        assert_eq!(client.frame(&input, 7, 2, 2, 1).unwrap(), vec![127; 16]);
+        let error = client.frame(&input, 8, 2, 2, 1).unwrap_err();
+        assert!(error.contains("ended early"));
+        assert_eq!(client.sequence, 3, "the session allowance cannot reset on the next frame");
+        assert_eq!(client.frame(&input, 9, 2, 2, 1).unwrap_err(), error);
+        assert_eq!(client.sequence, 3, "the original cause stays sticky after the second failure");
+        worker.join().unwrap();
+    }
+
+    #[test]
+    fn software_short_streams_cannot_enable_recovery() {
+        let (mut client, peer) = pair();
+        client.pipe = true;
+        let worker = std::thread::spawn(move || truncated(&peer, request_words(&peer), Duration::ZERO));
+        let input = File::open("/dev/null").unwrap();
+        assert!(client.frame(&input, 7, 2, 2, 1).unwrap_err().contains("pixel stream ended early"));
+        assert!(client.failed && !client.recovery_used && client.cache.is_empty());
+        assert_eq!(client.sequence, 1);
+        worker.join().unwrap();
+    }
+
+    #[test]
+    fn recovery_requires_a_valid_sealed_snapshot_and_preserves_the_first_cause() {
+        for case in ["unsealed", "sequence", "stream", "refusal"] {
+            let (mut client, peer) = pair();
+            client.pipe = true;
+            client.recovery_allowed = true;
+            client.pixel_deadline = Duration::from_secs(1);
+            let worker = std::thread::spawn(move || {
+                let first = request_words(&peer);
+                truncated(&peer, first, Duration::ZERO);
+                snapshot(&peer, request_words(&peer), case);
+            });
+            let input = File::open("/dev/null").unwrap();
+            let error = client.frame(&input, 7, 2, 2, 1).unwrap_err();
+            assert!(error.contains("pixel stream ended early; one decoder recovery failed:"), "{case}: {error}");
+            assert!(client.failed && client.cache.is_empty());
+            assert_eq!(client.frame(&input, 8, 2, 2, 1).unwrap_err(), error);
+            assert_eq!(client.sequence, 2, "{case}");
+            worker.join().unwrap();
+        }
+    }
+
+    #[test]
+    fn recovery_and_original_delivery_share_one_end_to_end_deadline() {
+        let (mut client, peer) = pair();
+        client.pipe = true;
+        client.recovery_allowed = true;
+        client.pixel_deadline = Duration::from_millis(800);
+        let worker = std::thread::spawn(move || {
+            let first = request_words(&peer);
+            truncated(&peer, first, Duration::from_millis(500));
+            let retry = request_words(&peer);
+            assert!((1..=350).contains(&(retry[3] ^ RECOVERY)), "only the remaining budget may cross the channel");
+            std::thread::sleep(Duration::from_millis(500));
+            snapshot(&peer, retry, "valid");
+        });
+        let input = File::open("/dev/null").unwrap();
+        let error = client.frame(&input, 7, 2, 2, 1).unwrap_err();
+        assert!(error.contains("pixel stream ended early; one decoder recovery failed:"));
+        assert!(client.cache.is_empty(), "a late complete response still cannot become pixels");
+        worker.join().unwrap();
     }
 
     #[test]
@@ -359,6 +543,7 @@ mod tests {
         ] {
             let (mut client, peer) = pair();
             client.pipe = true;
+            client.recovery_allowed = true;
             let worker = std::thread::spawn(move || {
                 let mut request = [0; 16];
                 (&peer).read_exact(&mut request).unwrap();
@@ -419,6 +604,8 @@ mod tests {
             assert!(client.frame(&source, 7, 2, 2, 100).is_err(), "{case}");
             assert!(client.failed, "{case}");
             assert!(client.cache.is_empty(), "{case}");
+            assert!(!client.recovery_used, "hostile metadata must never trigger recovery: {case}");
+            assert_eq!(client.sequence, 1, "{case}");
             worker.join().unwrap();
         }
     }

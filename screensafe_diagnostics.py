@@ -78,7 +78,7 @@ def record(data):
             if decoder in ('hardware', 'software', 'unavailable'):
                 result['decoder'] = decoder
             stats = value.get('ssv2', {})
-            counters = {k:v for k,v in stats.items() if k in ('requests','failures','decoderStarts','decodedFrames','cacheHits') and type(v) is int and 0 <= v <= 2**53}
+            counters = {k:v for k,v in stats.items() if k in ('requests','failures','decoderStarts','decodedFrames','cacheHits','recoveryAttempts') and type(v) is int and 0 <= v <= 2**53}
             if counters:
                 result['videoCounters'] = counters
         except (ValueError, TypeError, AttributeError):

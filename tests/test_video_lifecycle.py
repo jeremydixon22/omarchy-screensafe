@@ -52,6 +52,12 @@ class VideoLifecycleTests(unittest.TestCase):
                 self.assertLess(seconds, 1)
                 self.assertNotIn('disconnected before renderer exit', p.stderr)
 
+    def test_software_launch_clears_inherited_hardware_recovery_authority(self):
+        with patch.dict(os.environ,{'SCREENSAFE_SSV2_RECOVERY':'1'}):
+            p,_=self.broker("print(os.environ.get('SCREENSAFE_SSV2_RECOVERY','absent'),flush=True)\n")
+        self.assertEqual(p.returncode,0,p.stderr)
+        self.assertEqual(p.stdout.strip(),'absent')
+
     def test_direct_decoder_stderr_and_natural_exit_status_survive_cleanup(self):
         decoder = play_v2.Decoder.__new__(play_v2.Decoder)
         decoder.proc = subprocess.Popen([sys.executable,'-c',"import sys;print('driver decode fault',file=sys.stderr);sys.exit(7)"],
